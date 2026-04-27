@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: omnibioai-model-registry
-Version: 0.1.1
+Version: 0.1.2
 Summary: Production-grade model registry for the OmniBioAI ecosystem.
 Author: Manish Kumar
 License: MIT
@@ -13,16 +13,24 @@ Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
 Classifier: Operating System :: OS Independent
 Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
 Classifier: Topic :: Scientific/Engineering :: Bio-Informatics
 Classifier: Topic :: Software Development :: Libraries
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.110
+Requires-Dist: uvicorn[standard]>=0.27
+Requires-Dist: pydantic>=2.6
+Requires-Dist: pydantic-settings>=2.2
+Requires-Dist: PyYAML>=6.0.1
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: boto3>=1.34.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.0; extra == "dev"
-Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: black==26.3.1; extra == "dev"
 Requires-Dist: ruff>=0.1.0; extra == "dev"
 Requires-Dist: mypy>=1.0; extra == "dev"
 
@@ -39,7 +47,7 @@ It provides:
 - **Deterministic resolution by stable reference** (`model@alias` or `model@version`)
 - **Local-first design** with a clean path to future backends (S3/Azure/on-prem)
 
-The registry is implemented as a **standalone Python library** and includes:
+iThe registry is implemented as a **standalone Python library** and includes:
 - a **CLI** (`omr`)
 - a **minimal REST service** (FastAPI)
 

@@ -23,4 +23,4 @@ omnibioai_model_registry/service/app/main.py
 omnibioai_model_registry/storage/__init__.py
 omnibioai_model_registry/storage/base.py
 omnibioai_model_registry/storage/localfs.py
-tests/test_registry_localfs.py
+tests/test_model_registry.py

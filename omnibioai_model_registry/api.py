@@ -25,7 +25,6 @@ class ModelRegistry:
     def from_env(cls) -> "ModelRegistry":
         cfg = load_config()
         if cfg.backend != "localfs":
-            # keep strict for v1, add other backends later
             raise ValueError(
                 f"Unsupported backend '{cfg.backend}' (v1 supports only localfs)."
             )
@@ -51,19 +50,11 @@ class ModelRegistry:
         actor: Optional[str] = None,
         reason: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Production-grade behaviors (v1):
-          - version immutability (no overwrite)
-          - validates required files
-          - writes model_meta.json + sha256sums.txt
-          - optionally updates alias + audit log
-        """
+
         artifacts_dir = Path(artifacts_dir).resolve()
         if not artifacts_dir.exists():
             raise ValidationError(f"artifacts_dir does not exist: {artifacts_dir}")
 
-        # must include required artifacts except model_meta/manifest which we write here if missing
-        # allow artifacts_dir to already contain them; we still recompute manifest after copy
         self._ensure_model_dirs(task, model_name)
 
         dst = L.version_dir(self.root, task, model_name, version)
@@ -72,28 +63,38 @@ class ModelRegistry:
                 f"Model version already exists: {task}/{model_name}/{version}"
             )
 
-        # Copy into immutable destination
         self.backend.copy_tree(artifacts_dir, dst)
 
-        # Write/overwrite metadata in destination (source of truth)
+        # ------------------------------------------------------
+        # ✅ MINIMAL CHANGE: add MLflow-style lineage metadata
+        # ------------------------------------------------------
         meta = dict(metadata)
         meta.setdefault("task", task)
         meta.setdefault("model_name", model_name)
         meta.setdefault("version", version)
         meta.setdefault("created_at", now_utc_iso())
+
+        meta.setdefault(
+            "lineage",
+            {
+                "dataset": metadata.get("dataset"),
+                "run_id": metadata.get("run_id"),
+                "metrics": metadata.get("metrics", {}),
+                "parent_version": metadata.get("parent_version"),
+            },
+        )
+        # ------------------------------------------------------
+
         self.backend.atomic_write_text(
             dst / "model_meta.json", json.dumps(meta, indent=2) + "\n"
         )
 
-        # Validate required files exist (after copy + meta write)
         validate_package_files(dst)
 
-        # Write sha256 manifest for required files
         hashes = write_sha256_manifest(
             dst, dst / "sha256sums.txt", include_files=L.REQUIRED_FILES
         )
 
-        # Optionally set alias (latest/staging/production)
         if set_alias:
             self.promote_model(
                 task,
@@ -115,15 +116,9 @@ class ModelRegistry:
         }
 
     def resolve_model(self, task: str, model_ref: str, verify: bool = True) -> Path:
-        """
-        model_ref: "<model_name>@<alias_or_version>"
-        - If selector matches an alias file, resolves to its version.
-        - Else assumes selector is a version directory.
-        """
         ref = parse_model_ref(model_ref)
         self._ensure_model_dirs(task, ref.model_name)
 
-        # Check alias first
         alias_file = L.alias_path(self.root, task, ref.model_name, ref.selector)
         if alias_file.exists():
             data = json.loads(alias_file.read_text())
@@ -152,10 +147,9 @@ class ModelRegistry:
         actor: Optional[str] = None,
         reason: Optional[str] = None,
     ) -> None:
-        """
-        Updates aliases/<alias>.json and appends an audit log event.
-        """
+
         self._ensure_model_dirs(task, model_name)
+
         vdir = L.version_dir(self.root, task, model_name, version)
         if not vdir.exists():
             raise ModelNotFound(
@@ -171,6 +165,7 @@ class ModelRegistry:
             "actor": actor,
             "reason": reason,
         }
+
         self.backend.atomic_write_text(
             L.alias_path(self.root, task, model_name, alias),
             json.dumps(payload, indent=2) + "\n",
@@ -185,14 +180,18 @@ class ModelRegistry:
             reason=reason,
             ts_utc=payload["updated_at"],
         )
-        append_promotion_event(L.promotions_log_path(self.root, task, model_name), ev)
+
+        append_promotion_event(
+            L.promotions_log_path(self.root, task, model_name), ev
+        )
 
     def verify_model_ref(self, task: str, model_ref: str) -> None:
         _ = self.resolve_model(task, model_ref, verify=True)
 
 
-# Convenience module-level functions (easy for plugins to call)
-
+# -------------------------
+# Convenience functions
+# -------------------------
 
 def _default_registry() -> ModelRegistry:
     return ModelRegistry.from_env()
