@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import ReactFlow, { Background, Controls } from "reactflow";
 import type { Node, Edge } from "reactflow";
 
@@ -84,7 +84,7 @@ function buildGraph(model: Model) {
     data: { label: `📦 ${model.model_name}` },
     position: { x: 0, y: 0 },
     style: {
-      background: "#1f2937",
+      background: "#2563eb",
       color: "#fff",
       padding: 10,
       borderRadius: 8,
