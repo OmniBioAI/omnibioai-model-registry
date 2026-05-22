@@ -227,7 +227,7 @@ function fieldInputStyle(hasError: boolean): CSSProperties {
 const overlayStyle: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(15,23,42,0.35)",
+  background: "rgba(0,0,0,0.65)",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
@@ -243,7 +243,7 @@ const modalStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
-  boxShadow: "0 12px 40px rgba(15,23,42,0.12)",
+  boxShadow: "0 12px 48px rgba(0,0,0,0.55)",
 };
 
 const modalHeaderStyle: CSSProperties = {

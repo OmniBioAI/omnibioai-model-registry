@@ -60,7 +60,7 @@ export default function ModelLineageView({ model }: { model: Model }) {
   );
 
   return (
-    <div style={{ height: 500, border: "1px solid #ddd", marginTop: 10 }}>
+    <div style={{ height: 500, border: "1px solid #2a2d3e", borderRadius: 8, marginTop: 10, background: "#0f1117" }}>
       <ReactFlow nodes={layoutNodes} edges={graph.edges} fitView>
         <Background />
         <Controls />
@@ -84,10 +84,11 @@ function buildGraph(model: Model) {
     data: { label: `📦 ${model.model_name}` },
     position: { x: 0, y: 0 },
     style: {
-      background: "#2563eb",
+      background: "#0094ff",
       color: "#fff",
       padding: 10,
       borderRadius: 8,
+      border: "1px solid rgba(0,148,255,0.4)",
     },
   });
 
@@ -103,9 +104,11 @@ function buildGraph(model: Model) {
     },
     position: { x: 0, y: 0 },
     style: {
-      background: "#f3f4f6",
+      background: "#1a1d2e",
+      color: "#ffffff",
       padding: 10,
       borderRadius: 8,
+      border: "1px solid #2a2d3e",
       whiteSpace: "pre-wrap",
       fontSize: 12,
     },
@@ -128,9 +131,11 @@ function buildGraph(model: Model) {
       data: { label: `🧬 ${model.lineage.dataset}` },
       position: { x: 0, y: 0 },
       style: {
-        background: "#ecfeff",
+        background: "rgba(0, 229, 160, 0.12)",
+        color: "#00e5a0",
         padding: 10,
         borderRadius: 8,
+        border: "1px solid rgba(0, 229, 160, 0.3)",
       },
     });
 
@@ -154,9 +159,11 @@ function buildGraph(model: Model) {
       },
       position: { x: 0, y: 0 },
       style: {
-        background: "#fef3c7",
+        background: "rgba(251, 191, 36, 0.12)",
+        color: "#fbbf24",
         padding: 10,
         borderRadius: 8,
+        border: "1px solid rgba(251, 191, 36, 0.3)",
         fontSize: 12,
       },
     });

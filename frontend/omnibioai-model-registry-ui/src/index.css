@@ -1,39 +1,49 @@
+/* OmniBioAI Design Tokens v1.0 — Phase 2 migration */
 :root {
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  font-size: 14px;
+  --font-sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 13px;
   line-height: 1.5;
-  color-scheme: light;
+  color-scheme: dark;
 
-  /* OmniBioAI light theme tokens */
-  --bg:    #ffffff;
-  --bg2:   #f8fafc;
-  --bg3:   #f1f5f9;
-  --bg4:   rgba(15,23,42,0.04);
-  --border:  rgba(15,23,42,0.10);
-  --border2: rgba(15,23,42,0.18);
-  --text:  #0f172a;
-  --text2: #64748b;
-  --text3: #94a3b8;
-  --teal:      #2563eb;
-  --teal-dim:  rgba(37,99,235,0.08);
-  --teal-dim2: rgba(37,99,235,0.14);
-  --r:  10px;
-  --rl: 16px;
-  --red:   #dc2626;
-  --amber: #d97706;
-  --green: #16a34a;
+  /* OmniBioAI dark theme tokens */
+  --bg:    #0f1117;
+  --bg2:   #1a1d2e;
+  --bg3:   #1f2236;
+  --bg4:   rgba(0, 229, 160, 0.07);
+  --border:  #2a2d3e;
+  --border2: #353850;
+  --text:  #ffffff;
+  --color-text-muted: #6b7280;
+  --text3: #4b5563;
+  --teal:      #00e5a0;
+  --teal-dim:  rgba(0, 229, 160, 0.12);
+  --teal-dim2: rgba(0, 229, 160, 0.22);
+  --blue:      #0094ff;
+  --blue-dim:  rgba(0, 148, 255, 0.12);
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --color-accent:  #00e5a0;
+  --color-danger:  #ef4444;
+  --color-warning: #f59e0b;
+  --green: #34d399;
 
-  /* Aliases so existing component references resolve correctly */
+  /* Aliases — backward compatibility */
   --surface:    var(--bg2);
   --surface-2:  var(--bg3);
   --accent:     var(--teal);
   --accent-bg:  var(--teal-dim);
-  --text-muted: var(--text2);
-  --radius:     var(--r);
-  --green-bg:   rgba(22, 163, 74, 0.10);
-  --red-bg:     rgba(220, 38, 38, 0.10);
-  --yellow:     var(--amber);
-  --yellow-bg:  rgba(217, 119, 6, 0.10);
+  --text2:      var(--color-text-muted);
+  --text-muted: var(--color-text-muted);
+  --red:        var(--color-danger);
+  --amber:      var(--color-warning);
+  --r:          var(--radius-lg);
+  --rl:         var(--radius-xl);
+  --radius:     var(--radius-lg);
+  --green-bg:   rgba(52, 211, 153, 0.12);
+  --red-bg:     rgba(239, 68, 68, 0.12);
+  --yellow:     var(--color-warning);
+  --yellow-bg:  rgba(245, 158, 11, 0.12);
 }
 
 *,

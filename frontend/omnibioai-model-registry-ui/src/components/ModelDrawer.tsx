@@ -159,7 +159,7 @@ export default function ModelDrawer({
                       {v.version}
                     </code>
                     {v.alias && (
-                      <span style={aliasBadge}>{v.alias}</span>
+                      <span style={drawerAliasBadge(v.alias)}>{v.alias}</span>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
@@ -249,7 +249,7 @@ const overlayStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   zIndex: 100,
-  boxShadow: "-4px 0 24px rgba(15,23,42,0.10)",
+  boxShadow: "-4px 0 32px rgba(0,0,0,0.45)",
 };
 
 const headerStyle: CSSProperties = {
@@ -268,13 +268,16 @@ const versionCardStyle: CSSProperties = {
   padding: "10px 12px",
 };
 
-const aliasBadge: CSSProperties = {
-  display: "inline-block",
-  background: "var(--green-bg)",
-  color: "var(--green)",
-  padding: "1px 7px",
-  borderRadius: 10,
-  fontSize: 11,
-  marginLeft: 8,
-  fontWeight: 500,
-};
+function drawerAliasBadge(alias: string): CSSProperties {
+  const isProduction = alias === "production";
+  return {
+    display: "inline-block",
+    background: isProduction ? "var(--blue-dim)" : "var(--teal-dim)",
+    color: isProduction ? "var(--blue)" : "var(--teal)",
+    padding: "1px 7px",
+    borderRadius: 10,
+    fontSize: 11,
+    marginLeft: 8,
+    fontWeight: 500,
+  };
+}

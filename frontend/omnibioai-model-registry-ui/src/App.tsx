@@ -334,7 +334,7 @@ export default function App() {
                           <td style={tdStyle}>
                             {aliases.length > 0 ? (
                               aliases.map((a) => (
-                                <span key={a} style={aliasBadgeStyle}>{a}</span>
+                                <span key={a} style={aliasBadgeStyle(a)}>{a}</span>
                               ))
                             ) : (
                               <span style={{ color: "var(--text-muted)" }}>—</span>
@@ -595,13 +595,16 @@ const taskBadgeStyle: CSSProperties = {
   fontWeight: 500,
 };
 
-const aliasBadgeStyle: CSSProperties = {
-  background: "var(--green-bg)",
-  color: "var(--green)",
-  padding: "2px 8px",
-  borderRadius: 10,
-  fontSize: 12,
-  fontWeight: 500,
-  marginRight: 4,
-  display: "inline-block",
-};
+function aliasBadgeStyle(alias: string): CSSProperties {
+  const isProduction = alias === "production";
+  return {
+    background: isProduction ? "var(--blue-dim)" : "var(--teal-dim)",
+    color: isProduction ? "var(--blue)" : "var(--teal)",
+    padding: "2px 8px",
+    borderRadius: 10,
+    fontSize: 12,
+    fontWeight: 500,
+    marginRight: 4,
+    display: "inline-block",
+  };
+}

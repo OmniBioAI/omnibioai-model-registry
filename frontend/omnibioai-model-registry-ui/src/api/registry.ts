@@ -1,4 +1,4 @@
-const BASE_URL = "/v1";
+const BASE_URL = "/modelregistry/v1";
 
 export async function fetchModels() {
   const res = await fetch(`${BASE_URL}/models`);
