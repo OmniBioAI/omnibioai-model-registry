@@ -25,3 +25,8 @@ class IntegrityError(ModelRegistryError):
 
 class ValidationError(ModelRegistryError):
     pass
+
+
+class InvalidStageTransition(ModelRegistryError):
+    """Raised when an invalid stage transition is attempted."""
+    pass

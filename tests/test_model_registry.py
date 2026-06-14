@@ -1315,3 +1315,318 @@ class TestCLIMain:
         assert exc_info.value.code == 1
         err = capsys.readouterr().err
         assert "model_meta.json not found" in err
+
+
+# ============================================================
+# package/layout.py — run path helpers (Phase 1)
+# ============================================================
+
+
+class TestLayoutRunPaths:
+
+    def test_runs_root(self, tmp_path):
+        from omnibioai_model_registry.package.layout import runs_root
+
+        p = runs_root(tmp_path, "celltype_sc", "human_pbmc")
+        assert p.parent.name == "human_pbmc"
+        assert p.name == "runs"
+        assert str(p).endswith("models/human_pbmc/runs")
+
+    def test_run_dir(self, tmp_path):
+        from omnibioai_model_registry.package.layout import run_dir
+
+        p = run_dir(tmp_path, "t", "m", "run_abc123")
+        assert p.name == "run_abc123"
+        assert p.parent.name == "runs"
+
+    def test_run_params_path(self, tmp_path):
+        from omnibioai_model_registry.package.layout import run_params_path
+
+        p = run_params_path(tmp_path, "t", "m", "r1")
+        assert p.name == "params.json"
+        assert p.parent.name == "r1"
+
+    def test_run_tags_path(self, tmp_path):
+        from omnibioai_model_registry.package.layout import run_tags_path
+
+        p = run_tags_path(tmp_path, "t", "m", "r1")
+        assert p.name == "tags.json"
+        assert p.parent.name == "r1"
+
+    def test_run_metric_log_path(self, tmp_path):
+        from omnibioai_model_registry.package.layout import run_metric_log_path
+
+        p = run_metric_log_path(tmp_path, "t", "m", "r1", "accuracy")
+        assert p.name == "accuracy.jsonl"
+        assert p.parent.name == "metrics"
+        assert p.parent.parent.name == "r1"
+
+    def test_version_tags_path(self, tmp_path):
+        from omnibioai_model_registry.package.layout import version_tags_path
+
+        p = version_tags_path(tmp_path, "t", "m", "v1")
+        assert p.name == "tags.json"
+        assert p.parent.name == "v1"
+
+    def test_run_paths_share_consistent_prefix(self, tmp_path):
+        """All run paths for the same run_id share the same parent run_dir."""
+        from omnibioai_model_registry.package.layout import (
+            run_dir,
+            run_metric_log_path,
+            run_params_path,
+            run_tags_path,
+        )
+
+        base = run_dir(tmp_path, "t", "m", "rx")
+        assert run_params_path(tmp_path, "t", "m", "rx").parent == base
+        assert run_tags_path(tmp_path, "t", "m", "rx").parent == base
+        assert run_metric_log_path(tmp_path, "t", "m", "rx", "loss").parent == base / "metrics"
+
+
+# ============================================================
+# run.py — RunLogger (Phase 1)
+# ============================================================
+
+
+class TestRunLogger:
+
+    def test_run_id_auto_generated(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        assert isinstance(r.run_id, str)
+        assert len(r.run_id) > 0
+
+    def test_run_id_explicit(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", run_id="fixed_id", registry_root=tmp_path)
+        assert r.run_id == "fixed_id"
+
+    def test_run_id_stable_across_calls(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        rid = r.run_id
+        r.log_param("x", 1)
+        r.log_metric("acc", 0.9, step=0)
+        r.set_tag("k", "v")
+        assert r.run_id == rid
+
+    def test_log_param_writes_params_json(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.log_param("lr", 0.001)
+
+        params_file = (
+            tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r.run_id / "params.json"
+        )
+        assert params_file.exists()
+        data = json.loads(params_file.read_text())
+        assert data["lr"] == 0.001
+
+    def test_log_params_merges_all_keys(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.log_params({"lr": 0.001, "epochs": 50, "batch_size": 32})
+
+        params_file = (
+            tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r.run_id / "params.json"
+        )
+        data = json.loads(params_file.read_text())
+        assert data["lr"] == 0.001
+        assert data["epochs"] == 50
+        assert data["batch_size"] == 32
+
+    def test_log_param_then_log_params_cumulates(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.log_param("lr", 0.001)
+        r.log_params({"epochs": 50})
+
+        params_file = (
+            tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r.run_id / "params.json"
+        )
+        data = json.loads(params_file.read_text())
+        assert data["lr"] == 0.001
+        assert data["epochs"] == 50
+
+    def test_log_metric_creates_jsonl_file(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.log_metric("accuracy", 0.95, step=0)
+
+        metric_file = (
+            tmp_path
+            / "tasks" / "t" / "models" / "m" / "runs" / r.run_id
+            / "metrics" / "accuracy.jsonl"
+        )
+        assert metric_file.exists()
+        lines = [ln for ln in metric_file.read_text().splitlines() if ln.strip()]
+        assert len(lines) == 1
+        entry = json.loads(lines[0])
+        assert entry["key"] == "accuracy"
+        assert entry["value"] == 0.95
+        assert entry["step"] == 0
+        assert "ts_utc" in entry
+
+    def test_log_metric_multiple_steps_appends(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.log_metric("loss", 1.0, step=0)
+        r.log_metric("loss", 0.5, step=1)
+        r.log_metric("loss", 0.2, step=2)
+
+        metric_file = (
+            tmp_path
+            / "tasks" / "t" / "models" / "m" / "runs" / r.run_id
+            / "metrics" / "loss.jsonl"
+        )
+        lines = [ln for ln in metric_file.read_text().splitlines() if ln.strip()]
+        assert len(lines) == 3
+        steps = [json.loads(ln)["step"] for ln in lines]
+        assert steps == [0, 1, 2]
+        values = [json.loads(ln)["value"] for ln in lines]
+        assert values == [1.0, 0.5, 0.2]
+
+    def test_log_metrics_dict_creates_separate_files(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.log_metrics({"acc": 0.9, "f1": 0.85, "auc": 0.92}, step=0)
+
+        metrics_dir = (
+            tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r.run_id / "metrics"
+        )
+        assert (metrics_dir / "acc.jsonl").exists()
+        assert (metrics_dir / "f1.jsonl").exists()
+        assert (metrics_dir / "auc.jsonl").exists()
+        assert json.loads((metrics_dir / "f1.jsonl").read_text().strip())["value"] == 0.85
+
+    def test_set_tag_writes_tags_json(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.set_tag("team", "bioml")
+
+        tags_file = (
+            tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r.run_id / "tags.json"
+        )
+        assert tags_file.exists()
+        data = json.loads(tags_file.read_text())
+        assert data["team"] == "bioml"
+
+    def test_set_tags_merges_all_keys(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.set_tags({"team": "bioml", "env": "training", "version": "v3"})
+
+        tags_file = (
+            tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r.run_id / "tags.json"
+        )
+        data = json.loads(tags_file.read_text())
+        assert data["team"] == "bioml"
+        assert data["env"] == "training"
+        assert data["version"] == "v3"
+
+    def test_set_tag_then_set_tags_cumulates(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.set_tag("team", "bioml")
+        r.set_tags({"env": "training"})
+
+        tags_file = (
+            tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r.run_id / "tags.json"
+        )
+        data = json.loads(tags_file.read_text())
+        assert data["team"] == "bioml"
+        assert data["env"] == "training"
+
+    def test_finish_returns_run_id(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.log_param("x", 1)
+        result = r.finish()
+        assert result == r.run_id
+
+    def test_finish_flushes_params_and_tags(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r.log_param("lr", 0.01)
+        r.set_tag("k", "v")
+        rid = r.finish()
+
+        base = tmp_path / "tasks" / "t" / "models" / "m" / "runs" / rid
+        assert json.loads((base / "params.json").read_text())["lr"] == 0.01
+        assert json.loads((base / "tags.json").read_text())["k"] == "v"
+
+    def test_context_manager_calls_finish(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        with RunLogger(task="t", model_name="m", registry_root=tmp_path) as r:
+            r.log_param("lr", 0.01)
+            run_id = r.run_id
+
+        params_file = (
+            tmp_path / "tasks" / "t" / "models" / "m" / "runs" / run_id / "params.json"
+        )
+        assert params_file.exists()
+        assert json.loads(params_file.read_text())["lr"] == 0.01
+
+    def test_context_manager_with_metrics_and_tags(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        with RunLogger(task="t", model_name="m", registry_root=tmp_path) as r:
+            r.log_params({"n_estimators": 100})
+            r.log_metric("accuracy", 0.95, step=0)
+            r.log_metric("accuracy", 0.97, step=1)
+            r.set_tag("team", "bioml")
+            run_id = r.run_id
+
+        base = tmp_path / "tasks" / "t" / "models" / "m" / "runs" / run_id
+        assert json.loads((base / "params.json").read_text())["n_estimators"] == 100
+        assert json.loads((base / "tags.json").read_text())["team"] == "bioml"
+        lines = [
+            ln for ln in (base / "metrics" / "accuracy.jsonl").read_text().splitlines()
+            if ln.strip()
+        ]
+        assert len(lines) == 2
+
+    def test_two_instances_produce_separate_dirs(self, tmp_path):
+        from omnibioai_model_registry.run import RunLogger
+
+        r1 = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        r2 = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        assert r1.run_id != r2.run_id
+
+        r1.log_param("x", 1)
+        r2.log_param("x", 2)
+
+        p1 = tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r1.run_id / "params.json"
+        p2 = tmp_path / "tasks" / "t" / "models" / "m" / "runs" / r2.run_id / "params.json"
+        assert json.loads(p1.read_text())["x"] == 1
+        assert json.loads(p2.read_text())["x"] == 2
+
+    def test_runlogger_exported_from_package(self):
+        """Covers __init__.py export."""
+        import omnibioai_model_registry as pkg
+
+        assert hasattr(pkg, "RunLogger")
+        assert pkg.RunLogger is not None
+
+    def test_invalid_stage_transition_error_exists(self):
+        """Covers errors.py: InvalidStageTransition is exported and inherits correctly."""
+        from omnibioai_model_registry.errors import InvalidStageTransition, ModelRegistryError
+
+        e = InvalidStageTransition("cannot go from production to none")
+        assert isinstance(e, ModelRegistryError)
+        assert "cannot go" in str(e)

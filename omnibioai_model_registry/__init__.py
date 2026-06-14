@@ -6,6 +6,7 @@ from .api import (
     resolve_model,
     verify_model_ref,
 )
+from .run import RunLogger
 
 __all__ = [
     "ModelRegistry",
@@ -13,4 +14,5 @@ __all__ = [
     "resolve_model",
     "promote_model",
     "verify_model_ref",
+    "RunLogger",
 ]
