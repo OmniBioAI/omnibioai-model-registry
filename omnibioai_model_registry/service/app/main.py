@@ -340,11 +340,24 @@ def api_show(task: str, ref: str, verify: bool = False):
 def list_models(
     task: Optional[str] = Query(None, description="filter by task"),
     model_name: Optional[str] = Query(None, description="filter by model name"),
+    metric_gte: Optional[str] = Query(None, description="metric filter, format key:threshold"),
 ):
     """
     UI endpoint for dashboard:
     returns list of models from filesystem registry
     """
+    # Parse metric_gte once so invalid format returns 400 before scanning files
+    _metric_key: Optional[str] = None
+    _metric_threshold: Optional[float] = None
+    if metric_gte is not None:
+        try:
+            _metric_key, _thresh_str = metric_gte.split(":", 1)
+            _metric_threshold = float(_thresh_str)
+        except (ValueError, AttributeError):
+            raise HTTPException(
+                status_code=400,
+                detail={"ok": False, "error": f"Invalid metric_gte format '{metric_gte}'. Expected 'key:threshold'"},
+            )
 
     root = Path(registry.root)
 
@@ -359,6 +372,17 @@ def list_models(
                 continue
             if model_name and meta.get("model_name") != model_name:
                 continue
+
+            if _metric_key is not None:
+                metrics_path = meta_file.parent / "metrics.json"
+                if not metrics_path.exists():
+                    continue
+                try:
+                    m_data = json.loads(metrics_path.read_text())
+                except Exception:
+                    continue
+                if m_data.get(_metric_key, -float("inf")) < _metric_threshold:
+                    continue
 
             models.append(meta)
 
@@ -639,17 +663,22 @@ def api_set_stage(req: SetStageRequest):
                 model_name=req.model_name,
                 alias=req.stage,
                 version=req.version,
-                actor=req.actor,
-                reason=req.reason or f"stage transition to {req.stage}",
+                actor=req.actor or "api",
+                reason=req.reason or "stage transition",
             )
         except Exception as e:
             _handle_registry_error(e)
 
-    return {"ok": True}
+    return {"ok": True, "stage": req.stage, "version": req.version}
 
 
 @app.get(f"{DEFAULT_PREFIX}/compare", response_model=CompareResponse)
-def api_compare(task: str, model: str, versions: List[str] = Query(...)):
+def api_compare(task: str, model: str, versions: List[str] = Query(default=[])):
+    if len(versions) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail={"ok": False, "error": "At least 2 versions required"},
+        )
     from omnibioai_model_registry.package.layout import version_dir as _vdir_fn
 
     result: Dict[str, Dict[str, Any]] = {}
