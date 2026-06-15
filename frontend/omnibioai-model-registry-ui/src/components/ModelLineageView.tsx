@@ -98,9 +98,15 @@ function buildGraph(model: Model) {
   nodes.push({
     id: versionId,
     data: {
-      label: `Version: ${model.version}\nTask: ${model.task}\nRun: ${
-        model.lineage?.run_id ?? "N/A"
-      }`,
+      label: (
+        <div style={{ textAlign: "left", lineHeight: 1.6, fontSize: 12 }}>
+          <div>Version: {model.version}</div>
+          <div>Task: {model.task}</div>
+          <div style={{ color: model.lineage?.run_id ? "#ffffff" : "#9CA3AF" }}>
+            Run: {model.lineage?.run_id ?? "not tracked"}
+          </div>
+        </div>
+      ),
     },
     position: { x: 0, y: 0 },
     style: {
@@ -109,7 +115,6 @@ function buildGraph(model: Model) {
       padding: 10,
       borderRadius: 8,
       border: "1px solid #2a2d3e",
-      whiteSpace: "pre-wrap",
       fontSize: 12,
     },
   });
