@@ -2,6 +2,8 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { Model } from "../App";
 import { relativeTime } from "../App";
 import ModelLineageView from "./ModelLineageView";
+import MetricsComparePanel from "./MetricsComparePanel";
+import { setStage } from "../api/registry";
 
 const BASE_URL = "/v1";
 
@@ -29,6 +31,7 @@ export default function ModelDrawer({
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState<{ label: string; status?: number; data?: any; error?: string } | null>(null);
   const [showLineage, setShowLineage] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
 
   const sortedVersions = [...models].sort((a, b) =>
     (b.created_at ?? "").localeCompare(a.created_at ?? "")
@@ -124,6 +127,12 @@ export default function ModelDrawer({
             >
               {showLineage ? "Hide Lineage" : "Lineage"}
             </button>
+            <button
+              onClick={() => setShowMetrics((s) => !s)}
+              style={showMetrics ? { background: "var(--accent-bg)", color: "var(--accent)", borderColor: "var(--accent)" } : {}}
+            >
+              {showMetrics ? "Hide Metrics" : "Compare Metrics"}
+            </button>
           </div>
         </Section>
 
@@ -161,8 +170,21 @@ export default function ModelDrawer({
                     {v.alias && (
                       <span style={drawerAliasBadge(v.alias)}>{v.alias}</span>
                     )}
+                    <StageBadge stage={v.stage as string | undefined} />
                   </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+                    <select
+                      value={(v.stage as string | undefined) ?? "none"}
+                      style={{ fontSize: 11, padding: "2px 4px", background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 4 }}
+                      onChange={(e) => {
+                        void setStage(model.task, model.model_name, v.version, e.target.value, "registry-ui").then(() => onRefresh());
+                      }}
+                    >
+                      <option value="none">none</option>
+                      <option value="staging">staging</option>
+                      <option value="production">production</option>
+                      <option value="archived">archived</option>
+                    </select>
                     <button
                       style={{ fontSize: 11, padding: "3px 8px" }}
                       disabled={loading}
@@ -212,8 +234,46 @@ export default function ModelDrawer({
             <ModelLineageView model={model} />
           </Section>
         )}
+
+        {/* METRICS COMPARISON */}
+        {showMetrics && (
+          <Section title="Metrics Comparison">
+            <MetricsComparePanel
+              task={model.task}
+              model={model.model_name}
+              versions={sortedVersions.map((v) => v.version)}
+            />
+          </Section>
+        )}
       </div>
     </div>
+  );
+}
+
+function StageBadge({ stage }: { stage?: string }) {
+  if (!stage || stage === "none") return null;
+  const colors: Record<string, { bg: string; fg: string }> = {
+    staging:    { bg: "var(--teal-dim)",   fg: "var(--teal)" },
+    production: { bg: "var(--blue-dim)",   fg: "var(--blue)" },
+    archived:   { bg: "var(--surface-2)",  fg: "var(--text-muted)" },
+  };
+  const c = colors[stage] ?? { bg: "var(--surface-2)", fg: "var(--text-muted)" };
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        background: c.bg,
+        color: c.fg,
+        padding: "1px 7px",
+        borderRadius: 10,
+        fontSize: 11,
+        marginLeft: 8,
+        fontWeight: 500,
+        textTransform: "capitalize",
+      }}
+    >
+      {stage}
+    </span>
   );
 }
 
