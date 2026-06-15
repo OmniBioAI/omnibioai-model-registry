@@ -163,7 +163,7 @@ export default function App() {
       {/* ── TOP HEADER ── */}
       <header style={hdrStyle}>
         <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" }}>
-          🧬 OmniBioAI Model Registry
+          🧬 OmniBioAI ModelHub
         </span>
         <div style={{ display: "flex", gap: 8 }}>
           <button
