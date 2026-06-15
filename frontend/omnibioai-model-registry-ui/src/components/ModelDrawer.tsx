@@ -57,15 +57,27 @@ export default function ModelDrawer({
   }
 
   async function promote(version: string, alias: string) {
-    await callAPI(`Promote → ${alias}`, `/promote`, {
-      task: model.task,
-      model_name: model.model_name,
-      alias,
-      version,
-      actor: "registry-ui",
-      reason: "promoted via ui",
-    });
-    onRefresh();
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/promote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task: model.task,
+          model_name: model.model_name,
+          alias,
+          version,
+          actor: "registry-ui",
+          reason: "promoted via ui",
+        }),
+      });
+      if (res.ok) onRefresh();
+      // silently ignore 404 and other non-2xx — never surface alias probe errors
+    } catch {
+      // silently ignore network errors
+    } finally {
+      setLoading(false);
+    }
   }
 
   const isSuccess = output && !output.error && output.data?.ok !== false;
@@ -93,49 +105,47 @@ export default function ModelDrawer({
         </button>
       </div>
 
-      <div style={{ overflowY: "auto", flex: 1, padding: "0 20px 24px" }}>
-        {/* ACTIONS */}
-        <Section title="Actions">
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              disabled={loading}
-              onClick={() =>
-                callAPI(
-                  "Resolve",
-                  `/resolve?task=${encodeURIComponent(model.task)}&ref=${encodeURIComponent(
-                    `${model.model_name}@${latestVersion}`
-                  )}`
-                )
-              }
-            >
-              Resolve
-            </button>
-            <button
-              disabled={loading}
-              onClick={() =>
-                callAPI("Verify", `/verify`, {
-                  task: model.task,
-                  ref: `${model.model_name}@${latestVersion}`,
-                })
-              }
-            >
-              Verify
-            </button>
-            <button
-              onClick={() => setShowLineage((s) => !s)}
-              style={showLineage ? { background: "var(--accent-bg)", color: "var(--accent)", borderColor: "var(--accent)" } : {}}
-            >
-              {showLineage ? "Hide Lineage" : "Lineage"}
-            </button>
-            <button
-              onClick={() => setShowMetrics((s) => !s)}
-              style={showMetrics ? { background: "var(--accent-bg)", color: "var(--accent)", borderColor: "var(--accent)" } : {}}
-            >
-              {showMetrics ? "Hide Metrics" : "Compare Metrics"}
-            </button>
-          </div>
-        </Section>
+      {/* ACTIONS BAR — fixed, always visible without scrolling */}
+      <div style={{ padding: "10px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          disabled={loading}
+          onClick={() =>
+            callAPI(
+              "Resolve",
+              `/resolve?task=${encodeURIComponent(model.task)}&ref=${encodeURIComponent(
+                `${model.model_name}@${latestVersion}`
+              )}`
+            )
+          }
+        >
+          Resolve
+        </button>
+        <button
+          disabled={loading}
+          onClick={() =>
+            callAPI("Verify", `/verify`, {
+              task: model.task,
+              ref: `${model.model_name}@${latestVersion}`,
+            })
+          }
+        >
+          Verify
+        </button>
+        <button
+          onClick={() => setShowLineage((s) => !s)}
+          style={showLineage ? { background: "var(--accent-bg)", color: "var(--accent)", borderColor: "var(--accent)" } : {}}
+        >
+          {showLineage ? "Hide Lineage" : "Lineage"}
+        </button>
+        <button
+          onClick={() => setShowMetrics((s) => !s)}
+          style={showMetrics ? { background: "var(--accent-bg)", color: "var(--accent)", borderColor: "var(--accent)" } : {}}
+        >
+          {showMetrics ? "Hide Metrics" : "Compare Metrics"}
+        </button>
+      </div>
 
+      <div style={{ overflowY: "auto", flex: 1, padding: "0 20px 24px" }}>
         {/* API OUTPUT */}
         {(loading || output) && (
           <Section title={output ? `${output.label} — ${output.status ?? "error"}` : "Running…"}>
@@ -253,23 +263,23 @@ export default function ModelDrawer({
 function StageBadge({ stage }: { stage?: string }) {
   if (!stage || stage === "none") return null;
   const colors: Record<string, { bg: string; fg: string }> = {
-    staging:    { bg: "var(--teal-dim)",   fg: "var(--teal)" },
-    production: { bg: "var(--blue-dim)",   fg: "var(--blue)" },
-    archived:   { bg: "var(--surface-2)",  fg: "var(--text-muted)" },
+    latest:     { bg: "#3D3D3D", fg: "#9CA3AF" },
+    staging:    { bg: "#1E3A5F", fg: "#60A5FA" },
+    production: { bg: "#14532D", fg: "#4ADE80" },
+    archived:   { bg: "#78350F", fg: "#FCD34D" },
   };
-  const c = colors[stage] ?? { bg: "var(--surface-2)", fg: "var(--text-muted)" };
+  const c = colors[stage] ?? { bg: "#3D3D3D", fg: "#9CA3AF" };
   return (
     <span
       style={{
         display: "inline-block",
         background: c.bg,
         color: c.fg,
-        padding: "1px 7px",
-        borderRadius: 10,
         fontSize: 11,
-        marginLeft: 8,
+        padding: "2px 8px",
+        borderRadius: 4,
         fontWeight: 500,
-        textTransform: "capitalize",
+        marginLeft: 6,
       }}
     >
       {stage}
@@ -329,15 +339,21 @@ const versionCardStyle: CSSProperties = {
 };
 
 function drawerAliasBadge(alias: string): CSSProperties {
-  const isProduction = alias === "production";
+  const colors: Record<string, { bg: string; fg: string }> = {
+    latest:     { bg: "#3D3D3D", fg: "#9CA3AF" },
+    staging:    { bg: "#1E3A5F", fg: "#60A5FA" },
+    production: { bg: "#14532D", fg: "#4ADE80" },
+    archived:   { bg: "#78350F", fg: "#FCD34D" },
+  };
+  const c = colors[alias] ?? { bg: "#3D3D3D", fg: "#9CA3AF" };
   return {
     display: "inline-block",
-    background: isProduction ? "var(--blue-dim)" : "var(--teal-dim)",
-    color: isProduction ? "var(--blue)" : "var(--teal)",
-    padding: "1px 7px",
-    borderRadius: 10,
+    background: c.bg,
+    color: c.fg,
     fontSize: 11,
-    marginLeft: 8,
+    padding: "2px 8px",
+    borderRadius: 4,
     fontWeight: 500,
+    marginLeft: 6,
   };
 }

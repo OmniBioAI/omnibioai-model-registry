@@ -586,13 +586,19 @@ const taskBadgeStyle: CSSProperties = {
 };
 
 function aliasBadgeStyle(alias: string): CSSProperties {
-  const isProduction = alias === "production";
+  const colors: Record<string, { bg: string; fg: string }> = {
+    latest:     { bg: "#3D3D3D", fg: "#9CA3AF" },
+    staging:    { bg: "#1E3A5F", fg: "#60A5FA" },
+    production: { bg: "#14532D", fg: "#4ADE80" },
+    archived:   { bg: "#78350F", fg: "#FCD34D" },
+  };
+  const c = colors[alias] ?? { bg: "#3D3D3D", fg: "#9CA3AF" };
   return {
-    background: isProduction ? "var(--blue-dim)" : "var(--teal-dim)",
-    color: isProduction ? "var(--blue)" : "var(--teal)",
+    background: c.bg,
+    color: c.fg,
+    fontSize: 11,
     padding: "2px 8px",
-    borderRadius: 10,
-    fontSize: 12,
+    borderRadius: 4,
     fontWeight: 500,
     marginRight: 4,
     display: "inline-block",
