@@ -7,7 +7,7 @@ from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Any, Dict, Optional, List
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from omnibioai_model_registry import (
@@ -18,7 +18,12 @@ from omnibioai_model_registry import (
     verify_model_ref,
 )
 from omnibioai_model_registry.errors import ModelRegistryError, RegistryNotConfigured
+from omnibioai_model_registry.config import load_config
+from omnibioai_model_registry.auth import require_auth, require_write_auth
+from omnibioai_model_registry.audit_client import AuditClient
 import logging as _logging
+
+_audit = AuditClient(os.environ.get("AUDIT_URL", ""))
 
 try:
     from omnibioai_model_registry import db as _db
@@ -55,6 +60,14 @@ registry = ModelRegistry.from_env()
 @app.on_event("startup")
 def _startup() -> None:
     _log = _logging.getLogger(__name__)
+    try:
+        cfg = load_config()
+        if cfg.auth_enabled:
+            _log.info("Auth enabled — JWT validation active")
+        else:
+            _log.warning("Auth disabled — running in open mode (AUTH_ENABLED != true)")
+    except Exception:
+        pass
     if _db is None:
         return
     try:
@@ -266,7 +279,7 @@ def health():
 
 
 @app.post(f"{DEFAULT_PREFIX}/register", response_model=RegisterResponse)
-def api_register(req: RegisterRequest):
+def api_register(req: RegisterRequest, actor: str = Depends(require_write_auth)):
     try:
         out = register_model(
             task=req.task,
@@ -275,8 +288,13 @@ def api_register(req: RegisterRequest):
             artifacts_dir=req.artifacts_dir,
             metadata=req.metadata,
             set_alias=req.set_alias,
-            actor=req.actor,
+            actor=actor,
             reason=req.reason,
+        )
+        _audit.log_event(
+            "register_model", actor,
+            f"{req.task}/{req.model_name}@{req.version}",
+            task=req.task, model_name=req.model_name, version=req.version,
         )
         return RegisterResponse(**out)
     except Exception as e:
@@ -284,15 +302,20 @@ def api_register(req: RegisterRequest):
 
 
 @app.post(f"{DEFAULT_PREFIX}/promote")
-def api_promote(req: PromoteRequest):
+def api_promote(req: PromoteRequest, actor: str = Depends(require_write_auth)):
     try:
         promote_model(
             task=req.task,
             model_name=req.model_name,
             alias=req.alias,
             version=req.version,
-            actor=req.actor,
+            actor=actor,
             reason=req.reason,
+        )
+        _audit.log_event(
+            "promote_model", actor,
+            f"{req.task}/{req.model_name}@{req.alias}",
+            task=req.task, model_name=req.model_name, version=req.version,
         )
         return {"ok": True}
     except Exception as e:
@@ -402,7 +425,7 @@ _VALID_STAGES = frozenset({"none", "staging", "production", "archived"})
 
 
 @app.post(f"{DEFAULT_PREFIX}/runs/log-metric")
-def api_log_metric(req: LogMetricRequest):
+def api_log_metric(req: LogMetricRequest, actor: str = Depends(require_auth)):
     conn = _get_db_conn()
     try:
         _tracking.log_metric(
@@ -417,7 +440,7 @@ def api_log_metric(req: LogMetricRequest):
 
 
 @app.post(f"{DEFAULT_PREFIX}/runs/log-param")
-def api_log_param(req: LogParamRequest):
+def api_log_param(req: LogParamRequest, actor: str = Depends(require_auth)):
     conn = _get_db_conn()
     try:
         _tracking.log_param(
@@ -432,7 +455,7 @@ def api_log_param(req: LogParamRequest):
 
 
 @app.post(f"{DEFAULT_PREFIX}/runs/log-batch")
-def api_log_batch(req: LogBatchRequest):
+def api_log_batch(req: LogBatchRequest, actor: str = Depends(require_auth)):
     conn = _get_db_conn()
     try:
         for m in req.metrics:
@@ -580,7 +603,7 @@ def api_aliases(task: str, model: str):
 
 
 @app.put(f"{DEFAULT_PREFIX}/tags")
-def api_set_tag(req: SetTagRequest):
+def api_set_tag(req: SetTagRequest, actor: str = Depends(require_write_auth)):
     import tempfile
 
     # Persist to DB when available (best-effort; never blocks the filesystem write)
@@ -614,11 +637,17 @@ def api_set_tag(req: SetTagRequest):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+    _audit.log_event(
+        "set_tag", actor,
+        f"{req.task}/{req.model_name}@{req.version}",
+        task=req.task, model_name=req.model_name, version=req.version,
+        metadata={"key": req.key, "value": req.value},
+    )
     return {"ok": True}
 
 
 @app.post(f"{DEFAULT_PREFIX}/versions/patch")
-def api_patch_version(req: PatchVersionRequest):
+def api_patch_version(req: PatchVersionRequest, actor: str = Depends(require_write_auth)):
     import tempfile
 
     from omnibioai_model_registry.package.layout import version_dir as _vdir_fn
@@ -651,7 +680,7 @@ def api_patch_version(req: PatchVersionRequest):
 
 
 @app.post(f"{DEFAULT_PREFIX}/stage")
-def api_set_stage(req: SetStageRequest):
+def api_set_stage(req: SetStageRequest, actor: str = Depends(require_write_auth)):
     import tempfile
 
     if req.stage not in _VALID_STAGES:
@@ -687,12 +716,17 @@ def api_set_stage(req: SetStageRequest):
                 model_name=req.model_name,
                 alias=req.stage,
                 version=req.version,
-                actor=req.actor or "api",
+                actor=actor,
                 reason=req.reason or "stage transition",
             )
         except Exception as e:
             _handle_registry_error(e)
 
+    _audit.log_event(
+        "set_stage", actor,
+        f"{req.task}/{req.model_name}@{req.stage}",
+        task=req.task, model_name=req.model_name, version=req.version,
+    )
     return {"ok": True, "stage": req.stage, "version": req.version}
 
 
@@ -758,3 +792,19 @@ def api_artifacts(task: str, ref: str):
         files.append(ArtifactEntry(name=f.name, sha256=hashes.get(f.name), size_bytes=size))
 
     return ArtifactsResponse(ok=True, version=vdir.name, files=files)
+
+
+@app.get(f"{DEFAULT_PREFIX}/auth/status")
+def api_auth_status():
+    try:
+        cfg = load_config()
+        auth_enabled = cfg.auth_enabled
+        iam_url = cfg.iam_url if auth_enabled else None
+    except Exception:
+        auth_enabled = False
+        iam_url = None
+    return {
+        "auth_enabled": auth_enabled,
+        "mode": "jwt" if auth_enabled else "open",
+        "iam_url": iam_url,
+    }

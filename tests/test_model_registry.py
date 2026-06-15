@@ -1951,3 +1951,1685 @@ class TestServicePhase3Routes:
         client, _ = svc_client
         r = client.get("/v1/models", params={"metric_gte": "no_colon_here"})
         assert r.status_code == 400
+
+
+# ============================================================
+# db.py + tracking.py — TestDBAndTracking
+# ============================================================
+
+
+class TestDBAndTracking:
+
+    @pytest.fixture
+    def mock_conn(self):
+        from unittest.mock import MagicMock
+
+        cursor = MagicMock()
+        cursor.rowcount = 1
+
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cursor
+        conn.cursor.return_value.__exit__.return_value = False
+        return conn, cursor
+
+    # ── db.py ──────────────────────────────────────────────────────────────
+
+    def test_get_connection_raises_without_db_host(self, monkeypatch):
+        monkeypatch.delenv("DB_HOST", raising=False)
+        from omnibioai_model_registry.db import get_connection
+        from omnibioai_model_registry.errors import RegistryNotConfigured
+
+        with pytest.raises(RegistryNotConfigured):
+            get_connection()
+
+    def test_get_connection_calls_pymysql_connect(self, monkeypatch):
+        from unittest.mock import MagicMock, patch
+
+        monkeypatch.setenv("DB_HOST", "localhost")
+        monkeypatch.setenv("DB_USER", "root")
+        monkeypatch.setenv("DB_PASSWORD", "secret")
+        monkeypatch.setenv("DB_NAME", "testdb")
+
+        fake_conn = MagicMock()
+        with patch("pymysql.connect", return_value=fake_conn):
+            from omnibioai_model_registry.db import get_connection
+
+            conn = get_connection()
+        assert conn is fake_conn
+
+    def test_init_tables_executes_all_ddl(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.db import _DDL, init_tables
+
+        init_tables(conn)
+        assert cursor.execute.call_count == len(_DDL)
+
+    # ── tracking.py — create / finish ──────────────────────────────────────
+
+    def test_create_run_returns_run_dict(self, mock_conn):
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchone.return_value = {
+            "run_id": "r1",
+            "task": "t",
+            "model_name": "m",
+            "status": "running",
+            "started_at": now,
+            "finished_at": None,
+            "actor": None,
+        }
+        cursor.fetchall.return_value = []
+
+        from omnibioai_model_registry.tracking import create_run
+
+        result = create_run(conn, task="t", model_name="m", run_id="r1")
+        assert result["run_id"] == "r1"
+        assert result["status"] == "running"
+
+    def test_finish_run_updates_status(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.rowcount = 1
+        from omnibioai_model_registry.tracking import finish_run
+
+        finish_run(conn, "r1")
+        sqls = [str(c[0][0]) for c in cursor.execute.call_args_list]
+        assert any("UPDATE" in s for s in sqls)
+
+    def test_finish_run_raises_if_not_found(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.rowcount = 0
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import finish_run
+
+        with pytest.raises(ModelNotFound):
+            finish_run(conn, "nonexistent")
+
+    # ── tracking.py — params ───────────────────────────────────────────────
+
+    def test_log_param_executes_insert(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.tracking import log_param
+
+        log_param(conn, "r1", "lr", 0.001, task="t", model_name="m")
+        sqls = [str(c[0][0]) for c in cursor.execute.call_args_list]
+        assert any("INSERT" in s for s in sqls)
+
+    def test_log_params_calls_log_param_for_each(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.tracking import log_params
+
+        log_params(conn, "r1", {"lr": 0.001, "epochs": 50}, task="t", model_name="m")
+        assert cursor.execute.call_count >= 4  # 2 params × 2 executes each
+
+    # ── tracking.py — metrics ──────────────────────────────────────────────
+
+    def test_log_metric_executes_insert(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.tracking import log_metric
+
+        log_metric(conn, "r1", "accuracy", 0.95, step=1, task="t", model_name="m")
+        sqls = [str(c[0][0]) for c in cursor.execute.call_args_list]
+        assert any("INSERT" in s for s in sqls)
+
+    def test_log_metrics_iterates_dict(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.tracking import log_metrics
+
+        log_metrics(conn, "r1", {"acc": 0.9, "f1": 0.85}, step=0, task="t", model_name="m")
+        assert cursor.execute.call_count >= 4  # 2 metrics × 2 executes each
+
+    # ── tracking.py — tags ─────────────────────────────────────────────────
+
+    def test_set_tag_executes_insert(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.tracking import set_tag
+
+        set_tag(conn, "r1", "team", "bioml", task="t", model_name="m")
+        sqls = [str(c[0][0]) for c in cursor.execute.call_args_list]
+        assert any("INSERT" in s for s in sqls)
+
+    def test_set_tags_iterates_dict(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.tracking import set_tags
+
+        set_tags(conn, "r1", {"team": "bioml", "env": "prod"}, task="t", model_name="m")
+        assert cursor.execute.call_count >= 4
+
+    # ── tracking.py — get_run ──────────────────────────────────────────────
+
+    def test_get_run_returns_full_snapshot(self, mock_conn):
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchone.return_value = {
+            "run_id": "r1",
+            "task": "t",
+            "model_name": "m",
+            "status": "running",
+            "started_at": now,
+            "finished_at": None,
+            "actor": "manish",
+        }
+        cursor.fetchall.return_value = []
+
+        from omnibioai_model_registry.tracking import get_run
+
+        result = get_run(conn, "r1")
+        assert result["run_id"] == "r1"
+        assert result["task"] == "t"
+        assert result["actor"] == "manish"
+        assert isinstance(result["params"], dict)
+        assert isinstance(result["tags"], dict)
+        assert isinstance(result["metrics_summary"], dict)
+        assert result["finished_at"] is None
+        assert "T" in result["started_at"]
+
+    def test_get_run_with_finished_datetime(self, mock_conn):
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchone.return_value = {
+            "run_id": "r1",
+            "task": "t",
+            "model_name": "m",
+            "status": "finished",
+            "started_at": now,
+            "finished_at": now,
+            "actor": None,
+        }
+        cursor.fetchall.return_value = []
+
+        from omnibioai_model_registry.tracking import get_run
+
+        result = get_run(conn, "r1")
+        assert result["finished_at"] is not None
+        assert "T" in result["finished_at"]
+
+    def test_get_run_with_none_started_at(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {
+            "run_id": "r1",
+            "task": "t",
+            "model_name": "m",
+            "status": "running",
+            "started_at": None,
+            "finished_at": None,
+            "actor": None,
+        }
+        cursor.fetchall.return_value = []
+
+        from omnibioai_model_registry.tracking import get_run
+
+        result = get_run(conn, "r1")
+        assert result["started_at"] is None
+
+    def test_get_run_raises_if_not_found(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = None
+
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import get_run
+
+        with pytest.raises(ModelNotFound):
+            get_run(conn, "nonexistent")
+
+    def test_get_run_parses_params_from_json(self, mock_conn):
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchone.return_value = {
+            "run_id": "r1",
+            "task": "t",
+            "model_name": "m",
+            "status": "running",
+            "started_at": now,
+            "finished_at": None,
+            "actor": None,
+        }
+        cursor.fetchall.side_effect = [
+            [{"key_name": "lr", "value_text": "0.001"}],
+            [],
+            [],
+        ]
+
+        from omnibioai_model_registry.tracking import get_run
+
+        result = get_run(conn, "r1")
+        assert result["params"]["lr"] == 0.001
+
+    def test_get_run_handles_invalid_json_param(self, mock_conn):
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchone.return_value = {
+            "run_id": "r1",
+            "task": "t",
+            "model_name": "m",
+            "status": "running",
+            "started_at": now,
+            "finished_at": None,
+            "actor": None,
+        }
+        cursor.fetchall.side_effect = [
+            [{"key_name": "mode", "value_text": "not_json_value"}],
+            [],
+            [],
+        ]
+
+        from omnibioai_model_registry.tracking import get_run
+
+        result = get_run(conn, "r1")
+        assert result["params"]["mode"] == "not_json_value"
+
+    def test_get_run_metrics_summary_deduplicates_keys(self, mock_conn):
+        """Covers the 'key already in metrics_summary' branch."""
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchone.return_value = {
+            "run_id": "r1",
+            "task": "t",
+            "model_name": "m",
+            "status": "running",
+            "started_at": now,
+            "finished_at": None,
+            "actor": None,
+        }
+        cursor.fetchall.side_effect = [
+            [],
+            [],
+            [
+                {"key_name": "acc", "value": 0.97, "step": 1},
+                {"key_name": "acc", "value": 0.95, "step": 0},
+            ],
+        ]
+
+        from omnibioai_model_registry.tracking import get_run
+
+        result = get_run(conn, "r1")
+        assert result["metrics_summary"]["acc"] == 0.97
+
+    # ── tracking.py — get_metric_history ───────────────────────────────────
+
+    def test_get_metric_history_returns_list(self, mock_conn):
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchall.return_value = [
+            {"value": 0.9, "step": 0, "ts_utc": now},
+            {"value": 0.95, "step": 1, "ts_utc": now},
+        ]
+
+        from omnibioai_model_registry.tracking import get_metric_history
+
+        result = get_metric_history(conn, "r1", "accuracy")
+        assert len(result) == 2
+        assert result[0]["value"] == 0.9
+        assert result[1]["step"] == 1
+        assert "T" in result[0]["ts_utc"]
+
+    def test_get_metric_history_handles_none_ts_utc(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchall.return_value = [
+            {"value": 0.9, "step": 0, "ts_utc": None},
+        ]
+
+        from omnibioai_model_registry.tracking import get_metric_history
+
+        result = get_metric_history(conn, "r1", "accuracy")
+        assert result[0]["ts_utc"] is None
+
+    # ── tracking.py — list_runs ────────────────────────────────────────────
+
+    def test_list_runs_returns_list(self, mock_conn):
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchall.return_value = [
+            {"run_id": "r1", "status": "running", "started_at": now, "finished_at": None},
+        ]
+
+        from omnibioai_model_registry.tracking import list_runs
+
+        result = list_runs(conn, "t", "m")
+        assert len(result) == 1
+        assert result[0]["run_id"] == "r1"
+        assert result[0]["finished_at"] is None
+
+    def test_list_runs_with_finished_at(self, mock_conn):
+        from datetime import datetime, timezone
+
+        conn, cursor = mock_conn
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        cursor.fetchall.return_value = [
+            {"run_id": "r1", "status": "finished", "started_at": now, "finished_at": now},
+        ]
+
+        from omnibioai_model_registry.tracking import list_runs
+
+        result = list_runs(conn, "t", "m")
+        assert result[0]["finished_at"] is not None
+
+    def test_list_runs_empty(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchall.return_value = []
+
+        from omnibioai_model_registry.tracking import list_runs
+
+        assert list_runs(conn, "t", "m") == []
+
+    # ── tracking.py — version tags ─────────────────────────────────────────
+
+    def test_set_version_tag_executes_insert(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.tracking import set_version_tag
+
+        set_version_tag(conn, "t", "m", "v1", "team", "bioml")
+        sqls = [str(c[0][0]) for c in cursor.execute.call_args_list]
+        assert any("INSERT" in s for s in sqls)
+
+    def test_get_version_tags_returns_dict(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchall.return_value = [
+            {"key_name": "team", "value_text": "bioml"},
+            {"key_name": "env", "value_text": "prod"},
+        ]
+
+        from omnibioai_model_registry.tracking import get_version_tags
+
+        result = get_version_tags(conn, "t", "m", "v1")
+        assert result["team"] == "bioml"
+        assert result["env"] == "prod"
+
+    def test_get_version_tags_empty(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchall.return_value = []
+
+        from omnibioai_model_registry.tracking import get_version_tags
+
+        assert get_version_tags(conn, "t", "m", "v1") == {}
+
+
+# ============================================================
+# plugin_client.py — TestPluginClient
+# ============================================================
+
+
+class TestPluginClient:
+
+    def _fake_urlopen(self, posted: list, body: bytes = b'{"ok": true}'):
+        """Return a fake urlopen side_effect that records the posted payloads."""
+        from unittest.mock import MagicMock
+
+        def side_effect(req, **kwargs):
+            posted.append(json.loads(req.data))
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = body
+            mock_resp.__enter__ = lambda s: s
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            return mock_resp
+
+        return side_effect
+
+    # ── __init__ ───────────────────────────────────────────────────────────
+
+    def test_init_with_explicit_url(self):
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        client = PluginClient(registry_url="http://example.com:9000")
+        assert client._url == "http://example.com:9000"
+
+    def test_init_strips_trailing_slash(self):
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        client = PluginClient(registry_url="http://example.com/")
+        assert client._url == "http://example.com"
+
+    def test_init_without_url_uses_default(self, monkeypatch):
+        monkeypatch.delenv("OMNIBIOAI_REGISTRY_URL", raising=False)
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        client = PluginClient()
+        assert "localhost" in client._url or "8000" in client._url
+
+    def test_init_uses_env_var(self, monkeypatch):
+        monkeypatch.setenv("OMNIBIOAI_REGISTRY_URL", "http://myregistry:7000")
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        client = PluginClient()
+        assert client._url == "http://myregistry:7000"
+
+    # ── start ──────────────────────────────────────────────────────────────
+
+    def test_start_creates_run_id(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            client = PluginClient(registry_url="http://test")
+            run_id = client.start(task="t", model_name="m")
+
+        assert isinstance(run_id, str)
+        assert len(run_id) > 0
+        assert client._run_id == run_id
+
+    def test_start_posts_to_runs_start(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            client = PluginClient(registry_url="http://test")
+            client.start(task="t", model_name="m")
+
+        assert len(posted) == 1
+        assert posted[0]["task"] == "t"
+        assert posted[0]["model_name"] == "m"
+
+    # ── log_param / log_params ─────────────────────────────────────────────
+
+    def test_log_param_posts_correct_payload(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            client = PluginClient(registry_url="http://test")
+            client._run_id = "run123"
+            client.log_param("lr", 0.001)
+
+        assert len(posted) == 1
+        assert posted[0]["key"] == "lr"
+        assert posted[0]["value"] == 0.001
+        assert posted[0]["run_id"] == "run123"
+
+    def test_log_params_posts_each_param(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            client = PluginClient(registry_url="http://test")
+            client._run_id = "run123"
+            client.log_params({"lr": 0.001, "epochs": 50})
+
+        assert len(posted) == 2
+        keys = {p["key"] for p in posted}
+        assert keys == {"lr", "epochs"}
+
+    # ── log_metric / log_metrics ───────────────────────────────────────────
+
+    def test_log_metric_posts_correct_payload(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            client = PluginClient(registry_url="http://test")
+            client._run_id = "run123"
+            client.log_metric("accuracy", 0.95, step=1)
+
+        assert len(posted) == 1
+        assert posted[0]["key"] == "accuracy"
+        assert posted[0]["value"] == 0.95
+        assert posted[0]["step"] == 1
+
+    def test_log_metrics_posts_each_metric(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            client = PluginClient(registry_url="http://test")
+            client._run_id = "run123"
+            client.log_metrics({"acc": 0.9, "f1": 0.85}, step=0)
+
+        assert len(posted) == 2
+        keys = {p["key"] for p in posted}
+        assert keys == {"acc", "f1"}
+        for p in posted:
+            assert p["step"] == 0
+
+    # ── set_tag ────────────────────────────────────────────────────────────
+
+    def test_set_tag_posts_correct_payload(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            client = PluginClient(registry_url="http://test")
+            client._run_id = "run123"
+            client.set_tag("team", "bioml")
+
+        assert len(posted) == 1
+        assert posted[0]["key"] == "team"
+        assert posted[0]["value"] == "bioml"
+
+    # ── finish ─────────────────────────────────────────────────────────────
+
+    def test_finish_returns_run_id(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            client = PluginClient(registry_url="http://test")
+            client._run_id = "run123"
+            result = client.finish()
+
+        assert result == "run123"
+
+    def test_finish_with_no_run_id_returns_none(self):
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        client = PluginClient(registry_url="http://test")
+        assert client.finish() is None
+
+    # ── context manager ────────────────────────────────────────────────────
+
+    def test_context_manager_calls_finish_on_exit(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        posted: list = []
+        with patch("urllib.request.urlopen", side_effect=self._fake_urlopen(posted)):
+            with PluginClient(registry_url="http://test") as client:
+                client._run_id = "run123"
+                client.set_tag("k", "v")
+
+        run_ids = [p.get("run_id") for p in posted]
+        assert "run123" in run_ids
+
+    # ── _post error handling ───────────────────────────────────────────────
+
+    def test_post_handles_http_error_gracefully(self):
+        import urllib.error
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        def bad_urlopen(req, **kwargs):
+            raise urllib.error.HTTPError(
+                url="http://test/v1/runs/log_param",
+                code=500,
+                msg="Internal Server Error",
+                hdrs=None,
+                fp=None,
+            )
+
+        with patch("urllib.request.urlopen", side_effect=bad_urlopen):
+            client = PluginClient(registry_url="http://test")
+            client._run_id = "run123"
+            result = client._post("/v1/runs/log_param", {"run_id": "run123"})
+
+        assert result is not None
+        assert result.get("code") == 500
+
+    def test_post_handles_connection_error_gracefully(self):
+        from unittest.mock import patch
+
+        from omnibioai_model_registry.plugin_client import PluginClient
+
+        def bad_urlopen(req, **kwargs):
+            raise ConnectionError("Connection refused")
+
+        with patch("urllib.request.urlopen", side_effect=bad_urlopen):
+            client = PluginClient(registry_url="http://test")
+            client._run_id = "run123"
+            result = client._post("/v1/runs/log_param", {"run_id": "run123"})
+
+        assert result is None
+
+
+# ============================================================
+# auth.py — TestAuth
+# ============================================================
+
+
+class TestAuth:
+
+    def test_require_auth_returns_system_when_disabled(self, monkeypatch):
+        import asyncio
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        from omnibioai_model_registry.auth import require_auth
+        actor = asyncio.run(require_auth(authorization=None))
+        assert actor == "system"
+
+    def test_extract_token_raises_on_missing_header(self):
+        from omnibioai_model_registry.auth import AuthError, extract_token
+        with pytest.raises(AuthError) as exc_info:
+            extract_token(None)
+        assert exc_info.value.status_code == 401
+
+    def test_extract_token_raises_on_non_bearer_header(self):
+        from omnibioai_model_registry.auth import AuthError, extract_token
+        with pytest.raises(AuthError) as exc_info:
+            extract_token("Basic abc123")
+        assert exc_info.value.status_code == 401
+
+    def test_extract_token_returns_token_on_valid_bearer(self):
+        from omnibioai_model_registry.auth import extract_token
+        token = extract_token("Bearer mytoken123")
+        assert token == "mytoken123"
+
+    def test_validate_token_raises_on_expired_token(self):
+        import jwt
+        from datetime import datetime, timezone
+        from omnibioai_model_registry.auth import AuthError, validate_token
+        expired = jwt.encode(
+            {"sub": "user1", "exp": datetime(2020, 1, 1, tzinfo=timezone.utc)},
+            "secret",
+            algorithm="HS256",
+        )
+        with pytest.raises(AuthError) as exc_info:
+            validate_token(expired, "secret")
+        assert exc_info.value.status_code == 401
+
+    def test_validate_token_raises_on_wrong_secret(self):
+        import jwt
+        from omnibioai_model_registry.auth import AuthError, validate_token
+        token = jwt.encode({"sub": "user1"}, "correct_secret", algorithm="HS256")
+        with pytest.raises(AuthError) as exc_info:
+            validate_token(token, "wrong_secret")
+        assert exc_info.value.status_code == 401
+
+    def test_validate_token_returns_payload_on_valid_token(self):
+        import jwt
+        from omnibioai_model_registry.auth import validate_token
+        token = jwt.encode({"sub": "user1", "extra": "data"}, "secret", algorithm="HS256")
+        payload = validate_token(token, "secret")
+        assert payload["sub"] == "user1"
+        assert payload["extra"] == "data"
+
+    def test_get_actor_extracts_from_sub(self):
+        from omnibioai_model_registry.auth import get_actor
+        assert get_actor({"sub": "user@example.com"}) == "user@example.com"
+
+    def test_get_actor_extracts_from_username(self):
+        from omnibioai_model_registry.auth import get_actor
+        assert get_actor({"username": "manish"}) == "manish"
+
+    def test_get_actor_falls_back_to_unknown(self):
+        from omnibioai_model_registry.auth import get_actor
+        assert get_actor({}) == "unknown"
+        assert get_actor({"irrelevant": "field"}) == "unknown"
+
+
+# ============================================================
+# audit_client.py — TestAuditClient
+# ============================================================
+
+
+class TestAuditClient:
+
+    def test_log_event_with_empty_audit_url_does_nothing(self):
+        from omnibioai_model_registry.audit_client import AuditClient
+        client = AuditClient("")
+        # Should complete silently without raising or spawning a thread
+        client.log_event("register_model", "system", "t/m@v1")
+
+    def test_log_event_fires_http_post_in_background_thread(self):
+        from unittest.mock import MagicMock, patch
+        from omnibioai_model_registry.audit_client import AuditClient
+
+        client = AuditClient("http://test-audit:8004")
+        mock_thread = MagicMock()
+
+        with patch("omnibioai_model_registry.audit_client.threading.Thread", return_value=mock_thread) as mock_cls:
+            client.log_event("register_model", "actor@test", "t/m@v1",
+                             task="t", model_name="m", version="v1")
+            mock_cls.assert_called_once()
+            call_kwargs = mock_cls.call_args[1]
+            assert call_kwargs.get("daemon") is True
+            mock_thread.start.assert_called_once()
+
+    def test_send_swallows_connection_errors_silently(self):
+        from unittest.mock import patch
+        from omnibioai_model_registry.audit_client import AuditClient
+
+        def bad_urlopen(req, timeout=None):
+            raise ConnectionError("Connection refused")
+
+        client = AuditClient("http://test-audit:8004")
+        with patch("urllib.request.urlopen", side_effect=bad_urlopen):
+            # Must not raise
+            client._send({"action": "test", "actor": "system"})
+
+    def test_payload_shape_matches_spec(self):
+        from unittest.mock import MagicMock, patch
+        from omnibioai_model_registry.audit_client import AuditClient
+
+        captured = []
+
+        def fake_urlopen(req, timeout=None):
+            captured.append(json.loads(req.data))
+            resp = MagicMock()
+            resp.__enter__ = lambda s: s
+            resp.__exit__ = MagicMock(return_value=False)
+            return resp
+
+        client = AuditClient("http://test-audit:8004")
+        payload = {
+            "service": "model-registry",
+            "action": "register_model",
+            "actor": "user@test",
+            "resource": "t/m@v1",
+            "task": "t",
+            "model_name": "m",
+            "version": "v1",
+            "ts_utc": "2026-06-15T00:00:00+00:00",
+            "metadata": {"env": "prod"},
+        }
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            client._send(payload)
+
+        assert len(captured) == 1
+        p = captured[0]
+        for key in ("service", "action", "actor", "resource", "ts_utc"):
+            assert key in p, f"missing key: {key}"
+        assert p["service"] == "model-registry"
+        assert p["action"] == "register_model"
+        assert p["actor"] == "user@test"
+        assert p["resource"] == "t/m@v1"
+        assert p["metadata"] == {"env": "prod"}
+
+
+# ============================================================
+# run.py — coverage gaps
+# ============================================================
+
+
+class TestRunLoggerCoverageGaps:
+
+    def test_run_logger_without_registry_root_uses_env(self, env_root):
+        """Covers run.py _resolve_registry_root(None) → load_config() path."""
+        from omnibioai_model_registry.run import RunLogger
+        r = RunLogger(task="t", model_name="m")
+        assert isinstance(r.run_id, str)
+        r.log_param("lr", 0.001)
+
+    def test_run_logger_write_json_cleanup_on_replace_failure(self, tmp_path, monkeypatch):
+        """Covers run.py lines 33-35: os.unlink(tmp) called when replace fails."""
+        import omnibioai_model_registry.run as run_mod
+        from omnibioai_model_registry.run import RunLogger
+
+        replace_calls = []
+
+        orig_replace = run_mod.os.replace
+
+        def bad_replace(src, dst):
+            replace_calls.append(src)
+            raise OSError("simulated replace failure")
+
+        monkeypatch.setattr(run_mod.os, "replace", bad_replace)
+        r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
+        with pytest.raises(OSError):
+            r.log_param("x", 1)
+
+
+# ============================================================
+# service/app/main.py — comprehensive route coverage
+# ============================================================
+
+
+@pytest.fixture
+def full_svc_client(tmp_path, monkeypatch):
+    root = tmp_path / "registry"
+    monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+    monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+    monkeypatch.delenv("AUTH_ENABLED", raising=False)
+    import omnibioai_model_registry.service.app.main as _svc
+    from fastapi.testclient import TestClient
+    new_reg = _svc.ModelRegistry.from_env()
+    monkeypatch.setattr(_svc, "registry", new_reg)
+    return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+
+class TestServiceAllRoutes:
+    """Exercise previously untested routes for coverage."""
+
+    def _register(self, root, tmp_path, task="t", model="m", version="v1"):
+        src = tmp_path / f"src_{task}_{model}_{version}"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc.registry.register_model(
+            task=task, model_name=model, version=version,
+            artifacts_dir=src, metadata={}, set_alias=None,
+        )
+        return src
+
+    def test_health_endpoint(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.get("/health")
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        assert "version" in r.json()
+
+    def test_register_endpoint_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        r = client.post("/v1/register", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": str(src), "metadata": {},
+        })
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        assert r.json()["version"] == "v1"
+
+    def test_register_endpoint_error(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.post("/v1/register", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": "/nonexistent/path", "metadata": {},
+        })
+        assert r.status_code == 400
+
+    def test_promote_endpoint_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        r = client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "alias": "staging", "version": "v1",
+        })
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_promote_endpoint_error(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "alias": "prod", "version": "nonexistent",
+        })
+        assert r.status_code == 400
+
+    def test_resolve_endpoint_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        assert "path" in r.json()
+
+    def test_resolve_endpoint_missing(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@missing"})
+        assert r.status_code == 400
+
+    def test_verify_endpoint_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        r = client.post("/v1/verify", json={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_show_endpoint_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        r = client.get("/v1/show", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["ok"] is True
+        assert "meta" in data
+        assert "package_dir" in data
+
+    def test_show_endpoint_missing_meta(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        meta_path = root / "tasks" / "t" / "models" / "m" / "versions" / "v1" / "model_meta.json"
+        meta_path.unlink()
+        r = client.get("/v1/show", params={"task": "t", "ref": "m@v1"})
+        # HTTPException(404) raised inside try-except gets caught and re-wrapped as 500
+        assert r.status_code == 500
+
+    def test_metrics_endpoint_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["ok"] is True
+        assert "version_metrics" in data
+        assert "run_history" in data
+        assert data["version_metrics"]["acc"] == 0.9
+
+    def test_artifacts_endpoint_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        r = client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["ok"] is True
+        assert isinstance(data["files"], list)
+        assert len(data["files"]) > 0
+
+    def test_runs_log_metric_returns_503_without_db(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.post("/v1/runs/log-metric", json={
+            "task": "t", "model_name": "m", "run_id": "r1",
+            "key": "accuracy", "value": 0.95, "step": 0,
+        })
+        assert r.status_code == 503
+
+    def test_runs_log_param_returns_503_without_db(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.post("/v1/runs/log-param", json={
+            "task": "t", "model_name": "m", "run_id": "r1",
+            "key": "lr", "value": 0.001,
+        })
+        assert r.status_code == 503
+
+    def test_runs_log_batch_returns_503_without_db(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.post("/v1/runs/log-batch", json={
+            "task": "t", "model_name": "m", "run_id": "r1",
+            "metrics": [], "params": {}, "tags": {},
+        })
+        assert r.status_code == 503
+
+    def test_runs_get_returns_503_without_db(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.get("/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"})
+        assert r.status_code == 503
+
+    def test_runs_list_returns_503_without_db(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.get("/v1/runs/list", params={"task": "t", "model": "m"})
+        assert r.status_code == 503
+
+    def test_tags_endpoint_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        r = client.put("/v1/tags", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "key": "team", "value": "bioml",
+        })
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        meta_path = root / "tasks" / "t" / "models" / "m" / "versions" / "v1" / "model_meta.json"
+        meta = json.loads(meta_path.read_text())
+        assert meta["tags"]["team"] == "bioml"
+
+    def test_versions_patch_success(self, full_svc_client, tmp_path):
+        client, root = full_svc_client
+        self._register(root, tmp_path)
+        r = client.post("/v1/versions/patch", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "description": "Updated description",
+            "tags": {"env": "prod"},
+        })
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_versions_patch_not_found(self, full_svc_client):
+        client, _ = full_svc_client
+        r = client.post("/v1/versions/patch", json={
+            "task": "t", "model_name": "nonexistent", "version": "v99",
+        })
+        assert r.status_code == 404
+
+    def test_auth_status_open_mode(self, full_svc_client, monkeypatch):
+        client, _ = full_svc_client
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        r = client.get("/v1/auth/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["auth_enabled"] is False
+        assert data["mode"] == "open"
+        assert data["iam_url"] is None
+
+    def test_auth_status_jwt_mode(self, full_svc_client, monkeypatch):
+        client, _ = full_svc_client
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("IAM_URL", "http://auth-service:8001")
+        r = client.get("/v1/auth/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["auth_enabled"] is True
+        assert data["mode"] == "jwt"
+        assert data["iam_url"] == "http://auth-service:8001"
+
+    def test_register_then_promote_then_resolve_alias(self, full_svc_client, tmp_path):
+        """End-to-end: register → promote → resolve alias."""
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        client.post("/v1/register", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": str(src), "metadata": {},
+        })
+        client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "alias": "latest", "version": "v1",
+        })
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@latest"})
+        assert r.status_code == 200
+        assert "v1" in r.json()["path"]
+
+    def test_startup_handler_auth_disabled(self, monkeypatch, tmp_path):
+        """Cover startup handler: auth_enabled=False branch."""
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(tmp_path))
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc._startup()  # must not raise
+
+    def test_startup_handler_auth_enabled(self, monkeypatch, tmp_path):
+        """Cover startup handler: auth_enabled=True branch."""
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(tmp_path))
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc._startup()  # must not raise
+
+    def test_startup_handler_load_config_exception(self, monkeypatch):
+        """Cover startup handler except Exception: pass (line ~72)."""
+        monkeypatch.delenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", raising=False)
+        monkeypatch.delenv("REGISTRY_ROOT", raising=False)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc._startup()  # load_config raises → caught silently
+
+    def test_metrics_endpoint_with_run_id_filesystem_fallback(self, full_svc_client, tmp_path, monkeypatch):
+        """Cover metrics endpoint filesystem fallback for run history (lines ~543-579)."""
+        monkeypatch.delenv("DB_HOST", raising=False)
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc.registry.register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=src,
+            metadata={"lineage": {"run_id": "run123"}},
+            set_alias=None,
+        )
+        run_dir = root / "tasks" / "t" / "models" / "m" / "runs" / "run123" / "metrics"
+        run_dir.mkdir(parents=True)
+        (run_dir / "accuracy.jsonl").write_text(
+            json.dumps({"key": "accuracy", "value": 0.95, "step": 0, "ts_utc": "2026-01-01T00:00:00Z"}) + "\n"
+            + "\n"  # blank line to test skip
+            + "invalid json line\n"  # to test exception handling
+        )
+        r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["ok"] is True
+        assert "accuracy" in data["run_history"]
+
+    def test_runs_log_metric_with_mocked_db(self, full_svc_client, monkeypatch):
+        """Cover runs/log-metric handler body with mocked DB."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        mock_conn = MagicMock()
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.log_metric"):
+                r = client.post("/v1/runs/log-metric", json={
+                    "task": "t", "model_name": "m", "run_id": "r1",
+                    "key": "accuracy", "value": 0.95, "step": 0,
+                })
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_runs_log_param_with_mocked_db(self, full_svc_client):
+        """Cover runs/log-param handler body with mocked DB."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        mock_conn = MagicMock()
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.log_param"):
+                r = client.post("/v1/runs/log-param", json={
+                    "task": "t", "model_name": "m", "run_id": "r1",
+                    "key": "lr", "value": 0.001,
+                })
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_runs_log_batch_with_mocked_db(self, full_svc_client):
+        """Cover runs/log-batch handler body with mocked DB."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        mock_conn = MagicMock()
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.log_metric"):
+                with patch("omnibioai_model_registry.tracking.log_params"):
+                    with patch("omnibioai_model_registry.tracking.set_tags"):
+                        r = client.post("/v1/runs/log-batch", json={
+                            "task": "t", "model_name": "m", "run_id": "r1",
+                            "metrics": [{"key": "acc", "value": 0.9, "step": 0}],
+                            "params": {"lr": 0.001},
+                            "tags": {"team": "bioml"},
+                        })
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_runs_get_with_mocked_db(self, full_svc_client):
+        """Cover runs/get handler body with mocked DB."""
+        from datetime import datetime, timezone
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        mock_conn = MagicMock()
+        run_data = {
+            "run_id": "r1", "task": "t", "model_name": "m",
+            "status": "running",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": None,
+            "actor": "system",
+            "params": {}, "tags": {}, "metrics_summary": {},
+        }
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.get_run", return_value=run_data):
+                with patch("omnibioai_model_registry.tracking.get_metric_history", return_value=[]):
+                    r = client.get("/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"})
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_runs_list_with_mocked_db(self, full_svc_client):
+        """Cover runs/list handler body with mocked DB."""
+        from datetime import datetime, timezone
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        mock_conn = MagicMock()
+        run_list = [{"run_id": "r1", "status": "running"}]
+        run_detail = {
+            "run_id": "r1", "task": "t", "model_name": "m",
+            "status": "running",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": None,
+            "actor": None,
+            "params": {}, "tags": {}, "metrics_summary": {},
+        }
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.list_runs", return_value=run_list):
+                with patch("omnibioai_model_registry.tracking.get_run", return_value=run_detail):
+                    r = client.get("/v1/runs/list", params={"task": "t", "model": "m"})
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+
+class TestAuthRequireWriteAuth:
+    """Cover auth.py require_write_auth (lines 84-89)."""
+
+    def test_require_write_auth_disabled_returns_system(self, monkeypatch):
+        import asyncio
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        from omnibioai_model_registry.auth import require_write_auth
+        actor = asyncio.run(require_write_auth(authorization=None))
+        assert actor == "system"
+
+    def test_require_write_auth_enabled_valid_jwt(self, monkeypatch):
+        import asyncio
+        import jwt
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        token = jwt.encode({"sub": "user@test.com"}, "testsecret", algorithm="HS256")
+        from omnibioai_model_registry.auth import require_write_auth
+        actor = asyncio.run(require_write_auth(authorization=f"Bearer {token}"))
+        assert actor == "user@test.com"
+
+    def test_require_auth_enabled_invalid_token_raises_401(self, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        from omnibioai_model_registry.auth import require_auth
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(require_auth(authorization="Bearer invalidtoken"))
+        assert exc_info.value.status_code == 401
+
+    def test_require_auth_enabled_missing_header_raises_401(self, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        from omnibioai_model_registry.auth import require_auth
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(require_auth(authorization=None))
+        assert exc_info.value.status_code == 401
+
+
+# ============================================================
+# Targeted gap-closure tests for remaining uncovered statements
+# ============================================================
+
+
+class TestServiceCoverageGaps:
+    """Close the remaining ~50 uncovered statements in service/app/main.py."""
+
+    # ── _startup() variations ────────────────────────────────────────────────
+
+    def test_startup_db_none_early_return(self, monkeypatch, tmp_path):
+        """Cover line 72: early return when _db is None."""
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(tmp_path))
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        import omnibioai_model_registry.service.app.main as _svc
+        orig_db = _svc._db
+        try:
+            _svc._db = None
+            _svc._startup()  # hits line 71 (if _db is None: return)
+        finally:
+            _svc._db = orig_db
+
+    def test_startup_mock_db_success(self, monkeypatch, tmp_path):
+        """Cover lines 75-77: successful DB init in startup."""
+        from unittest.mock import MagicMock
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(tmp_path))
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        import omnibioai_model_registry.service.app.main as _svc
+        mock_conn = MagicMock()
+        mock_db = MagicMock()
+        mock_db.get_connection.return_value = mock_conn
+        orig_db = _svc._db
+        try:
+            _svc._db = mock_db
+            _svc._startup()  # hits init_tables + conn.close + log.info
+        finally:
+            _svc._db = orig_db
+
+    # ── _get_db_conn() variations ────────────────────────────────────────────
+
+    def test_get_db_conn_when_db_module_is_none(self, full_svc_client, monkeypatch):
+        """Cover line 259: HTTPException 503 when _db is None."""
+        from unittest.mock import patch
+        client, _ = full_svc_client
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_db", None):
+            r = client.get("/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"})
+        assert r.status_code == 503
+
+    def test_get_db_conn_generic_exception(self, full_svc_client, monkeypatch):
+        """Cover lines 264-265: HTTPException 503 on generic DB error."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        import omnibioai_model_registry.service.app.main as _svc
+        mock_db = MagicMock()
+        mock_db.get_connection.side_effect = RuntimeError("pool exhausted")
+        with patch.object(_svc, "_db", mock_db):
+            r = client.get("/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"})
+        assert r.status_code == 503
+
+    # ── api_verify error path ────────────────────────────────────────────────
+
+    def test_verify_nonexistent_model_returns_error(self, full_svc_client):
+        """Cover lines 339-340: api_verify exception path."""
+        client, _ = full_svc_client
+        r = client.post("/v1/verify", json={"task": "t", "ref": "m@nonexistent_ver"})
+        assert r.status_code in (400, 404, 500)
+
+    # ── list_models filter edge cases ─────────────────────────────────────────
+
+    def test_list_models_task_filter_skips_wrong_task(self, full_svc_client):
+        """Cover line 396: task filter continue."""
+        client, root = full_svc_client
+        for task, ver in [("task_a", "v1"), ("task_b", "v1")]:
+            vdir = root / "tasks" / task / "models" / "m" / "versions" / ver
+            vdir.mkdir(parents=True)
+            (vdir / "model_meta.json").write_text(
+                json.dumps({"task": task, "model_name": "m", "version": ver})
+            )
+        r = client.get("/v1/models", params={"task": "task_a"})
+        assert r.status_code == 200
+        tasks = [m["task"] for m in r.json()]
+        assert all(t == "task_a" for t in tasks)
+        assert len(tasks) == 1
+
+    def test_list_models_model_name_filter_skips_wrong_model(self, full_svc_client):
+        """Cover line 398: model_name filter continue."""
+        client, root = full_svc_client
+        for mn, ver in [("model_a", "v1"), ("model_b", "v1")]:
+            vdir = root / "tasks" / "t" / "models" / mn / "versions" / ver
+            vdir.mkdir(parents=True)
+            (vdir / "model_meta.json").write_text(
+                json.dumps({"task": "t", "model_name": mn, "version": ver})
+            )
+        r = client.get("/v1/models", params={"model_name": "model_a"})
+        assert r.status_code == 200
+        names = [m["model_name"] for m in r.json()]
+        assert names == ["model_a"]
+
+    def test_list_models_metric_gte_skips_model_without_metrics_file(self, full_svc_client):
+        """Cover line 403: continue when metrics file absent with metric_gte filter."""
+        client, root = full_svc_client
+        vdir = root / "tasks" / "t" / "models" / "no_metrics" / "versions" / "v1"
+        vdir.mkdir(parents=True)
+        (vdir / "model_meta.json").write_text(json.dumps({"task": "t", "model_name": "no_metrics"}))
+        r = client.get("/v1/models", params={"metric_gte": "accuracy:0.5"})
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_list_models_metric_gte_skips_bad_metrics_json(self, full_svc_client):
+        """Cover lines 406-407: continue when metrics.json is malformed."""
+        client, root = full_svc_client
+        vdir = root / "tasks" / "t" / "models" / "bad_m" / "versions" / "v1"
+        vdir.mkdir(parents=True)
+        (vdir / "model_meta.json").write_text(json.dumps({"task": "t", "model_name": "bad_m"}))
+        (vdir / "metrics.json").write_text("{{{ invalid json")
+        r = client.get("/v1/models", params={"metric_gte": "accuracy:0.5"})
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_list_models_skips_bad_meta_json(self, full_svc_client):
+        """Cover lines 413-414: continue when model_meta.json is malformed."""
+        client, root = full_svc_client
+        vdir = root / "tasks" / "t" / "models" / "bad2" / "versions" / "v1"
+        vdir.mkdir(parents=True)
+        (vdir / "model_meta.json").write_text("{{{ not json at all")
+        r = client.get("/v1/models")
+        assert r.status_code == 200
+        assert all(m.get("model_name") != "bad2" for m in r.json())
+
+    # ── DB route error paths (after mock conn) ────────────────────────────────
+
+    def test_log_metric_exception_after_conn(self, full_svc_client):
+        """Cover lines 436-437: exception in api_log_metric body after DB conn."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        import omnibioai_model_registry.service.app.main as _svc
+        mock_conn = MagicMock()
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.log_metric",
+                       side_effect=RuntimeError("tracking failed")):
+                r = client.post("/v1/runs/log-metric", json={
+                    "task": "t", "model_name": "m", "run_id": "r1",
+                    "key": "acc", "value": 0.9, "step": 0,
+                })
+        assert r.status_code == 500
+
+    def test_log_param_exception_after_conn(self, full_svc_client):
+        """Cover lines 451-452: exception in api_log_param body after DB conn."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        import omnibioai_model_registry.service.app.main as _svc
+        mock_conn = MagicMock()
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.log_param",
+                       side_effect=RuntimeError("tracking failed")):
+                r = client.post("/v1/runs/log-param", json={
+                    "task": "t", "model_name": "m", "run_id": "r1",
+                    "key": "lr", "value": 0.001,
+                })
+        assert r.status_code == 500
+
+    def test_log_batch_exception_after_conn(self, full_svc_client):
+        """Cover lines 471-472: exception in api_log_batch body after DB conn."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        import omnibioai_model_registry.service.app.main as _svc
+        mock_conn = MagicMock()
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.log_metric",
+                       side_effect=RuntimeError("batch failed")):
+                r = client.post("/v1/runs/log-batch", json={
+                    "task": "t", "model_name": "m", "run_id": "r1",
+                    "metrics": [{"key": "acc", "value": 0.9}],
+                    "params": {}, "tags": {},
+                })
+        assert r.status_code == 500
+
+    def test_run_get_exception_after_conn(self, full_svc_client):
+        """Cover lines 484, 487-488: exception in api_run_get after DB conn."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        import omnibioai_model_registry.service.app.main as _svc
+        mock_conn = MagicMock()
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.get_run",
+                       side_effect=RuntimeError("run not found")):
+                r = client.get("/v1/runs/get",
+                               params={"task": "t", "model": "m", "run_id": "r1"})
+        assert r.status_code == 500
+
+    def test_runs_list_exception_after_conn(self, full_svc_client):
+        """Cover lines 503-504, 506-507: exception in api_runs_list after DB conn."""
+        from unittest.mock import MagicMock, patch
+        client, _ = full_svc_client
+        import omnibioai_model_registry.service.app.main as _svc
+        mock_conn = MagicMock()
+        with patch.object(_svc, "_get_db_conn", return_value=mock_conn):
+            with patch("omnibioai_model_registry.tracking.list_runs",
+                       side_effect=RuntimeError("list failed")):
+                r = client.get("/v1/runs/list", params={"task": "t", "model": "m"})
+        assert r.status_code == 500
+
+    # ── api_metrics edge cases ────────────────────────────────────────────────
+
+    def test_metrics_endpoint_error_resolve(self, full_svc_client):
+        """Cover lines 520-521: error path when resolve_model fails."""
+        client, _ = full_svc_client
+        r = client.get("/v1/metrics", params={"task": "t", "ref": "m@does_not_exist"})
+        assert r.status_code in (400, 404, 500)
+
+    def test_metrics_endpoint_bad_metrics_json(self, full_svc_client, tmp_path):
+        """Cover lines 531-532: except Exception when metrics.json is malformed."""
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc.registry.register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=src, metadata={}, set_alias=None,
+        )
+        vdir = root / "tasks" / "t" / "models" / "m" / "versions" / "v1"
+        (vdir / "metrics.json").write_text("{{{malformed")
+        r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        assert r.json()["version_metrics"] == {}
+
+    def test_metrics_endpoint_bad_meta_json(self, full_svc_client, tmp_path):
+        """Cover lines 536-537: except Exception when model_meta.json is malformed."""
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc.registry.register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=src, metadata={}, set_alias=None,
+        )
+        vdir = root / "tasks" / "t" / "models" / "m" / "versions" / "v1"
+        (vdir / "model_meta.json").write_text("{{{malformed")
+        r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+
+    def test_metrics_with_run_id_and_mock_db_cursor(self, full_svc_client, tmp_path, monkeypatch):
+        """Cover lines 545-555: api_metrics DB cursor path."""
+        from unittest.mock import MagicMock, patch
+        monkeypatch.delenv("DB_HOST", raising=False)
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc.registry.register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=src,
+            metadata={"lineage": {"run_id": "run_abc"}},
+            set_alias=None,
+        )
+        mock_cursor = MagicMock()
+        mock_cursor.fetchall.return_value = [{"key_name": "accuracy"}]
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
+        mock_conn.cursor.return_value.__exit__ = lambda s, *a: False
+        mock_db = MagicMock()
+        mock_db.get_connection.return_value = mock_conn
+        mock_tracking = MagicMock()
+        mock_tracking.get_metric_history.return_value = [
+            {"value": 0.9, "step": 0, "ts_utc": "2026-01-01T00:00:00"}
+        ]
+        with patch.object(_svc, "_db", mock_db):
+            with patch.object(_svc, "_tracking", mock_tracking):
+                r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["ok"] is True
+
+    # ── api_aliases bad file ──────────────────────────────────────────────────
+
+    def test_aliases_skips_malformed_alias_file(self, full_svc_client):
+        """Cover lines 600-601: continue when alias file has bad JSON."""
+        client, root = full_svc_client
+        aliases_dir = root / "tasks" / "t" / "models" / "m" / "aliases"
+        aliases_dir.mkdir(parents=True)
+        (aliases_dir / "bad.json").write_text("{{{ invalid")
+        r = client.get("/v1/aliases", params={"task": "t", "model": "m"})
+        assert r.status_code == 200
+        assert r.json()["aliases"] == []
+
+    # ── api_set_tag DB best-effort path ──────────────────────────────────────
+
+    def test_set_tag_db_best_effort_with_mock(self, full_svc_client, tmp_path):
+        """Cover lines 613-616: DB best-effort path in api_set_tag."""
+        from unittest.mock import MagicMock, patch
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc.registry.register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=src, metadata={}, set_alias=None,
+        )
+        mock_conn = MagicMock()
+        mock_db = MagicMock()
+        mock_db.get_connection.return_value = mock_conn
+        with patch.object(_svc, "_db", mock_db):
+            with patch.object(_svc, "_tracking", MagicMock()):
+                r = client.put("/v1/tags", json={
+                    "task": "t", "model_name": "m", "version": "v1",
+                    "key": "env", "value": "prod",
+                })
+        assert r.status_code == 200
+
+    def test_set_tag_bad_meta_json_returns_500(self, full_svc_client, tmp_path):
+        """Cover lines 637-638: 500 when model_meta.json is unreadable."""
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc.registry.register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=src, metadata={}, set_alias=None,
+        )
+        vdir = root / "tasks" / "t" / "models" / "m" / "versions" / "v1"
+        (vdir / "model_meta.json").write_text("{{{ bad json")
+        r = client.put("/v1/tags", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "key": "k", "value": "v",
+        })
+        assert r.status_code == 500
+
+    # ── api_set_stage edge cases ──────────────────────────────────────────────
+
+    def test_set_stage_not_found_returns_404(self, full_svc_client):
+        """Cover line 695: 404 when version dir does not exist."""
+        client, _ = full_svc_client
+        r = client.post("/v1/stage", json={
+            "task": "t", "model_name": "m", "version": "nonexistent", "stage": "staging",
+        })
+        assert r.status_code == 404
+
+    # ── api_compare bad JSON ──────────────────────────────────────────────────
+
+    def test_compare_bad_metrics_json_uses_empty_dict(self, full_svc_client):
+        """Cover lines 751-754: except Exception → entry['metrics'] = {}."""
+        client, root = full_svc_client
+        for ver in ["v1", "v2"]:
+            vdir = root / "tasks" / "t" / "models" / "m" / "versions" / ver
+            vdir.mkdir(parents=True)
+            (vdir / "model_meta.json").write_text(json.dumps({"task": "t", "version": ver}))
+            (vdir / "metrics.json").write_text("{{{ bad")
+        r = client.get("/v1/compare", params={"task": "t", "model": "m",
+                                               "versions": ["v1", "v2"]})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["versions"]["v1"]["metrics"] == {}
+        assert data["versions"]["v2"]["metrics"] == {}
+
+    def test_compare_bad_meta_json_graceful(self, full_svc_client):
+        """Cover lines 761-762: except Exception → pass when meta read fails."""
+        client, root = full_svc_client
+        for ver in ["v1", "v2"]:
+            vdir = root / "tasks" / "t" / "models" / "m" / "versions" / ver
+            vdir.mkdir(parents=True)
+            (vdir / "metrics.json").write_text(json.dumps({"acc": 0.9}))
+            (vdir / "model_meta.json").write_text("{{{ bad meta")
+        r = client.get("/v1/compare", params={"task": "t", "model": "m",
+                                               "versions": ["v1", "v2"]})
+        assert r.status_code == 200
+        data = r.json()
+        assert "v1" in data["versions"]
+
+    # ── api_artifacts edge cases ──────────────────────────────────────────────
+
+    def test_artifacts_nonexistent_model_returns_error(self, full_svc_client):
+        """Cover lines 771-772: error path when resolve_model fails."""
+        client, _ = full_svc_client
+        r = client.get("/v1/artifacts", params={"task": "t", "ref": "m@no_such_version"})
+        assert r.status_code in (400, 404, 500)
+
+    def test_artifacts_skips_subdirectory(self, full_svc_client, tmp_path):
+        """Cover line 786: continue when entry is a directory (not a file)."""
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        _svc.registry.register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=src, metadata={}, set_alias=None,
+        )
+        vdir = root / "tasks" / "t" / "models" / "m" / "versions" / "v1"
+        (vdir / "subdir").mkdir()
+        r = client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200
+        names = [f["name"] for f in r.json()["files"]]
+        assert "subdir" not in names
+
+    # ── api_auth_status exception path ───────────────────────────────────────
+
+    def test_auth_status_load_config_exception(self, full_svc_client, monkeypatch):
+        """Cover lines 803-805: except Exception block in api_auth_status."""
+        from unittest.mock import patch
+        client, _ = full_svc_client
+        with patch("omnibioai_model_registry.service.app.main.load_config",
+                   side_effect=RuntimeError("config broken")):
+            r = client.get("/v1/auth/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["auth_enabled"] is False
+        assert data["mode"] == "open"
+
+
+class TestRunCoverageGaps:
+    """Cover remaining run.py lines 34-35 (except Exception: pass in cleanup)."""
+
+    def test_atomic_write_json_cleanup_exception_suppressed(self, tmp_path):
+        """Cover lines 34-35: os.path.exists raises → except Exception: pass."""
+        import omnibioai_model_registry.run as run_mod
+        from unittest.mock import patch
+        from omnibioai_model_registry.run import _atomic_write_json
+
+        with patch.object(run_mod.os, "replace", side_effect=OSError("replace fail")):
+            with patch.object(run_mod.os.path, "exists", side_effect=OSError("exists fail")):
+                with pytest.raises(OSError, match="replace fail"):
+                    _atomic_write_json(tmp_path / "out.json", {"data": 1})
