@@ -160,6 +160,7 @@ class RunGetResponse(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
     tags: Dict[str, str] = Field(default_factory=dict)
     metrics_summary: Dict[str, float] = Field(default_factory=dict)
+    metric_history: Dict[str, List[Any]] = Field(default_factory=dict)
 
 
 class MetricPoint(BaseModel):
@@ -455,7 +456,30 @@ def api_run_get(task: str, model: str, run_id: str):
     conn = _get_db_conn()
     try:
         data = _tracking.get_run(conn, run_id)
+        history: Dict[str, List[Any]] = {}
+        for key in data.get("metrics_summary", {}).keys():
+            history[key] = _tracking.get_metric_history(conn, run_id, key)
+        data["metric_history"] = history
         return RunGetResponse(ok=True, **data)
+    except Exception as e:
+        _handle_registry_error(e)
+    finally:
+        conn.close()
+
+
+@app.get(f"{DEFAULT_PREFIX}/runs/list")
+def api_runs_list(task: str, model: str):
+    conn = _get_db_conn()
+    try:
+        basic = _tracking.list_runs(conn, task, model)
+        result = []
+        for r in basic:
+            try:
+                full = _tracking.get_run(conn, r["run_id"])
+                result.append(full)
+            except Exception:
+                result.append(r)
+        return result
     except Exception as e:
         _handle_registry_error(e)
     finally:

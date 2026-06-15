@@ -3,6 +3,7 @@ import { fetchModels, fetchAliases } from "./api/registry";
 import ModelDrawer from "./components/ModelDrawer";
 import RegisterModelModal from "./components/RegisterModelModal";
 import ModelLineageView from "./components/ModelLineageView";
+import ExperimentsView from "./components/ExperimentsView";
 
 export type Model = {
   task: string;
@@ -44,6 +45,7 @@ export default function App() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   // aliasMap: "task:model_name" → ["latest", "production", ...]
   const [aliasMap, setAliasMap] = useState<Record<string, string[]>>({});
+  const [activeTab, setActiveTab] = useState<'models' | 'experiments'>('models');
 
   useEffect(() => {
     load();
@@ -199,7 +201,39 @@ export default function App() {
 
         {/* ── MAIN CONTENT ── flex-column so table can fill remaining height */}
         <main style={mainStyle}>
-          {loading ? (
+          {/* TAB BAR */}
+          <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+            {(["models", "experiments"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: activeTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
+                  color: activeTab === tab ? "var(--accent)" : "var(--text-muted)",
+                  fontWeight: activeTab === tab ? 700 : 400,
+                  fontSize: 14,
+                  padding: "6px 16px 10px",
+                  cursor: "pointer",
+                  borderRadius: 0,
+                  textTransform: "capitalize",
+                }}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "experiments" ? (
+            <ExperimentsView
+              selectedTask={activeTask}
+              onOpenModel={(task, modelName) => {
+                const m = models.find((x) => x.task === task && x.model_name === modelName);
+                if (m) { setActiveTab("models"); setSelected(m); }
+              }}
+            />
+          ) : loading ? (
             <div style={{ color: "var(--text-muted)", textAlign: "center", paddingTop: 60 }}>
               Loading…
             </div>

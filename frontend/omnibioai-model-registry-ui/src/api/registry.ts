@@ -113,6 +113,44 @@ export async function setStage(
   return res.json() as Promise<{ ok: boolean; stage: string; version: string }>;
 }
 
+// ── Runs ──────────────────────────────────────────────────────────────────────
+
+export type RunSummary = {
+  run_id: string;
+  status: 'running' | 'finished' | 'failed';
+  started_at: string;
+  finished_at?: string;
+  params: Record<string, any>;
+  tags: Record<string, string>;
+  metrics_summary: Record<string, number>;
+  task?: string;
+  model_name?: string;
+};
+
+export type RunDetail = RunSummary & {
+  metric_history: Record<string, { value: number; step: number; ts_utc?: string }[]>;
+};
+
+export async function fetchRuns(task: string, model: string): Promise<RunSummary[]> {
+  const res = await fetch(
+    `${BASE_URL}/runs/list?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}`
+  );
+  if (!res.ok) throw new Error(`Failed to fetch runs: ${res.status}`);
+  return res.json() as Promise<RunSummary[]>;
+}
+
+export async function fetchRunDetail(
+  task: string,
+  model: string,
+  run_id: string
+): Promise<RunDetail> {
+  const res = await fetch(
+    `${BASE_URL}/runs/get?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}&run_id=${encodeURIComponent(run_id)}`
+  );
+  if (!res.ok) throw new Error(`Failed to fetch run detail: ${res.status}`);
+  return res.json() as Promise<RunDetail>;
+}
+
 // ── Artifacts ─────────────────────────────────────────────────────────────────
 
 export type ArtifactEntry = { name: string; sha256?: string; size_bytes?: number };
