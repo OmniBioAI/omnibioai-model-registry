@@ -67,3 +67,33 @@ def audit_root(registry_root: Path, task: str, model_name: str) -> Path:
 
 def promotions_log_path(registry_root: Path, task: str, model_name: str) -> Path:
     return audit_root(registry_root, task, model_name) / "promotions.jsonl"
+
+
+# ── Run entity paths ──────────────────────────────────────────────────────────
+
+def runs_root(registry_root: Path, task: str, model_name: str) -> Path:
+    return model_root(registry_root, task, model_name) / "runs"
+
+
+def run_dir(registry_root: Path, task: str, model_name: str, run_id: str) -> Path:
+    return runs_root(registry_root, task, model_name) / run_id
+
+
+def run_params_path(registry_root: Path, task: str, model_name: str, run_id: str) -> Path:
+    return run_dir(registry_root, task, model_name, run_id) / "params.json"
+
+
+def run_tags_path(registry_root: Path, task: str, model_name: str, run_id: str) -> Path:
+    return run_dir(registry_root, task, model_name, run_id) / "tags.json"
+
+
+def run_metric_log_path(
+    registry_root: Path, task: str, model_name: str, run_id: str, metric_key: str
+) -> Path:
+    return run_dir(registry_root, task, model_name, run_id) / "metrics" / f"{metric_key}.jsonl"
+
+
+# ── Version-level extras ──────────────────────────────────────────────────────
+
+def version_tags_path(registry_root: Path, task: str, model_name: str, version: str) -> Path:
+    return version_dir(registry_root, task, model_name, version) / "tags.json"

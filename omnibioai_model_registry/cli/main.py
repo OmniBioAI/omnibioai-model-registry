@@ -1,7 +1,9 @@
 # File: omnibioai_model_registry/cli/main.py
 import argparse
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 from omnibioai_model_registry import (
@@ -11,7 +13,7 @@ from omnibioai_model_registry import (
     resolve_model,
     verify_model_ref,
 )
-from omnibioai_model_registry.errors import ModelRegistryError
+from omnibioai_model_registry.errors import InvalidStageTransition, ModelRegistryError
 
 
 def cmd_list(args):
@@ -126,6 +128,251 @@ def cmd_show(args):
     print(f"Package dir: {vdir}")
 
 
+# ── Phase-3 helpers ───────────────────────────────────────────────────────────
+
+def _resolve_vdir_no_verify(registry: ModelRegistry, task: str, model_ref: str) -> Path:
+    """Resolve model ref → version dir without triggering Cython integrity checks."""
+    from omnibioai_model_registry.refs import parse_model_ref
+    from omnibioai_model_registry.package import layout as L
+    from omnibioai_model_registry.errors import ModelNotFound
+
+    ref = parse_model_ref(model_ref)
+    alias_file = L.alias_path(registry.root, task, ref.model_name, ref.selector)
+    if alias_file.exists():
+        version = json.loads(alias_file.read_text())["version"]
+    else:
+        version = ref.selector
+
+    vdir = L.version_dir(registry.root, task, ref.model_name, version)
+    if not vdir.exists():
+        raise ModelNotFound(f"Model not found: task={task}, ref={model_ref}")
+    return vdir
+
+
+# ── Phase-3 commands ──────────────────────────────────────────────────────────
+
+def cmd_metrics(args):
+    registry = ModelRegistry.from_env()
+    vdir = _resolve_vdir_no_verify(registry, args.task, args.ref)
+
+    metrics_path = vdir / "metrics.json"
+    version_metrics: dict = {}
+    if metrics_path.exists():
+        try:
+            version_metrics = json.loads(metrics_path.read_text())
+        except Exception:
+            pass
+
+    if args.json:
+        print(json.dumps(version_metrics, indent=2))
+        return
+
+    if version_metrics:
+        print("Version metrics:")
+        for k, v in version_metrics.items():
+            print(f"  {k}: {v}")
+    else:
+        print("No version metrics found.")
+
+    # Optionally show step history from DB
+    meta_path = vdir / "model_meta.json"
+    run_id = None
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text())
+            run_id = (meta.get("lineage") or {}).get("run_id")
+        except Exception:
+            pass
+
+    if run_id:
+        try:
+            from omnibioai_model_registry import db, tracking
+            conn = db.get_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT DISTINCT key_name FROM omr_metrics WHERE run_id = %s",
+                        (run_id,),
+                    )
+                    keys = [r["key_name"] for r in cur.fetchall()]
+                if keys:
+                    print(f"\nRun history (run_id={run_id}):")
+                    for key in keys:
+                        history = tracking.get_metric_history(conn, run_id, key)
+                        values = [h["value"] for h in history]
+                        print(f"  {key}: {values}")
+            finally:
+                conn.close()
+        except Exception as exc:
+            print(f"  [DB unavailable — step history skipped: {exc}]", file=sys.stderr)
+
+
+def cmd_aliases(args):
+    from omnibioai_model_registry.package.layout import aliases_root
+
+    registry = ModelRegistry.from_env()
+    aliases_dir = aliases_root(registry.root, args.task, args.model)
+
+    entries = []
+    if aliases_dir.exists():
+        for f in sorted(aliases_dir.glob("*.json")):
+            try:
+                entries.append(json.loads(f.read_text()))
+            except Exception:
+                continue
+
+    if args.json:
+        print(json.dumps(entries, indent=2))
+        return
+
+    if not entries:
+        print("No aliases found.")
+        return
+
+    col = 22
+    hdr = f"{'ALIAS':<{col}} {'VERSION':<{col}} {'UPDATED_AT':<28} {'ACTOR':<{col}}"
+    print(hdr)
+    print("-" * len(hdr))
+    for e in entries:
+        print(
+            f"{str(e.get('alias', '?')):<{col}} "
+            f"{str(e.get('version', '?')):<{col}} "
+            f"{str(e.get('updated_at', '?')):<28} "
+            f"{str(e.get('actor') or '-'):<{col}}"
+        )
+
+
+def cmd_tag(args):
+    registry = ModelRegistry.from_env()
+    vdir = _resolve_vdir_no_verify(registry, args.task, args.ref)
+
+    meta_path = vdir / "model_meta.json"
+    if not meta_path.exists():
+        print(f"model_meta.json not found: {meta_path}", file=sys.stderr)
+        sys.exit(1)
+
+    meta = json.loads(meta_path.read_text())
+    tags = meta.get("tags") or {}
+    tags[args.key] = args.value
+    meta["tags"] = tags
+    text = json.dumps(meta, indent=2) + "\n"
+
+    fd, tmp = tempfile.mkstemp(dir=meta_path.parent, suffix=".tmp")
+    try:
+        os.write(fd, text.encode())
+    finally:
+        os.close(fd)
+    os.replace(tmp, meta_path)
+
+    # Persist to DB if available
+    try:
+        from omnibioai_model_registry import db, tracking
+        conn = db.get_connection()
+        version = meta.get("version", vdir.name)
+        model_name = meta.get("model_name", "")
+        try:
+            tracking.set_version_tag(conn, args.task, model_name, version, args.key, args.value)
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+    print(f"Tagged {args.ref} with {args.key}={args.value}")
+
+
+_VALID_STAGES = frozenset({"none", "staging", "production", "archived"})
+
+
+def cmd_stage(args):
+    if args.stage not in _VALID_STAGES:
+        raise InvalidStageTransition(
+            f"Invalid stage '{args.stage}'. Must be one of: {sorted(_VALID_STAGES)}"
+        )
+
+    from omnibioai_model_registry.package.layout import version_dir as vdir_fn
+    from omnibioai_model_registry.errors import ModelNotFound
+
+    registry = ModelRegistry.from_env()
+    vdir = vdir_fn(registry.root, args.task, args.model, args.version)
+    if not vdir.exists():
+        raise ModelNotFound(
+            f"Version not found: {args.task}/{args.model}/{args.version}"
+        )
+
+    meta_path = vdir / "model_meta.json"
+    if meta_path.exists():
+        meta = json.loads(meta_path.read_text())
+        meta["stage"] = args.stage
+        text = json.dumps(meta, indent=2) + "\n"
+        fd, tmp = tempfile.mkstemp(dir=meta_path.parent, suffix=".tmp")
+        try:
+            os.write(fd, text.encode())
+        finally:
+            os.close(fd)
+        os.replace(tmp, meta_path)
+
+    if args.stage in ("staging", "production"):
+        promote_model(
+            task=args.task,
+            model_name=args.model,
+            alias=args.stage,
+            version=args.version,
+            actor=args.actor,
+            reason=args.reason or f"stage transition to {args.stage}",
+        )
+
+    print(f"Set {args.model}@{args.version} to stage={args.stage}")
+
+
+def cmd_compare(args):
+    from omnibioai_model_registry.package.layout import version_dir as vdir_fn
+
+    registry = ModelRegistry.from_env()
+    all_metrics: dict = {}
+    for ver in args.versions:
+        vdir = vdir_fn(registry.root, args.task, args.model, ver)
+        m: dict = {}
+        if (vdir / "metrics.json").exists():
+            try:
+                m = json.loads((vdir / "metrics.json").read_text())
+            except Exception:
+                pass
+        all_metrics[ver] = m
+
+    if args.json:
+        result = {"versions": {v: {"metrics": all_metrics[v]} for v in args.versions}}
+        print(json.dumps(result, indent=2))
+        return
+
+    all_keys = sorted({k for m in all_metrics.values() for k in m})
+    if not all_keys:
+        print("No metrics found for any version.")
+        return
+
+    col = 16
+    header = f"{'METRIC':<26}" + "".join(f"{v:<{col}}" for v in args.versions)
+    print(header)
+    print("-" * len(header))
+
+    for key in all_keys:
+        vals = {v: all_metrics[v].get(key) for v in args.versions}
+        numeric = {v: val for v, val in vals.items() if isinstance(val, (int, float))}
+        best = max(numeric, key=lambda v: numeric[v]) if numeric else None
+        row = f"{key:<26}"
+        for ver in args.versions:
+            val = vals.get(ver)
+            if val is None:
+                cell = "-"
+            elif isinstance(val, float):
+                cell = f"{val:.4f}"
+            else:
+                cell = str(val)
+            if ver == best and len(args.versions) > 1:
+                cell += "*"
+            row += f"{cell:<{col}}"
+        print(row)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="omr",
@@ -223,6 +470,58 @@ def build_parser():
         "--ref", dest="model_ref", required=True, help="Model reference"
     )
     p_verify.set_defaults(func=cmd_verify)
+
+    # metrics
+    p_metrics = subparsers.add_parser(
+        "metrics", help="Show version metrics and run history"
+    )
+    p_metrics.add_argument("--task", required=True, help="Task name")
+    p_metrics.add_argument("--ref", required=True, help="Model reference (model@version_or_alias)")
+    p_metrics.add_argument("--json", action="store_true", help="Print raw JSON")
+    p_metrics.set_defaults(func=cmd_metrics)
+
+    # aliases
+    p_aliases = subparsers.add_parser("aliases", help="List aliases for a model")
+    p_aliases.add_argument("--task", required=True, help="Task name")
+    p_aliases.add_argument("--model", required=True, help="Model name")
+    p_aliases.add_argument("--json", action="store_true", help="Print raw JSON")
+    p_aliases.set_defaults(func=cmd_aliases)
+
+    # tag
+    p_tag = subparsers.add_parser("tag", help="Set a tag on a model version")
+    p_tag.add_argument("--task", required=True, help="Task name")
+    p_tag.add_argument("--ref", required=True, help="Model reference (model@version_or_alias)")
+    p_tag.add_argument("--key", required=True, help="Tag key")
+    p_tag.add_argument("--value", required=True, help="Tag value")
+    p_tag.add_argument("--actor", default=None, help="Actor name")
+    p_tag.set_defaults(func=cmd_tag)
+
+    # stage
+    p_stage = subparsers.add_parser(
+        "stage", help="Set the lifecycle stage of a model version"
+    )
+    p_stage.add_argument("--task", required=True, help="Task name")
+    p_stage.add_argument("--model", required=True, help="Model name")
+    p_stage.add_argument("--version", required=True, help="Version string")
+    p_stage.add_argument(
+        "--stage", required=True,
+        help="Stage: none | staging | production | archived",
+    )
+    p_stage.add_argument("--actor", default=None, help="Actor performing the transition")
+    p_stage.add_argument("--reason", default=None, help="Reason for the transition")
+    p_stage.set_defaults(func=cmd_stage)
+
+    # compare
+    p_compare = subparsers.add_parser(
+        "compare", help="Compare metrics across model versions"
+    )
+    p_compare.add_argument("--task", required=True, help="Task name")
+    p_compare.add_argument("--model", required=True, help="Model name")
+    p_compare.add_argument(
+        "--versions", nargs="+", required=True, help="Two or more version strings"
+    )
+    p_compare.add_argument("--json", action="store_true", help="Print raw JSON")
+    p_compare.set_defaults(func=cmd_compare)
 
     return parser
 

@@ -1,10 +1,8 @@
 import { useEffect, useState, useMemo, type CSSProperties } from "react";
-import { fetchModels } from "./api/registry";
+import { fetchModels, fetchAliases } from "./api/registry";
 import ModelDrawer from "./components/ModelDrawer";
 import RegisterModelModal from "./components/RegisterModelModal";
 import ModelLineageView from "./components/ModelLineageView";
-
-const BASE_URL = "/v1";
 
 export type Model = {
   task: string;
@@ -59,34 +57,26 @@ export default function App() {
       const normalized: Model[] = Array.isArray(data) ? data : (data.models ?? []);
       setModels(normalized);
 
-      // Probe @latest and @production for every unique (task, model_name) pair.
-      // /v1/resolve returns HTTP 200 when the alias file exists, 400 otherwise.
       const pairs = new Map<string, { task: string; model_name: string }>();
       for (const m of normalized) {
         const key = `${m.task}:${m.model_name}`;
         if (!pairs.has(key)) pairs.set(key, { task: m.task, model_name: m.model_name });
       }
 
-      const probes = Array.from(pairs.entries()).flatMap(([key, { task, model_name }]) =>
-        (["latest", "production"] as const).map(async (alias) => {
+      const aliasResults = await Promise.all(
+        Array.from(pairs.entries()).map(async ([key, { task, model_name }]) => {
           try {
-            const res = await fetch(
-              `${BASE_URL}/resolve?task=${encodeURIComponent(task)}&ref=${encodeURIComponent(
-                `${model_name}@${alias}`
-              )}&verify=false`
-            );
-            return res.ok ? { key, alias } : null;
+            const res = await fetchAliases(task, model_name);
+            return { key, aliases: res.aliases.map((a) => a.alias) };
           } catch {
-            return null;
+            return { key, aliases: [] as string[] };
           }
         })
       );
 
-      const hits = (await Promise.all(probes)).filter(Boolean) as { key: string; alias: string }[];
       const newMap: Record<string, string[]> = {};
-      for (const { key, alias } of hits) {
-        if (!newMap[key]) newMap[key] = [];
-        newMap[key].push(alias);
+      for (const { key, aliases } of aliasResults) {
+        if (aliases.length > 0) newMap[key] = aliases;
       }
       setAliasMap(newMap);
     } finally {
