@@ -119,4 +119,4 @@ secrets/
 # ===============================
 Thumbs.db
 ehthumbs.db
-Desktop.ini
+Desktop.ini**/__pycache__/
