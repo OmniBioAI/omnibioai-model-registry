@@ -89,11 +89,14 @@ class ModelRegistry:
             dst / "model_meta.json", json.dumps(meta, indent=2) + "\n"
         )
 
-        validate_package_files(dst)
-
+        # sha256sums.txt is itself a REQUIRED_FILE, so it must be written
+        # before validate_package_files() runs, or validation will always
+        # fail claiming the manifest is missing.
         hashes = write_sha256_manifest(
             dst, dst / "sha256sums.txt", include_files=L.REQUIRED_FILES
         )
+
+        validate_package_files(dst)
 
         if set_alias:
             self.promote_model(

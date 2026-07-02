@@ -205,6 +205,82 @@ def test_register_fails_if_artifacts_dir_missing(env_root: Path, tmp_path: Path)
         )
 
 
+def test_register_then_resolve_end_to_end_without_precomputed_manifest(
+    env_root: Path, tmp_path: Path
+):
+    """
+    Real regression guard for the v0.1.2 bug: register_model() called
+    validate_package_files() (which requires sha256sums.txt to already
+    exist, since it's in REQUIRED_FILES) BEFORE write_sha256_manifest()
+    ever created that file. That made every registration fail unless the
+    caller had already pre-supplied a sha256sums.txt of their own — which
+    defeats the point of the registry generating it.
+
+    This test intentionally does NOT put a sha256sums.txt in the
+    artifacts_dir (unlike _make_minimal_package/registered_reg above,
+    which pre-seed an empty one and would silently mask this exact bug).
+    It exercises register_model() and resolve_model() end-to-end against
+    a real temp filesystem registry root, with no mocking of write/copy/
+    validate/verify logic, and asserts:
+      - registration succeeds and actually writes a real sha256sums.txt
+      - the manifest contains real hashes for the real files on disk
+      - resolve_model() (which re-validates + re-verifies the manifest)
+        succeeds for both the explicit version and the alias
+    """
+    src = tmp_path / "pkg_src_no_manifest"
+    src.mkdir()
+    (src / "model.pt").write_bytes(b"real weights bytes")
+    (src / "model_genes.txt").write_text("GeneA\nGeneB\nGeneC\n", encoding="utf-8")
+    (src / "label_map.json").write_text(
+        json.dumps({"0": "A", "1": "B"}) + "\n", encoding="utf-8"
+    )
+    (src / "metrics.json").write_text(
+        json.dumps({"acc": 0.95}) + "\n", encoding="utf-8"
+    )
+    (src / "feature_schema.json").write_text(
+        json.dumps({"features": ["GeneA", "GeneB", "GeneC"]}) + "\n", encoding="utf-8"
+    )
+    (src / "model_meta.json").write_text(json.dumps({}) + "\n", encoding="utf-8")
+    assert not (src / "sha256sums.txt").exists()
+
+    reg = ModelRegistry.from_env()
+    out = reg.register_model(
+        task="t",
+        model_name="e2e_model",
+        version="v1",
+        artifacts_dir=src,
+        metadata={"framework": "pytorch"},
+        set_alias="latest",
+        actor="tester",
+        reason="end-to-end regression test",
+    )
+
+    assert out["ok"] is True
+    vdir = Path(out["package_path"])
+    manifest_path = vdir / "sha256sums.txt"
+    assert manifest_path.exists(), (
+        "register_model() must generate sha256sums.txt itself; "
+        "it must not require the caller to supply one"
+    )
+
+    from omnibioai_model_registry.package.manifest import (
+        read_sha256_manifest,
+        sha256_file,
+    )
+
+    on_disk_hashes = read_sha256_manifest(manifest_path)
+    assert on_disk_hashes["model.pt"] == sha256_file(vdir / "model.pt")
+    assert on_disk_hashes["model_meta.json"] == sha256_file(vdir / "model_meta.json")
+    assert out["hashes"] == on_disk_hashes
+
+    # resolve_model re-runs validate_package_files + verify_sha256_manifest
+    # for real (no mocking) — this is the actual consumer path plugins use.
+    resolved_by_version = reg.resolve_model(task="t", model_ref="e2e_model@v1", verify=True)
+    resolved_by_alias = reg.resolve_model(task="t", model_ref="e2e_model@latest", verify=True)
+    assert resolved_by_version.exists()
+    assert str(resolved_by_version) == str(resolved_by_alias)
+
+
 # ============================================================
 # config.py
 # ============================================================
