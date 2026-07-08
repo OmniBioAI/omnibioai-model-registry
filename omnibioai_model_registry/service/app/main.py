@@ -21,6 +21,7 @@ from omnibioai_model_registry.errors import ModelRegistryError, RegistryNotConfi
 from omnibioai_model_registry.config import load_config
 from omnibioai_model_registry.auth import require_auth, require_write_auth
 from omnibioai_model_registry.audit_client import AuditClient
+from omnibioai_model_registry.hf_routes import router as hf_router
 import logging as _logging
 
 _audit = AuditClient(os.environ.get("AUDIT_URL", ""))
@@ -55,6 +56,7 @@ app.add_middleware(
 # Shared registry instance for UI/API
 # ==========================================================
 registry = ModelRegistry.from_env()
+app.include_router(hf_router, prefix=f"{DEFAULT_PREFIX}/hf", tags=["huggingface"])
 
 
 @app.on_event("startup")

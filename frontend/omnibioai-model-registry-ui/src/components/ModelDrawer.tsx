@@ -3,6 +3,7 @@ import type { Model } from "../App";
 import { relativeTime } from "../App";
 import ModelLineageView from "./ModelLineageView";
 import MetricsComparePanel from "./MetricsComparePanel";
+import HFPushButton from "./HFPushButton";
 import { setStage } from "../api/registry";
 
 const BASE_URL = "/v1";
@@ -211,6 +212,12 @@ export default function ModelDrawer({
                     >
                       → production
                     </button>
+                    <HFPushButton
+                      task={model.task}
+                      model_name={model.model_name}
+                      version={v.version}
+                      description={(v as any).description}
+                    />
                   </div>
                 </div>
                 {v.created_at && (
