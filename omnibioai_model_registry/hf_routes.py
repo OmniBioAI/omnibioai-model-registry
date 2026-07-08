@@ -159,5 +159,5 @@ def hf_push_status(job_id: str):
 def hf_settings():
     return HFSettingsResponse(
         has_default_token=bool(os.environ.get("HF_TOKEN", "").strip()),
-        default_namespace=os.environ.get("HF_DEFAULT_NAMESPACE", "man4sihg"),
+        default_namespace=os.environ.get("HF_DEFAULT_NAMESPACE", "omnibioai"),
     )

@@ -18,7 +18,7 @@ export default function HFPushButton({
   description?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [repoId, setRepoId] = useState(`man4sihg/${model_name}`);
+  const [repoId, setRepoId] = useState(`omnibioai/${model_name}`);
   const [token, setToken] = useState("");
   const [desc, setDesc] = useState(description ?? "");
   const [license, setLicense] = useState("apache-2.0");
