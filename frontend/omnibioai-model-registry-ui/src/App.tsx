@@ -4,6 +4,7 @@ import ModelDrawer from "./components/ModelDrawer";
 import RegisterModelModal from "./components/RegisterModelModal";
 import ModelLineageView from "./components/ModelLineageView";
 import ExperimentsView from "./components/ExperimentsView";
+import HFModelsGallery from "./components/HFModelsGallery";
 
 export type Model = {
   task: string;
@@ -45,7 +46,7 @@ export default function App() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   // aliasMap: "task:model_name" → ["latest", "production", ...]
   const [aliasMap, setAliasMap] = useState<Record<string, string[]>>({});
-  const [activeTab, setActiveTab] = useState<'models' | 'experiments'>('models');
+  const [activeTab, setActiveTab] = useState<'models' | 'experiments' | 'hf-models'>('models');
 
   useEffect(() => {
     load();
@@ -203,7 +204,7 @@ export default function App() {
         <main style={mainStyle}>
           {/* TAB BAR */}
           <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-            {(["models", "experiments"] as const).map((tab) => (
+            {(["models", "experiments", "hf-models"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -220,7 +221,7 @@ export default function App() {
                   textTransform: "capitalize",
                 }}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === "hf-models" ? "🤗 HF Models" : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -233,6 +234,10 @@ export default function App() {
                 if (m) { setActiveTab("models"); setSelected(m); }
               }}
             />
+          ) : activeTab === "hf-models" ? (
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              <HFModelsGallery />
+            </div>
           ) : loading ? (
             <div style={{ color: "var(--text-muted)", textAlign: "center", paddingTop: 60 }}>
               Loading…
