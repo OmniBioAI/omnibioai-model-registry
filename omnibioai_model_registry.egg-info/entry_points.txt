@@ -1,2 +1,0 @@
-[console_scripts]
-omr = omnibioai_model_registry.cli.main:main
