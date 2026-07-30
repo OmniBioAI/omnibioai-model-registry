@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
+import { authHeader } from "../api/auth";
 
 const BASE_URL = "/v1";
 
@@ -70,7 +71,7 @@ export default function RegisterModelModal({
 
       const res = await fetch(`${BASE_URL}/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify(body),
       });
       const data = await res.json();

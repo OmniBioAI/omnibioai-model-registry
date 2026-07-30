@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { authHeader } from "../api/auth";
 
 const BASE_URL = "/v1/hf";
 
@@ -71,7 +72,7 @@ export default function HFPushButton({
     try {
       const res = await fetch(`${BASE_URL}/push`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({
           task,
           model_name,

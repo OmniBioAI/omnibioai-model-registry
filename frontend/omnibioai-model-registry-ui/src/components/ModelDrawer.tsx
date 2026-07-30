@@ -5,6 +5,7 @@ import ModelLineageView from "./ModelLineageView";
 import MetricsComparePanel from "./MetricsComparePanel";
 import HFPushButton from "./HFPushButton";
 import { setStage } from "../api/registry";
+import { authHeader } from "../api/auth";
 
 const BASE_URL = "/v1";
 
@@ -62,7 +63,7 @@ export default function ModelDrawer({
     try {
       const res = await fetch(`${BASE_URL}/promote`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({
           task: model.task,
           model_name: model.model_name,

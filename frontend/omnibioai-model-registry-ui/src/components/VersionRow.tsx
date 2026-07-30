@@ -1,8 +1,10 @@
+import { authHeader } from "../api/auth";
+
 export default function VersionRow({ version }: { version: any }) {
   async function promote() {
     await fetch("/v1/promote", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeader() },
       body: JSON.stringify({
         task: version.task,
         model_name: version.model_name,
