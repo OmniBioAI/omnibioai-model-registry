@@ -1,3 +1,5 @@
+import { authHeader } from "./auth";
+
 const BASE_URL = "/modelregistry/v1";
 
 export async function fetchModels() {
@@ -106,7 +108,7 @@ export async function setStage(
 ): Promise<{ ok: boolean; stage: string; version: string }> {
   const res = await fetch(`${BASE_URL}/stage`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify({ task, model_name, version, stage, actor }),
   });
   if (!res.ok) throw new Error(`Failed to set stage: ${res.status}`);
