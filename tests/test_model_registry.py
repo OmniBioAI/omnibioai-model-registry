@@ -2709,47 +2709,186 @@ class TestAuth:
         token = extract_token("Bearer mytoken123")
         assert token == "mytoken123"
 
-    def test_validate_token_raises_on_expired_token(self):
-        import jwt
-        from datetime import datetime, timezone
-        from omnibioai_model_registry.auth import AuthError, validate_token
-        expired = jwt.encode(
-            {"sub": "user1", "exp": datetime(2020, 1, 1, tzinfo=timezone.utc)},
-            "secret",
-            algorithm="HS256",
+    # validate_token()/get_actor() (local HS256-only decode + raw-payload
+    # field extraction) were removed by the Model Registry IAM Integration
+    # PR -- JWT verification is now centralized via AsyncIAMClient
+    # (see TestVerifyAndAuthorize/TestActorIdentifier below), and
+    # _actor_identifier() reads a verified UserContext, not a raw dict.
+
+    def test_actor_identifier_prefers_email(self):
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import _actor_identifier
+        user = UserContext(
+            user_id="42", email="user@example.com", roles=[], permissions=["model.use"], valid=True,
         )
+        assert _actor_identifier(user) == "user@example.com"
+
+    def test_actor_identifier_falls_back_to_user_id(self):
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import _actor_identifier
+        user = UserContext(user_id="42", email="", roles=[], permissions=[], valid=True)
+        assert _actor_identifier(user) == "42"
+
+
+class TestVerifyAndAuthorize:
+    """Model Registry IAM Integration: verify_and_authorize() -- centralized
+    IAM authentication (via AsyncIAMClient, no local JWT decoding) plus
+    model.use permission enforcement and model_access audit events."""
+
+    @pytest.fixture(autouse=True)
+    def _registry_root(self, monkeypatch):
+        # load_config() (called inside verify_and_authorize) requires this
+        # regardless of auth -- matches every other test class's setup.
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def _mock_audit(self, monkeypatch):
+        from unittest.mock import MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_audit = MagicMock()
+        monkeypatch.setattr(auth_mod, "AuditClient", MagicMock(return_value=mock_audit))
+        return mock_audit
+
+    def test_valid_jwt_with_model_use_is_allowed(self, monkeypatch):
+        import asyncio
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import verify_and_authorize
+
+        user = UserContext(
+            user_id="1", email="user@test.com", roles=["member"],
+            permissions=["model.use"], valid=True, org_id="org-1",
+        )
+        self._mock_iam_client(monkeypatch, user)
+        audit = self._mock_audit(monkeypatch)
+
+        result = asyncio.run(verify_and_authorize("sometoken", action="model_access"))
+
+        assert result is user
+        audit.log_event.assert_called_once()
+        call = audit.log_event.call_args
+        assert call.args[0] == "model_access_success"
+        assert call.kwargs["metadata"]["organization_id"] == "org-1"
+
+    def test_valid_jwt_without_model_use_is_denied(self, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import AuthError, verify_and_authorize
+
+        user = UserContext(
+            user_id="2", email="nomodel@test.com", roles=["member"],
+            permissions=["dataset.read"], valid=True, org_id="org-2",
+        )
+        self._mock_iam_client(monkeypatch, user)
+        audit = self._mock_audit(monkeypatch)
+
         with pytest.raises(AuthError) as exc_info:
-            validate_token(expired, "secret")
+            asyncio.run(verify_and_authorize("sometoken", action="model_access"))
+        assert exc_info.value.status_code == 403
+
+        audit.log_event.assert_called_once()
+        call = audit.log_event.call_args
+        assert call.args[0] == "model_access_denied"
+        assert call.kwargs["metadata"]["reason"] == "missing_permission"
+        assert call.kwargs["metadata"]["organization_id"] == "org-2"
+
+    def test_invalid_jwt_is_denied(self, monkeypatch):
+        from omnibioai_model_registry.auth import AuthError, verify_and_authorize
+        import asyncio
+
+        self._mock_iam_client(monkeypatch, None)  # get_user() returns None: unverifiable token
+        audit = self._mock_audit(monkeypatch)
+
+        with pytest.raises(AuthError) as exc_info:
+            asyncio.run(verify_and_authorize("badtoken", action="model_access"))
+        assert exc_info.value.status_code == 401
+        audit.log_event.assert_called_once_with(
+            "model_access_denied", "unknown", "model_access", metadata={"reason": "invalid_token"},
+        )
+
+    def test_expired_jwt_is_denied(self, monkeypatch):
+        """AsyncIAMClient.get_user() returns None for an expired token (its
+        own local-decode step raises ExpiredSignatureError, caught
+        internally) -- indistinguishable from any other invalid token at
+        this layer, which is the correct fail-closed behavior: this
+        service never re-derives *why* a token failed from a raw payload,
+        it only ever trusts the IAM client's verified verdict."""
+        from omnibioai_model_registry.auth import AuthError, verify_and_authorize
+        import asyncio
+
+        self._mock_iam_client(monkeypatch, None)
+
+        with pytest.raises(AuthError) as exc_info:
+            asyncio.run(verify_and_authorize("expiredtoken", action="model_access"))
         assert exc_info.value.status_code == 401
 
-    def test_validate_token_raises_on_wrong_secret(self):
-        import jwt
-        from omnibioai_model_registry.auth import AuthError, validate_token
-        token = jwt.encode({"sub": "user1"}, "correct_secret", algorithm="HS256")
+    def test_iam_client_exception_is_denied_not_raised(self, monkeypatch):
+        """A network/connection failure talking to the IAM/auth service
+        must fail closed (401), never propagate as an unhandled 500."""
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+        from omnibioai_model_registry.auth import AuthError, verify_and_authorize
+        import asyncio
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(side_effect=ConnectionError("auth service unreachable"))
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        self._mock_audit(monkeypatch)
+
         with pytest.raises(AuthError) as exc_info:
-            validate_token(token, "wrong_secret")
+            asyncio.run(verify_and_authorize("sometoken", action="model_access"))
         assert exc_info.value.status_code == 401
 
-    def test_validate_token_returns_payload_on_valid_token(self):
-        import jwt
-        from omnibioai_model_registry.auth import validate_token
-        token = jwt.encode({"sub": "user1", "extra": "data"}, "secret", algorithm="HS256")
-        payload = validate_token(token, "secret")
-        assert payload["sub"] == "user1"
-        assert payload["extra"] == "data"
+    def test_organization_id_is_captured_from_identity(self, monkeypatch):
+        """Organization isolation (this PR's confirmed scope): org_id is
+        extracted from the verified identity and reaches the audit event
+        -- it is not used to filter registry data (no tenant concept
+        exists in the data model yet; see auth.py's module docstring)."""
+        import asyncio
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import verify_and_authorize
 
-    def test_get_actor_extracts_from_sub(self):
-        from omnibioai_model_registry.auth import get_actor
-        assert get_actor({"sub": "user@example.com"}) == "user@example.com"
+        user_org_a = UserContext(
+            user_id="1", email="a@test.com", roles=[], permissions=["model.use"],
+            valid=True, org_id="org-a",
+        )
+        self._mock_iam_client(monkeypatch, user_org_a)
+        audit = self._mock_audit(monkeypatch)
 
-    def test_get_actor_extracts_from_username(self):
-        from omnibioai_model_registry.auth import get_actor
-        assert get_actor({"username": "manish"}) == "manish"
+        result = asyncio.run(verify_and_authorize("token-a", action="model_access"))
+        assert result.org_id == "org-a"
+        assert audit.log_event.call_args.kwargs["metadata"]["organization_id"] == "org-a"
 
-    def test_get_actor_falls_back_to_unknown(self):
-        from omnibioai_model_registry.auth import get_actor
-        assert get_actor({}) == "unknown"
-        assert get_actor({"irrelevant": "field"}) == "unknown"
+    def test_organization_id_none_for_identity_with_no_org(self, monkeypatch):
+        """A valid identity with no org membership yet (org_id=None) is a
+        legitimate state, not an error -- must still be granted access
+        (model.use is a global concept here, not org-scoped in this
+        service) and logged with organization_id=None, not crash."""
+        import asyncio
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import verify_and_authorize
+
+        user_no_org = UserContext(
+            user_id="3", email="noorg@test.com", roles=[], permissions=["model.use"],
+            valid=True, org_id=None,
+        )
+        self._mock_iam_client(monkeypatch, user_no_org)
+        audit = self._mock_audit(monkeypatch)
+
+        result = asyncio.run(verify_and_authorize("token-noorg", action="model_access"))
+        assert result.org_id is None
+        assert audit.log_event.call_args.kwargs["metadata"]["organization_id"] is None
 
 
 # ============================================================
@@ -3243,7 +3382,19 @@ class TestServiceAllRoutes:
 
 
 class TestAuthRequireWriteAuth:
-    """Cover auth.py require_write_auth (lines 84-89)."""
+    """Cover auth.py require_auth/require_write_auth -- centralized IAM
+    verification (AsyncIAMClient) + model.use enforcement, not local JWT
+    decoding. Mocks AsyncIAMClient so no real network/Redis call is made."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
 
     def test_require_write_auth_disabled_returns_system(self, monkeypatch):
         import asyncio
@@ -3253,16 +3404,33 @@ class TestAuthRequireWriteAuth:
         actor = asyncio.run(require_write_auth(authorization=None))
         assert actor == "system"
 
-    def test_require_write_auth_enabled_valid_jwt(self, monkeypatch):
+    def test_require_write_auth_enabled_valid_jwt_with_model_use_is_allowed(self, monkeypatch):
         import asyncio
-        import jwt
+        from iam_client.models import UserContext
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
-        token = jwt.encode({"sub": "user@test.com"}, "testsecret", algorithm="HS256")
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.use"], valid=True,
+        ))
         from omnibioai_model_registry.auth import require_write_auth
-        actor = asyncio.run(require_write_auth(authorization=f"Bearer {token}"))
+        actor = asyncio.run(require_write_auth(authorization="Bearer sometoken"))
         assert actor == "user@test.com"
+
+    def test_require_auth_enabled_valid_jwt_without_model_use_raises_403(self, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        from iam_client.models import UserContext
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=[], valid=True,
+        ))
+        from omnibioai_model_registry.auth import require_auth
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(require_auth(authorization="Bearer sometoken"))
+        assert exc_info.value.status_code == 403
 
     def test_require_auth_enabled_invalid_token_raises_401(self, monkeypatch):
         import asyncio
@@ -3270,9 +3438,26 @@ class TestAuthRequireWriteAuth:
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, None)
         from omnibioai_model_registry.auth import require_auth
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(require_auth(authorization="Bearer invalidtoken"))
+        assert exc_info.value.status_code == 401
+
+    def test_require_auth_enabled_expired_token_raises_401(self, monkeypatch):
+        """AsyncIAMClient.get_user() returns None for an expired token --
+        this layer never re-derives the reason locally, it only trusts
+        the IAM client's verdict (see TestVerifyAndAuthorize's identical
+        assertion for the underlying implementation)."""
+        import asyncio
+        from fastapi import HTTPException
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, None)
+        from omnibioai_model_registry.auth import require_auth
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(require_auth(authorization="Bearer expiredtoken"))
         assert exc_info.value.status_code == 401
 
     def test_require_auth_enabled_missing_header_raises_401(self, monkeypatch):
