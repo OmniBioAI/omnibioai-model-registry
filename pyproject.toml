@@ -50,6 +50,12 @@ dependencies = [
   "cryptography>=41.0.0",
   "PyJWT>=2.8.0",
   "huggingface_hub>=0.20.0",
+  # Model Registry IAM integration: centralized JWT verification via the
+  # shared IAM client. Pinned direct git reference -- omnibioai-iam-client
+  # is a private repo distributed via git+https, not a package index
+  # (GitHub Packages has no PyPI-format registry). See that repo's README
+  # for the full distribution model.
+  "omnibioai-iam-client @ git+https://github.com/OmniBioAI/omnibioai-iam-client.git@v0.1.0",
 ]
 
 [project.optional-dependencies]

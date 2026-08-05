@@ -1,14 +1,11 @@
 # Model Registry IAM Integration: centralized JWT verification via the
 # shared IAM client, replacing the local HS256-only decoder auth.py used
-# to have. Editable local-path install, resolved relative to this repo's
-# own root (sibling checkout under the same $MACHINE_DIR) -- fine for
-# local dev/test, same as omnibioai-lims' requirements.lims.txt already
-# does for the same package.
+# to have. This editable local-path install is for local bare-metal dev
+# only -- run this file before `pip install -e .` so the
+# omnibioai-iam-client requirement declared in pyproject.toml is already
+# satisfied and pip doesn't try to fetch it from an index.
 #
-# The Docker image build (Dockerfile's build context is this repo alone,
-# no sibling access) still needs omnibioai-iam-client published (PyPI/
-# GitHub Packages) or the build context expanded before this works in a
-# built image -- not solved here. This is the exact same known,
-# already-tracked gap omnibioai-lims' requirements.lims.txt documents;
-# not something specific to this PR to fix.
+# The Docker build no longer uses this file for omnibioai-iam-client;
+# the Dockerfile now vendor-installs it directly from the sibling repo
+# (same pattern as omnibioai-lims/omnibioai-rag).
 -e ../omnibioai-iam-client
