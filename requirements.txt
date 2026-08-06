@@ -9,3 +9,7 @@
 # the Dockerfile now vendor-installs it directly from the sibling repo
 # (same pattern as omnibioai-lims/omnibioai-rag).
 -e ../omnibioai-iam-client
+
+# PR14.2B-3: same local-dev-only editable-install convention, for
+# omnibioai-usage-client.
+-e ../omnibioai-usage-client

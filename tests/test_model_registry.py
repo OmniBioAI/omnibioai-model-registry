@@ -3053,6 +3053,85 @@ class TestServiceAllRoutes:
         assert r.json()["ok"] is True
         assert r.json()["version"] == "v1"
 
+    def test_register_endpoint_emits_model_registered(self, full_svc_client, tmp_path, monkeypatch):
+        """PR14.2B-3: auth_enabled=False (this fixture's default) means
+        require_write_auth_with_context returns the synthetic 'system'
+        UserContext with org_id=None -- emission is skipped, not called
+        with a fabricated org. Covered separately below with a real org_id."""
+        from unittest.mock import patch
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_emit_usage_safe") as mock_emit_safe:
+            r = client.post("/v1/register", json={
+                "task": "t", "model_name": "m", "version": "v1",
+                "artifacts_dir": str(src), "metadata": {},
+            })
+        assert r.status_code == 200
+        mock_emit_safe.assert_called_once()
+        args, kwargs = mock_emit_safe.call_args
+        assert args[0] is _svc.emit_model_registered
+        assert kwargs["organization_id"] is None
+
+    def test_register_endpoint_emits_with_real_org_id_when_auth_enabled(self, full_svc_client, tmp_path, monkeypatch):
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from iam_client.models import UserContext
+        import omnibioai_model_registry.auth as auth_mod
+        import omnibioai_model_registry.service.app.main as _svc
+
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=UserContext(
+            user_id="9", email="u@test.com", roles=[], permissions=["model.use"],
+            valid=True, org_id="123",
+        ))
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        with patch.object(_svc, "_emit_usage_safe") as mock_emit_safe:
+            r = client.post(
+                "/v1/register",
+                json={"task": "t", "model_name": "m", "version": "v1",
+                      "artifacts_dir": str(src), "metadata": {}},
+                headers={"Authorization": "Bearer sometoken"},
+            )
+        assert r.status_code == 200
+        mock_emit_safe.assert_called_once_with(
+            _svc.emit_model_registered, organization_id="123", user_id="9",
+        )
+
+    def test_register_endpoint_emission_exception_does_not_affect_response(self, full_svc_client, tmp_path):
+        """Fail-open: an unexpected exception from emit_model_registered
+        must not affect the /register response -- _emit_usage_safe is
+        the mechanism, tested for real here (not mocked away)."""
+        from unittest.mock import patch
+        client, root = full_svc_client
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "emit_model_registered", side_effect=RuntimeError("boom")):
+            r = client.post("/v1/register", json={
+                "task": "t", "model_name": "m", "version": "v1",
+                "artifacts_dir": str(src), "metadata": {},
+            })
+        assert r.status_code == 200
+
+    def test_other_write_routes_unaffected_by_context_change(self, full_svc_client, tmp_path):
+        """promote/set_tag/patch_version/set_stage still depend on
+        require_write_auth (bare str), not require_write_auth_with_context
+        -- unaffected by this PR."""
+        client, root = full_svc_client
+        src = self._register(root, tmp_path)
+        r = client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "version": "v1", "alias": "prod",
+        })
+        assert r.status_code == 200
+
     def test_register_endpoint_error(self, full_svc_client):
         client, _ = full_svc_client
         r = client.post("/v1/register", json={
@@ -3381,6 +3460,62 @@ class TestServiceAllRoutes:
         assert isinstance(r.json(), list)
 
 
+class TestUsageEmit:
+    """PR14.2B-3: unit tests for usage_emit.py itself, isolated from the
+    FastAPI route layer."""
+
+    def test_client_constructs_a_real_usage_client(self):
+        from omnibioai_model_registry.usage_emit import _client
+        from usage_client import UsageClient
+
+        assert isinstance(_client(), UsageClient)
+
+    def test_emits_correct_fields(self):
+        from unittest.mock import MagicMock, patch
+        from omnibioai_model_registry.usage_emit import emit_model_registered
+
+        mock_client = MagicMock()
+        with patch("omnibioai_model_registry.usage_emit._client", return_value=mock_client):
+            emit_model_registered(organization_id="77", user_id="9", trace_id="trace-1")
+
+        mock_client.emit_usage_event.assert_called_once_with(
+            organization_id="77",
+            service="model.registry",
+            resource="model.register",
+            action="registered",
+            quantity=1,
+            unit="count",
+            user_id="9",
+            trace_id="trace-1",
+        )
+
+    def test_skips_emission_when_organization_id_none(self):
+        from unittest.mock import MagicMock, patch
+        from omnibioai_model_registry.usage_emit import emit_model_registered
+
+        mock_client = MagicMock()
+        with patch("omnibioai_model_registry.usage_emit._client", return_value=mock_client):
+            emit_model_registered(organization_id=None)
+
+        mock_client.emit_usage_event.assert_not_called()
+
+    def test_client_exception_is_swallowed(self):
+        from unittest.mock import MagicMock, patch
+        from omnibioai_model_registry.usage_emit import emit_model_registered
+
+        mock_client = MagicMock()
+        mock_client.emit_usage_event.side_effect = RuntimeError("boom")
+        with patch("omnibioai_model_registry.usage_emit._client", return_value=mock_client):
+            emit_model_registered(organization_id="77")  # must not raise
+
+    def test_client_construction_failure_is_swallowed(self):
+        from unittest.mock import patch
+        from omnibioai_model_registry.usage_emit import emit_model_registered
+
+        with patch("omnibioai_model_registry.usage_emit._client", side_effect=RuntimeError("boom")):
+            emit_model_registered(organization_id="77")  # must not raise
+
+
 class TestAuthRequireWriteAuth:
     """Cover auth.py require_auth/require_write_auth -- centralized IAM
     verification (AsyncIAMClient) + model.use enforcement, not local JWT
@@ -3470,6 +3605,87 @@ class TestAuthRequireWriteAuth:
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(require_auth(authorization=None))
         assert exc_info.value.status_code == 401
+
+
+class TestRequireWriteAuthWithContext:
+    """PR14.2B-3: require_write_auth_with_context -- same enforcement as
+    require_write_auth, but returns the full UserContext (for
+    organization_id) instead of just the actor string. Additive: does
+    not change require_write_auth's own contract, tested separately
+    above."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def test_disabled_returns_synthetic_system_context_with_none_org_id(self, monkeypatch):
+        import asyncio
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        from omnibioai_model_registry.auth import require_write_auth_with_context, _actor_identifier
+        user = asyncio.run(require_write_auth_with_context(authorization=None))
+        assert user.org_id is None
+        assert _actor_identifier(user) == "system"
+
+    def test_enabled_valid_jwt_returns_full_context_with_org_id(self, monkeypatch):
+        import asyncio
+        from iam_client.models import UserContext
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.use"],
+            valid=True, org_id="77",
+        ))
+        from omnibioai_model_registry.auth import require_write_auth_with_context, _actor_identifier
+        user = asyncio.run(require_write_auth_with_context(authorization="Bearer sometoken"))
+        assert user.org_id == "77"
+        assert _actor_identifier(user) == "user@test.com"
+
+    def test_enabled_without_model_use_raises_403(self, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        from iam_client.models import UserContext
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=[], valid=True, org_id="77",
+        ))
+        from omnibioai_model_registry.auth import require_write_auth_with_context
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(require_write_auth_with_context(authorization="Bearer sometoken"))
+        assert exc_info.value.status_code == 403
+
+    def test_enabled_invalid_token_raises_401(self, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, None)
+        from omnibioai_model_registry.auth import require_write_auth_with_context
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(require_write_auth_with_context(authorization="Bearer invalidtoken"))
+        assert exc_info.value.status_code == 401
+
+    def test_other_write_auth_routes_unaffected(self, monkeypatch):
+        """require_write_auth itself (used by promote/set_tag/patch_version/
+        set_stage) still returns a bare str -- this dependency's addition
+        must not change that contract."""
+        import asyncio
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        from omnibioai_model_registry.auth import require_write_auth
+        actor = asyncio.run(require_write_auth(authorization=None))
+        assert actor == "system"
+        assert isinstance(actor, str)
 
 
 # ============================================================
