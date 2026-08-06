@@ -55,7 +55,7 @@ dependencies = [
   # is a private repo distributed via git+https, not a package index
   # (GitHub Packages has no PyPI-format registry). See that repo's README
   # for the full distribution model.
-  "omnibioai-iam-client @ git+https://github.com/OmniBioAI/omnibioai-iam-client.git@v0.1.0",
+  "omnibioai-iam-client @ git+https://github.com/OmniBioAI/omnibioai-iam-client.git@v0.1.1",
 
   # PR14.2B-3: usage-metering event emission (usage_emit.py). Same
   # private-repo pinned-tag distribution convention as omnibioai-iam-client.
