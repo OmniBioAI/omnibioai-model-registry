@@ -181,3 +181,32 @@ async def require_write_auth(
     documents intent (a write action) at each call site even though the
     enforcement itself is identical."""
     return await require_auth(authorization)
+
+
+async def require_write_auth_with_context(
+    authorization: Annotated[str | None, Header()] = None,
+) -> UserContext:
+    """PR14.2B-3: same enforcement as require_write_auth, but returns the
+    full UserContext instead of just the actor string -- for the one call
+    site that needs organization_id (api_register(), for usage-event
+    emission). Additive, not a signature change to require_write_auth
+    itself: every other require_write_auth-dependent route
+    (promote/set_tag/patch_version/set_stage) is unaffected, unchanged,
+    still gets a bare str.
+
+    When auth_enabled=False, returns a synthetic "system" UserContext
+    with org_id=None -- api_register()'s usage-emission call already
+    treats organization_id=None as "skip emission, don't block the
+    request" the same way every other PR14.2B producer does.
+    """
+    cfg = load_config()
+    if not cfg.auth_enabled:
+        return UserContext(
+            user_id="system", email="system", roles=[], permissions=[MODEL_USE_PERMISSION],
+            valid=True, org_id=None,
+        )
+    try:
+        token = extract_token(authorization)
+        return await verify_and_authorize(token, action="model_access")
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))

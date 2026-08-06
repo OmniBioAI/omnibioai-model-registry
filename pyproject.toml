@@ -56,6 +56,10 @@ dependencies = [
   # (GitHub Packages has no PyPI-format registry). See that repo's README
   # for the full distribution model.
   "omnibioai-iam-client @ git+https://github.com/OmniBioAI/omnibioai-iam-client.git@v0.1.0",
+
+  # PR14.2B-3: usage-metering event emission (usage_emit.py). Same
+  # private-repo pinned-tag distribution convention as omnibioai-iam-client.
+  "omnibioai-usage-client @ git+https://github.com/OmniBioAI/omnibioai-usage-client.git@v0.1.0",
 ]
 
 [project.optional-dependencies]

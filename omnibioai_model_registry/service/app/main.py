@@ -19,12 +19,33 @@ from omnibioai_model_registry import (
 )
 from omnibioai_model_registry.errors import ModelRegistryError, RegistryNotConfigured
 from omnibioai_model_registry.config import load_config
-from omnibioai_model_registry.auth import require_auth, require_write_auth
+from omnibioai_model_registry.auth import (
+    _actor_identifier,
+    require_auth,
+    require_write_auth,
+    require_write_auth_with_context,
+)
 from omnibioai_model_registry.audit_client import AuditClient
 from omnibioai_model_registry.hf_routes import router as hf_router
+from omnibioai_model_registry.usage_emit import emit_model_registered
 import logging as _logging
 
 _audit = AuditClient(os.environ.get("AUDIT_URL", ""))
+_logger = _logging.getLogger(__name__)
+
+
+def _emit_usage_safe(fn, /, **kwargs) -> None:
+    """PR14.2B-3: last line of defense around every usage-event emission
+    call site in this file. usage_emit.py's own functions already catch
+    everything reasonably catchable (Redis errors) internally -- this
+    covers the unexpected case (a bug in that module itself). Usage
+    emission must always be fail-open: never let it fail model
+    registration.
+    """
+    try:
+        fn(**kwargs)
+    except Exception:
+        _logger.warning("usage_emit call failed unexpectedly", exc_info=True)
 
 try:
     from omnibioai_model_registry import db as _db
@@ -281,7 +302,14 @@ def health():
 
 
 @app.post(f"{DEFAULT_PREFIX}/register", response_model=RegisterResponse)
-def api_register(req: RegisterRequest, actor: str = Depends(require_write_auth)):
+def api_register(req: RegisterRequest, user=Depends(require_write_auth_with_context)):
+    # PR14.2B-3: require_write_auth_with_context (not require_write_auth)
+    # so organization_id is available for usage-event emission -- every
+    # other require_write_auth-dependent route is untouched. actor is
+    # derived the same way require_auth's own _actor_identifier() already
+    # does, preserving the exact str value every other route/call site
+    # (register_model(actor=...), _audit.log_event(...)) already expects.
+    actor = _actor_identifier(user)
     try:
         out = register_model(
             task=req.task,
@@ -298,6 +326,7 @@ def api_register(req: RegisterRequest, actor: str = Depends(require_write_auth))
             f"{req.task}/{req.model_name}@{req.version}",
             task=req.task, model_name=req.model_name, version=req.version,
         )
+        _emit_usage_safe(emit_model_registered, organization_id=user.org_id, user_id=user.user_id)
         return RegisterResponse(**out)
     except Exception as e:
         _handle_registry_error(e)
