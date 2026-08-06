@@ -3515,6 +3515,47 @@ class TestUsageEmit:
         with patch("omnibioai_model_registry.usage_emit._client", side_effect=RuntimeError("boom")):
             emit_model_registered(organization_id="77")  # must not raise
 
+    # -----------------------------------------------------------------
+    # PR14.3-4: structured-logging observability (no metrics dependency)
+    # -----------------------------------------------------------------
+
+    def _states(self, caplog):
+        return [
+            r.usage_event_state for r in caplog.records
+            if hasattr(r, "usage_event_state")
+        ]
+
+    def test_success_logs_attempted_then_succeeded(self, caplog):
+        from unittest.mock import MagicMock, patch
+        from omnibioai_model_registry.usage_emit import emit_model_registered
+
+        mock_client = MagicMock()
+        with caplog.at_level("INFO", logger="omnibioai_model_registry.usage_emit"):
+            with patch("omnibioai_model_registry.usage_emit._client", return_value=mock_client):
+                emit_model_registered(organization_id="77")
+
+        assert self._states(caplog) == ["attempted", "succeeded"]
+
+    def test_missing_org_logs_attempted_then_skipped(self, caplog):
+        from omnibioai_model_registry.usage_emit import emit_model_registered
+
+        with caplog.at_level("INFO", logger="omnibioai_model_registry.usage_emit"):
+            emit_model_registered(organization_id=None)
+
+        assert self._states(caplog) == ["attempted", "skipped_missing_org"]
+
+    def test_exception_logs_attempted_then_failed(self, caplog):
+        from unittest.mock import MagicMock, patch
+        from omnibioai_model_registry.usage_emit import emit_model_registered
+
+        mock_client = MagicMock()
+        mock_client.emit_usage_event.side_effect = RuntimeError("boom")
+        with caplog.at_level("INFO", logger="omnibioai_model_registry.usage_emit"):
+            with patch("omnibioai_model_registry.usage_emit._client", return_value=mock_client):
+                emit_model_registered(organization_id="77")  # must not raise
+
+        assert self._states(caplog) == ["attempted", "failed_exception"]
+
 
 class TestAuthRequireWriteAuth:
     """Cover auth.py require_auth/require_write_auth -- centralized IAM
