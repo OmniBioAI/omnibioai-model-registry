@@ -14,6 +14,9 @@ It provides:
 - **Plugin-first design** — `PluginRunClient` for TES container environments
 - **Local-first, cloud-ready** storage abstraction
 - **REST API (FastAPI) + CLI (`omr`) + Python SDK**
+- **IAM-gated writes** — every mutating endpoint requires a valid JWT (via `omnibioai-iam-client`) carrying the `model.use` permission, when `AUTH_ENABLED=true`
+- **One-click Hugging Face push** — package and upload a registered model version straight to the Hub
+- **Usage metering + cross-service audit** — registration events are emitted to the platform usage pipeline and to the security-audit service, in addition to this repo's own local `promotions.jsonl` trail
 
 The registry is implemented as a **standalone Python library** (package name: `omnibioai-model-registry`, CLI entrypoint: `omr`) and ships a self-contained FastAPI service.
 
@@ -25,8 +28,10 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ MySQL-backed metric + param storage
 - ✅ Immutable and verifiable model storage
 - ✅ Audit-ready promotion workflow
-- ✅ 18 REST endpoints (tracking + registry + governance)
+- ✅ 21 REST endpoints (tracking + registry + governance + Hugging Face push)
 - ✅ 11 CLI commands
+- ✅ IAM-gated writes (`model.use` permission, `omnibioai-iam-client`)
+- ✅ Usage metering + cross-service audit emission
 - ✅ ModelHub UI with Experiments tab + metric sparklines
 - ✅ Local-first, cloud-ready design
 
@@ -160,16 +165,22 @@ v0.2.0 supports a **local filesystem backend** (`localfs`) with a MySQL-backed t
 omnibioai-model-registry/
 ├── omnibioai_model_registry/
 │   ├── api.py
-│   ├── config.py
+│   ├── config.py            # Settings incl. AUTH_ENABLED/JWT_SECRET/IAM_URL
 │   ├── refs.py
 │   ├── errors.py
-│   ├── run.py              # RunLogger — filesystem-based tracking
-│   ├── plugin_client.py    # PluginRunClient — HTTP-based tracking for TES plugins
-│   ├── db.py               # MySQL connection + table bootstrap
-│   ├── tracking.py         # Pure-SQL tracking functions
+│   ├── run.py               # RunLogger — filesystem-based tracking
+│   ├── plugin_client.py     # PluginRunClient — HTTP-based tracking for TES plugins
+│   ├── db.py                # MySQL connection + table bootstrap
+│   ├── tracking.py          # Pure-SQL tracking functions
+│   ├── auth.py              # IAM integration — require_auth/require_write_auth,
+│   │                         # model.use permission via omnibioai-iam-client
+│   ├── audit_client.py      # Fire-and-forget AuditClient — POSTs to AUDIT_URL
+│   │                         # (security-audit), separate from audit/'s local trail
+│   ├── hf_routes.py         # Hugging Face push — POST /v1/hf/push, status, settings
+│   ├── usage_emit.py        # Usage-metering wrapper around omnibioai-usage-client
 │   ├── storage/
 │   ├── package/
-│   ├── audit/
+│   ├── audit/                # Local audit trail — audit/promotions.jsonl
 │   ├── cli/
 │   └── service/
 ├── frontend/
@@ -418,6 +429,20 @@ curl -s http://127.0.0.1:8095/health | python -m json.tool
 | PUT    | /v1/tags              | Set a tag on a model version                         |
 | POST   | /v1/versions/patch    | Patch description or tags on a version               |
 | POST   | /v1/stage             | Set lifecycle stage (none/staging/production/archived)|
+| GET    | /v1/auth/status       | Report whether auth is enabled and, if so, the caller's verified identity |
+
+**Hugging Face**
+
+| Method | Path                       | Description                                          |
+| ------ | -------------------------- | ----------------------------------------------------- |
+| POST   | /v1/hf/push                | Package a registered model version and push it to the Hugging Face Hub |
+| GET    | /v1/hf/push/status/{job_id}| Poll an async push job's status                       |
+| GET    | /v1/hf/settings             | Whether a default `HF_TOKEN`/namespace is configured  |
+
+`POST /v1/hf/push` accepts an explicit `token` in the request body, falling
+back to the `HF_TOKEN` env var if omitted — never required to be the
+caller's own credential. See [Authentication](#authentication) below for
+the gate on all mutating routes above, including these three.
 
 ### MySQL setup (optional)
 
@@ -442,6 +467,52 @@ export DB_NAME=model_registry
 ```
 
 When `DB_HOST` is absent, the service runs in filesystem-only mode. Tracking endpoints return HTTP 503; all registry and governance endpoints remain fully functional.
+
+---
+
+## Authentication
+
+Off by default; every mutating endpoint (`register`, `promote`, `tags`,
+`versions/patch`, `stage`, the `hf/*` routes, `runs/log-*`) is
+IAM-gated when explicitly enabled:
+
+```bash
+export AUTH_ENABLED=true
+export JWT_SECRET=...      # HS256 fallback secret, matches omnibioai-auth's SECRET_KEY
+export IAM_URL=http://auth-service:8001
+```
+
+`AUTH_ENABLED=false` (the default) runs the service in open mode — no
+token required, every call attributed to a synthetic `system` actor. When
+enabled, `require_write_auth` (`auth.py`) verifies the presented JWT via
+`omnibioai-iam-client`'s `AsyncIAMClient.get_user()` (RS256/JWKS-or-HS256
+signature check + revocation check against `omnibioai-auth`, no local JWT
+decoding of its own) and requires the `model.use` permission — the same
+IAM pattern `omnibioai-lims` and `omnibioai-api-gateway` use. `GET
+/v1/auth/status` reports whether auth is on and, if so, the caller's
+resolved identity — useful for a client to detect which mode it's
+talking to.
+
+**Scope note:** authorization is permission-based, not org-scoped. The
+verified identity's `organization_id` is attached to every audit/usage
+event this service emits, but nothing in the data model
+(`omr_runs`/`omr_params`/`omr_metrics`/`omr_tags`/`omr_version_tags`, or
+models/versions themselves) has an `organization_id` column — every
+organization currently shares one flat model namespace. Per-org isolation
+is real future work (see Roadmap), not something `AUTH_ENABLED=true`
+already provides.
+
+### Observability side effects of every write
+
+- **Audit** — `audit_client.py`'s `AuditClient` fire-and-forget-POSTs an
+  event to `AUDIT_URL` (the security-audit service) on
+  register/promote/set_tag/set_stage, in addition to this repo's own
+  local `audit/promotions.jsonl` trail described under "Core Design
+  Principles" above — two separate audit records, not one.
+- **Usage metering** — `usage_emit.py` wraps `omnibioai-usage-client` to
+  emit a `model.register` usage event on every registration
+  (`service="model-registry"`), fail-open by design: a metering failure
+  never blocks or fails the registration itself.
 
 ---
 
@@ -486,7 +557,7 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
 - S3 / Azure Blob storage backends
 - Step-history sparklines in UI pulled from DB (currently single-point)
 - Model signature validation (input/output schema enforcement)
-- RBAC — per-task access control
+- Per-organization data isolation — `model.use` permission gating (see [Authentication](#authentication)) is real today, but the data model has no `organization_id` anywhere; every org currently shares one flat model namespace
 
 ### Mid Term
 
