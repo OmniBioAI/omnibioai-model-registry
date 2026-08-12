@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from .api import ModelRegistry
 from .audit_client import AuditClient
-from .auth import require_write_auth
+from .auth import require_auth, require_write_auth
 
 router = APIRouter()
 
@@ -146,7 +146,15 @@ def hf_push(req: HFPushRequest, actor: str = Depends(require_write_auth)):
 
 
 @router.get("/push/status/{job_id}", response_model=HFPushStatusResponse)
-def hf_push_status(job_id: str):
+def hf_push_status(job_id: str, actor: str = Depends(require_auth)):
+    # Phase 1: authentication only, no ownership check yet -- _JOBS has no
+    # actor/org field to check against (in-memory, keyed only by uuid4
+    # job_id). Any authenticated model.use holder can currently poll any
+    # job_id's status. job_id is unguessable (uuid4) and the response never
+    # contains the HF token, so this is a bounded enumeration/status-leak
+    # risk, not a secret-disclosure one. Ownership-scoping (ties status to
+    # the actor who created the job) is deferred to the tenant-isolation
+    # phase along with the rest of per-resource ownership.
     job = _get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Unknown job_id")

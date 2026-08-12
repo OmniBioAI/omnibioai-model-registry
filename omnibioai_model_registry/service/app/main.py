@@ -354,7 +354,7 @@ def api_promote(req: PromoteRequest, actor: str = Depends(require_write_auth)):
 
 
 @app.get(f"{DEFAULT_PREFIX}/resolve", response_model=ResolveResponse)
-def api_resolve(task: str, ref: str, verify: bool = True):
+def api_resolve(task: str, ref: str, verify: bool = True, actor: str = Depends(require_auth)):
     try:
         path = resolve_model(task=task, model_ref=ref, verify=verify)
         return ResolveResponse(ok=True, path=str(path))
@@ -363,7 +363,12 @@ def api_resolve(task: str, ref: str, verify: bool = True):
 
 
 @app.post(f"{DEFAULT_PREFIX}/verify", response_model=VerifyResponse)
-def api_verify(req: VerifyRequest):
+def api_verify(req: VerifyRequest, actor: str = Depends(require_auth)):
+    # POST but read-only/data-bearing (acts as an existence+integrity
+    # oracle for a task/ref pair) -- discovered during the Phase 1
+    # route-by-route review and protected on the same basis as the
+    # explicitly listed GET endpoints, per the "every non-informational
+    # endpoint" objective.
     try:
         verify_model_ref(task=req.task, model_ref=req.ref)
         return VerifyResponse(ok=True)
@@ -372,7 +377,7 @@ def api_verify(req: VerifyRequest):
 
 
 @app.get(f"{DEFAULT_PREFIX}/show", response_model=ShowResponse)
-def api_show(task: str, ref: str, verify: bool = False):
+def api_show(task: str, ref: str, verify: bool = False, actor: str = Depends(require_auth)):
     try:
         vdir = ModelRegistry.from_env().resolve_model(
             task=task, model_ref=ref, verify=verify
@@ -396,6 +401,7 @@ def list_models(
     task: Optional[str] = Query(None, description="filter by task"),
     model_name: Optional[str] = Query(None, description="filter by model name"),
     metric_gte: Optional[str] = Query(None, description="metric filter, format key:threshold"),
+    actor: str = Depends(require_auth),
 ):
     """
     UI endpoint for dashboard:
@@ -506,7 +512,7 @@ def api_log_batch(req: LogBatchRequest, actor: str = Depends(require_auth)):
 
 
 @app.get(f"{DEFAULT_PREFIX}/runs/get", response_model=RunGetResponse)
-def api_run_get(task: str, model: str, run_id: str):
+def api_run_get(task: str, model: str, run_id: str, actor: str = Depends(require_auth)):
     conn = _get_db_conn()
     try:
         data = _tracking.get_run(conn, run_id)
@@ -522,7 +528,7 @@ def api_run_get(task: str, model: str, run_id: str):
 
 
 @app.get(f"{DEFAULT_PREFIX}/runs/list")
-def api_runs_list(task: str, model: str):
+def api_runs_list(task: str, model: str, actor: str = Depends(require_auth)):
     conn = _get_db_conn()
     try:
         basic = _tracking.list_runs(conn, task, model)
@@ -545,7 +551,7 @@ def api_runs_list(task: str, model: str):
 # ==========================================================
 
 @app.get(f"{DEFAULT_PREFIX}/metrics", response_model=MetricsResponse)
-def api_metrics(task: str, ref: str):
+def api_metrics(task: str, ref: str, actor: str = Depends(require_auth)):
     try:
         vdir = Path(registry.resolve_model(task=task, model_ref=ref, verify=False))
     except Exception as e:
@@ -613,7 +619,7 @@ def api_metrics(task: str, ref: str):
 
 
 @app.get(f"{DEFAULT_PREFIX}/aliases", response_model=AliasesResponse)
-def api_aliases(task: str, model: str):
+def api_aliases(task: str, model: str, actor: str = Depends(require_auth)):
     from omnibioai_model_registry.package.layout import aliases_root as _aliases_root
 
     aliases_dir = _aliases_root(Path(registry.root), task, model)
@@ -762,7 +768,12 @@ def api_set_stage(req: SetStageRequest, actor: str = Depends(require_write_auth)
 
 
 @app.get(f"{DEFAULT_PREFIX}/compare", response_model=CompareResponse)
-def api_compare(task: str, model: str, versions: List[str] = Query(default=[])):
+def api_compare(
+    task: str,
+    model: str,
+    versions: List[str] = Query(default=[]),
+    actor: str = Depends(require_auth),
+):
     if len(versions) < 2:
         raise HTTPException(
             status_code=400,
@@ -796,7 +807,7 @@ def api_compare(task: str, model: str, versions: List[str] = Query(default=[])):
 
 
 @app.get(f"{DEFAULT_PREFIX}/artifacts", response_model=ArtifactsResponse)
-def api_artifacts(task: str, ref: str):
+def api_artifacts(task: str, ref: str, actor: str = Depends(require_auth)):
     try:
         vdir = Path(registry.resolve_model(task=task, model_ref=ref, verify=False))
     except Exception as e:
