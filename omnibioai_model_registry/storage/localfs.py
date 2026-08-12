@@ -33,3 +33,28 @@ class LocalFS(StorageBackend):
                     os.unlink(tmp)
             except Exception:
                 pass
+
+    def write_once_text(self, path: Path, text: str) -> bool:
+        """Exclusive create: write to a temp file in the same directory,
+        then os.link() it into place. os.link() is atomic and raises
+        FileExistsError if `path` already exists, so two racing callers
+        (e.g. two requests registering the same brand-new model at once)
+        can never both "win" -- exactly one creates the file, the other
+        observes it already exists and its own write is discarded. Unlike
+        atomic_write_text's os.replace, this never overwrites."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(text)
+            try:
+                os.link(tmp, path)
+                return True
+            except FileExistsError:
+                return False
+        finally:
+            try:
+                if os.path.exists(tmp):
+                    os.unlink(tmp)
+            except Exception:
+                pass

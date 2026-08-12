@@ -6,6 +6,7 @@ from .api import (
     resolve_model,
     verify_model_ref,
 )
+from .ownership import OwnershipRecord, backfill_legacy_ownership, read_ownership
 from .run import RunLogger
 
 __all__ = [
@@ -15,4 +16,7 @@ __all__ = [
     "promote_model",
     "verify_model_ref",
     "RunLogger",
+    "OwnershipRecord",
+    "read_ownership",
+    "backfill_legacy_ownership",
 ]
