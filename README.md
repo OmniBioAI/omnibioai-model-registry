@@ -14,7 +14,7 @@ It provides:
 - **Plugin-first design** — `PluginRunClient` for TES container environments
 - **Local-first, cloud-ready** storage abstraction
 - **REST API (FastAPI) + CLI (`omr`) + Python SDK**
-- **IAM-gated writes** — every mutating endpoint requires a valid JWT (via `omnibioai-iam-client`) carrying the `model.use` permission, when `AUTH_ENABLED=true`
+- **IAM-gated reads and writes** — every non-informational endpoint (mutations and reads alike) requires a valid JWT (via `omnibioai-iam-client`) carrying the `model.use` permission, when `AUTH_ENABLED=true`; the registry verifies this itself rather than relying solely on the API Gateway
 - **One-click Hugging Face push** — package and upload a registered model version straight to the Hub
 - **Usage metering + cross-service audit** — registration events are emitted to the platform usage pipeline and to the security-audit service, in addition to this repo's own local `promotions.jsonl` trail
 
@@ -30,7 +30,7 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ Audit-ready promotion workflow
 - ✅ 21 REST endpoints (tracking + registry + governance + Hugging Face push)
 - ✅ 11 CLI commands
-- ✅ IAM-gated writes (`model.use` permission, `omnibioai-iam-client`)
+- ✅ IAM-gated reads and writes (`model.use` permission, `omnibioai-iam-client`, enforced independently at the registry)
 - ✅ Usage metering + cross-service audit emission
 - ✅ ModelHub UI with Experiments tab + metric sparklines
 - ✅ Local-first, cloud-ready design
@@ -472,9 +472,11 @@ When `DB_HOST` is absent, the service runs in filesystem-only mode. Tracking end
 
 ## Authentication
 
-Off by default; every mutating endpoint (`register`, `promote`, `tags`,
-`versions/patch`, `stage`, the `hf/*` routes, `runs/log-*`) is
-IAM-gated when explicitly enabled:
+Off by default; **every non-informational endpoint** — both mutations
+(`register`, `promote`, `tags`, `versions/patch`, `stage`, the `hf/*`
+routes, `runs/log-*`) and reads (`resolve`, `verify`, `show`, `models`,
+`runs/get`, `runs/list`, `metrics`, `aliases`, `compare`, `artifacts`,
+`hf/push/status/{job_id}`) — is IAM-gated when explicitly enabled:
 
 ```bash
 export AUTH_ENABLED=true
@@ -484,23 +486,33 @@ export IAM_URL=http://auth-service:8001
 
 `AUTH_ENABLED=false` (the default) runs the service in open mode — no
 token required, every call attributed to a synthetic `system` actor. When
-enabled, `require_write_auth` (`auth.py`) verifies the presented JWT via
-`omnibioai-iam-client`'s `AsyncIAMClient.get_user()` (RS256/JWKS-or-HS256
-signature check + revocation check against `omnibioai-auth`, no local JWT
-decoding of its own) and requires the `model.use` permission — the same
-IAM pattern `omnibioai-lims` and `omnibioai-api-gateway` use. `GET
-/v1/auth/status` reports whether auth is on and, if so, the caller's
-resolved identity — useful for a client to detect which mode it's
-talking to.
+enabled, `require_auth`/`require_write_auth` (`auth.py`) verify the
+presented JWT via `omnibioai-iam-client`'s `AsyncIAMClient.get_user()`
+(RS256/JWKS-or-HS256 signature check + revocation check against
+`omnibioai-auth`, no local JWT decoding of its own) and require the
+`model.use` permission — the same IAM pattern `omnibioai-lims` and
+`omnibioai-api-gateway` use. **The registry performs this verification
+itself, independently of the API Gateway** — it never trusts
+gateway-injected identity headers (`X-Organization-ID`, `X-Team-ID`,
+`X-User-ID`, `X-User-Email`, or similar) as a substitute for a verified
+Bearer token. The Gateway remains a real enforcement layer of its own
+(it authenticates and policy-checks every request before forwarding),
+but the registry no longer depends on it as the *only* layer — a
+request that reaches the service directly is now held to the same
+standard as one that arrives via the Gateway. `GET /v1/auth/status`,
+`GET /v1/hf/settings`, and `GET /health` remain public — they carry no
+registry data, only service/mode metadata.
 
 **Scope note:** authorization is permission-based, not org-scoped. The
 verified identity's `organization_id` is attached to every audit/usage
 event this service emits, but nothing in the data model
 (`omr_runs`/`omr_params`/`omr_metrics`/`omr_tags`/`omr_version_tags`, or
 models/versions themselves) has an `organization_id` column — every
-organization currently shares one flat model namespace. Per-org isolation
-is real future work (see Roadmap), not something `AUTH_ENABLED=true`
-already provides.
+organization currently shares one flat model namespace, and any caller
+holding `model.use` can read or mutate any model regardless of who
+registered it. Per-org isolation is real future work (see Roadmap), not
+something `AUTH_ENABLED=true` provides today — this phase closes the
+*unauthenticated*-access gap only, it does not add tenant ownership.
 
 ### Observability side effects of every write
 
@@ -551,13 +563,25 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
 - ModelHub UI with Experiments tab + metric sparklines
 - Stage management (`none` → `staging` → `production` → `archived`)
 - Alias listing, metric comparison, artifact browser endpoints
+- **HIPAA hardening Phase 1** — every non-informational read endpoint
+  now independently requires IAM authentication (`model.use`), closing
+  the previously-unauthenticated read-path gap; see
+  [Authentication](#authentication). Tenant/organization isolation is
+  explicitly **not** part of this phase — see Near Term below.
 
 ### Near Term
 
 - S3 / Azure Blob storage backends
 - Step-history sparklines in UI pulled from DB (currently single-point)
 - Model signature validation (input/output schema enforcement)
-- Per-organization data isolation — `model.use` permission gating (see [Authentication](#authentication)) is real today, but the data model has no `organization_id` anywhere; every org currently shares one flat model namespace
+- **HIPAA hardening Phase 2 — per-organization data isolation.**
+  `model.use` permission gating (see [Authentication](#authentication))
+  now covers every route, but it is still a flat, non-resource-scoped
+  permission: any caller holding it can read or mutate any org's models,
+  because the data model has no `organization_id`/ownership concept
+  anywhere and every org currently shares one flat model namespace. This
+  phase is deferred pending a product decision on the target ownership
+  model (see the tenant-isolation discovery audit).
 
 ### Mid Term
 

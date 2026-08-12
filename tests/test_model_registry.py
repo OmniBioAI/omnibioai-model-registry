@@ -4151,3 +4151,253 @@ class TestRunCoverageGaps:
             with patch.object(run_mod.os.path, "exists", side_effect=OSError("exists fail")):
                 with pytest.raises(OSError, match="replace fail"):
                     _atomic_write_json(tmp_path / "out.json", {"data": 1})
+
+
+# ============================================================
+# Phase 1 — HIPAA/security hardening: read-path authentication
+# ============================================================
+#
+# Closes the unauthenticated-read-path gap identified in the
+# tenant-isolation discovery audit: every non-informational data-bearing
+# route (previously only mutations were IAM-gated) must now independently
+# authenticate the caller via the same omnibioai-iam-client mechanism,
+# rather than relying on the API Gateway / network topology alone.
+#
+# Deliberately NOT covered here (out of scope for Phase 1, see the PR
+# description): organization/team ownership checks, org_id columns,
+# model.use redesign, service-to-service tokens, or any change to the
+# flat-namespace registration/storage semantics.
+
+
+class TestPhase1ReadEndpointsRequireAuth:
+    """Route-level (real HTTP, via TestClient) coverage proving every
+    previously-open GET/data-bearing route now independently requires a
+    valid Bearer JWT verified through iam-client, with model.use enforced
+    exactly as it already is for writes -- no new/separate permission."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    @pytest.fixture
+    def auth_client(self, tmp_path, monkeypatch):
+        """AUTH_ENABLED=true TestClient with one registered model version,
+        so protected routes have real data to resolve once authenticated."""
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        new_reg.register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=src, metadata={}, set_alias="latest",
+        )
+        return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+    # ── 1-9 explicitly listed routes + discovered extras: 401 when absent ──
+
+    @pytest.mark.parametrize("method,path,params", [
+        ("get", "/v1/models", {}),
+        ("get", "/v1/show", {"task": "t", "ref": "m@v1"}),
+        ("get", "/v1/resolve", {"task": "t", "ref": "m@v1"}),
+        ("get", "/v1/runs/get", {"task": "t", "model": "m", "run_id": "r1"}),
+        ("get", "/v1/runs/list", {"task": "t", "model": "m"}),
+        ("get", "/v1/metrics", {"task": "t", "ref": "m@v1"}),
+        ("get", "/v1/aliases", {"task": "t", "model": "m"}),
+        ("get", "/v1/compare", {"task": "t", "model": "m", "versions": ["v1", "v1"]}),
+        ("get", "/v1/artifacts", {"task": "t", "ref": "m@v1"}),
+        ("get", "/v1/hf/push/status/some-job-id", {}),
+    ], ids=[
+        "models", "show", "resolve", "runs_get", "runs_list",
+        "metrics", "aliases", "compare", "artifacts", "hf_push_status",
+    ])
+    def test_read_endpoint_without_authorization_returns_401(self, auth_client, method, path, params):
+        client, _ = auth_client
+        r = getattr(client, method)(path, params=params)
+        assert r.status_code == 401
+
+    def test_verify_without_authorization_returns_401(self, auth_client):
+        """POST /v1/verify is a data-bearing existence/integrity oracle
+        discovered during the Phase 1 route-by-route review (not in the
+        explicit GET list, but non-informational) -- protected on the
+        same basis."""
+        client, _ = auth_client
+        r = client.post("/v1/verify", json={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 401
+
+    # ── malformed / expired / revoked tokens ────────────────────────────────
+
+    def test_malformed_authorization_header_returns_401(self, auth_client):
+        client, _ = auth_client
+        r = client.get("/v1/models", headers={"Authorization": "NotBearer sometoken"})
+        assert r.status_code == 401
+
+    def test_expired_or_revoked_token_returns_401(self, auth_client, monkeypatch):
+        """AsyncIAMClient.get_user() returns None for an expired/revoked
+        token -- this layer trusts the IAM client's verdict rather than
+        re-deriving the reason locally, same contract already asserted
+        for require_auth/require_write_auth in TestAuthRequireWriteAuth."""
+        self._mock_iam_client(monkeypatch, None)
+        client, _ = auth_client
+        r = client.get("/v1/models", headers={"Authorization": "Bearer expiredtoken"})
+        assert r.status_code == 401
+
+    def test_valid_token_without_model_use_returns_403(self, auth_client, monkeypatch):
+        from iam_client.models import UserContext
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=[], valid=True,
+        ))
+        client, _ = auth_client
+        r = client.get("/v1/models", headers={"Authorization": "Bearer sometoken"})
+        assert r.status_code == 403
+
+    # ── authenticated + model.use → existing behavior fully preserved ──────
+
+    def test_authenticated_with_model_use_preserves_models_behavior(self, auth_client, monkeypatch):
+        from iam_client.models import UserContext
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.use"], valid=True,
+        ))
+        client, _ = auth_client
+        r = client.get("/v1/models", headers={"Authorization": "Bearer sometoken"})
+        assert r.status_code == 200
+        models = r.json()
+        assert isinstance(models, list)
+        assert any(m.get("model_name") == "m" for m in models)
+
+    def test_authenticated_with_model_use_preserves_resolve_behavior(self, auth_client, monkeypatch):
+        from iam_client.models import UserContext
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.use"], valid=True,
+        ))
+        client, _ = auth_client
+        r = client.get(
+            "/v1/resolve", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer sometoken"},
+        )
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        assert r.json()["path"].endswith("v1")
+
+    # ── 400/404-equivalent behavior preserved after auth succeeds ──────────
+
+    def test_show_missing_ref_still_returns_400_after_auth(self, auth_client, monkeypatch):
+        """ModelNotFound -> _handle_registry_error -> 400, unchanged by
+        adding auth (matches the pre-existing full_svc_client-based
+        assertion for the same scenario without auth enabled)."""
+        from iam_client.models import UserContext
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.use"], valid=True,
+        ))
+        client, _ = auth_client
+        r = client.get(
+            "/v1/show", params={"task": "t", "ref": "m@does_not_exist"},
+            headers={"Authorization": "Bearer sometoken"},
+        )
+        assert r.status_code == 400
+
+    def test_compare_requires_two_versions_after_auth(self, auth_client, monkeypatch):
+        from iam_client.models import UserContext
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.use"], valid=True,
+        ))
+        client, _ = auth_client
+        r = client.get(
+            "/v1/compare", params={"task": "t", "model": "m", "versions": ["v1"]},
+            headers={"Authorization": "Bearer sometoken"},
+        )
+        assert r.status_code == 400
+
+    # ── spoofed gateway identity headers must never authenticate ───────────
+
+    def test_spoofed_gateway_headers_do_not_authenticate(self, auth_client):
+        """The registry independently verifies identity via iam-client; it
+        must never treat gateway-injected identity headers as a substitute
+        for a verified Bearer token, even if a well-formed one is present
+        without a token."""
+        client, _ = auth_client
+        r = client.get(
+            "/v1/models",
+            headers={
+                "X-Organization-ID": "org-attacker",
+                "X-Team-ID": "team-attacker",
+                "X-User-ID": "9999",
+                "X-User-Email": "attacker@example.com",
+            },
+        )
+        assert r.status_code == 401
+
+    def test_spoofed_gateway_headers_alongside_invalid_token_still_401(self, auth_client, monkeypatch):
+        """Even with an Authorization header present, spoofed identity
+        headers must not influence the outcome -- only IAM's verdict on
+        the token itself matters."""
+        self._mock_iam_client(monkeypatch, None)
+        client, _ = auth_client
+        r = client.get(
+            "/v1/models",
+            headers={
+                "Authorization": "Bearer invalidtoken",
+                "X-Organization-ID": "org-attacker",
+                "X-User-Email": "attacker@example.com",
+            },
+        )
+        assert r.status_code == 401
+
+    # ── AUTH_ENABLED=false: pre-existing dev/test bypass, unchanged ────────
+
+    def test_auth_disabled_still_allows_reads_without_a_token(self, tmp_path, monkeypatch):
+        """Phase 1 does not change AUTH_ENABLED semantics. When explicitly
+        disabled -- the same pre-existing dev/test switch every write
+        route already honors -- require_auth still returns the synthetic
+        'system' actor and protected reads remain open. This is not a new
+        bypass: it is the existing write-route behavior now applied
+        consistently to reads instead of reads having no gate at all. The
+        default (AUTH_ENABLED unset) is 'false' both here and in
+        production unless an operator explicitly opts in -- unchanged by
+        this PR."""
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        client = TestClient(_svc.app, raise_server_exceptions=False)
+
+        r = client.get("/v1/models")
+        assert r.status_code == 200
+
+    # ── informational endpoints deliberately remain public ─────────────────
+
+    def test_health_remains_public(self, auth_client):
+        client, _ = auth_client
+        r = client.get("/health")
+        assert r.status_code == 200
+
+    def test_auth_status_remains_public(self, auth_client):
+        client, _ = auth_client
+        r = client.get("/v1/auth/status")
+        assert r.status_code == 200
+
+    def test_hf_settings_remains_public(self, auth_client):
+        client, _ = auth_client
+        r = client.get("/v1/hf/settings")
+        assert r.status_code == 200

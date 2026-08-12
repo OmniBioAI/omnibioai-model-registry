@@ -213,14 +213,36 @@ curl -s -X POST http://127.0.0.1:8095/v1/verify \
 
 ---
 
-# Security Model (v0.1)
+# Security Model
 
-This minimal service:
+This section describes the state as of the Phase 1 read-path
+authentication hardening. It supersedes the old "v0.1 — no
+authentication, assumes trusted internal network" description, which no
+longer reflects the code.
 
-* Has no authentication
-* Has no RBAC
-* Assumes trusted internal network
-* Is intended for controlled environments
-
-Authentication and RBAC will be introduced in later versions.
+* When `AUTH_ENABLED=true`, every non-informational endpoint — reads
+  (`resolve`, `verify`, `show`, `models`, `runs/get`, `runs/list`,
+  `metrics`, `aliases`, `compare`, `artifacts`,
+  `hf/push/status/{job_id}`) and mutations alike — requires a valid
+  Bearer JWT carrying the `model.use` IAM permission (`model.use` is the
+  only permission this service checks; see the root README's
+  [Authentication](../../README.md#authentication) section).
+* The registry verifies the JWT itself via `omnibioai-iam-client`,
+  independently of the API Gateway. It does not trust gateway-injected
+  identity headers (`X-Organization-ID`, `X-Team-ID`, `X-User-ID`,
+  `X-User-Email`) as a substitute for a verified token.
+* The API Gateway remains a real enforcement layer in front of this
+  service (it authenticates and permission-checks requests before
+  forwarding them), but this service no longer depends on the Gateway,
+  or on network topology, as its only line of defense.
+* `AUTH_ENABLED=false` (the default) still runs the service fully open —
+  no token required anywhere, every call attributed to a synthetic
+  `system` actor. This is an explicit opt-in dev/test switch, not a
+  production default; it is unchanged by the Phase 1 hardening.
+* **Not yet implemented**: organization/team ownership. `model.use` is a
+  flat permission, not scoped to a resource or an org — every
+  organization currently shares one flat model namespace, and any
+  authenticated caller holding `model.use` can read or mutate any
+  model. Per-org isolation is a separate, deferred phase (see the
+  tenant-isolation discovery audit and the root README's Roadmap).
 
