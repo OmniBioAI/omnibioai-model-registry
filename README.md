@@ -29,11 +29,12 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ Immutable and verifiable model storage
 - ✅ Audit-ready promotion workflow
 - ✅ 21 REST endpoints (tracking + registry + governance + Hugging Face push)
-- ✅ 11 CLI commands
+- ✅ 12 CLI commands
 - ✅ IAM-gated reads and writes (`model.use` permission, `omnibioai-iam-client`, enforced independently at the registry)
 - ✅ Usage metering + cross-service audit emission
 - ✅ ModelHub UI with Experiments tab + metric sparklines
 - ✅ Local-first, cloud-ready design
+- ✅ Organization ownership recorded for newly registered models (server-derived from verified IAM identity) — recorded, not yet enforced; see [Organization Ownership](#organization-ownership-phase-2a)
 
 ---
 
@@ -178,6 +179,8 @@ omnibioai-model-registry/
 │   │                         # (security-audit), separate from audit/'s local trail
 │   ├── hf_routes.py         # Hugging Face push — POST /v1/hf/push, status, settings
 │   ├── usage_emit.py        # Usage-metering wrapper around omnibioai-usage-client
+│   ├── ownership.py         # Phase 2A — write-once model ownership.json,
+│   │                         # legacy backfill (see Organization Ownership)
 │   ├── storage/
 │   ├── package/
 │   ├── audit/                # Local audit trail — audit/promotions.jsonl
@@ -213,7 +216,11 @@ tasks/<task>/models/<model_name>/
         production.json
     audit/
         promotions.jsonl
+    ownership.json
 ```
+
+`ownership.json` (Phase 2A) is write-once and model-level, not per-version
+— see [Organization Ownership](#organization-ownership-phase-2a).
 
 This guarantees deterministic loading, integrity validation, and cross-environment portability.
 
@@ -336,6 +343,17 @@ Valid stages: `none`, `staging`, `production`, `archived`.
 ```bash
 omr compare --task celltype_sc --model human_pbmc --versions 2026-02-14_001 2026-06-14_001
 ```
+
+### Backfill legacy ownership records (Phase 2A, operator/admin use)
+
+```bash
+omr migrate-ownership --json
+```
+
+Deterministic, repeatable, additive-only: writes an explicit
+`status="legacy_unowned"` `ownership.json` for every pre-existing model
+that has none yet. Never guesses an organization. Safe to re-run — see
+[Organization Ownership](#organization-ownership-phase-2a).
 
 ---
 
@@ -503,16 +521,73 @@ standard as one that arrives via the Gateway. `GET /v1/auth/status`,
 `GET /v1/hf/settings`, and `GET /health` remain public — they carry no
 registry data, only service/mode metadata.
 
-**Scope note:** authorization is permission-based, not org-scoped. The
-verified identity's `organization_id` is attached to every audit/usage
-event this service emits, but nothing in the data model
-(`omr_runs`/`omr_params`/`omr_metrics`/`omr_tags`/`omr_version_tags`, or
-models/versions themselves) has an `organization_id` column — every
-organization currently shares one flat model namespace, and any caller
-holding `model.use` can read or mutate any model regardless of who
-registered it. Per-org isolation is real future work (see Roadmap), not
-something `AUTH_ENABLED=true` provides today — this phase closes the
-*unauthenticated*-access gap only, it does not add tenant ownership.
+**Scope note:** authorization is permission-based, not org-scoped, and
+`model.use` remains the existing flat, non-resource-scoped permission —
+it has **not** become org-aware. As of Phase 2A, newly registered models
+*record* organization ownership (see
+[Organization Ownership](#organization-ownership-phase-2a) below), but
+nothing yet *enforces* it: any caller holding `model.use` can still read
+or mutate any model regardless of which org owns it. Full tenant
+isolation — query-layer filtering, cross-org read/write blocking,
+resource-scoped `model.use` — is real future work (see Roadmap), not
+something this phase or `AUTH_ENABLED=true` provides today.
+
+### Organization Ownership (Phase 2A)
+
+Every newly registered model now has a durable, server-derived
+organization-ownership record, stored as `ownership.json` at the model
+root (`tasks/<task>/models/<model_name>/ownership.json` — one per model,
+not per version; versions inherit their parent model's ownership by
+construction, they carry no independent ownership field). This is
+**not** part of the SHA256-hashed version manifest (that only covers
+files inside a version directory) — it is a separate, model-level,
+write-once file next to `aliases/` and `audit/`.
+
+- **Source of truth**: the filesystem. MySQL's `omr_*` tables are an
+  optional, `DB_HOST`-gated side-store for experiment-tracking metrics
+  only (see below) and never represent models/versions themselves — the
+  service is fully functional with `DB_HOST` unset, so ownership cannot
+  depend on MySQL being configured. There is exactly one source of truth
+  for ownership; it is not duplicated into MySQL or into
+  `model_meta.json`.
+- **Where `organization_id` comes from**: only the caller's
+  already-verified IAM identity (`UserContext.org_id`, resolved by
+  `require_write_auth_with_context` after JWT verification). Never from
+  the request body, query/path parameters, or any header
+  (`X-Organization-ID`, `X-Team-ID`, `X-User-ID`, `X-User-Email`, or a
+  client-supplied `organization_id` key inside the free-form `metadata`
+  dict) — none of those are ever consulted.
+- **Write-once**: the very first successful registration of a given
+  `task`/`model_name` establishes ownership permanently. Every later
+  version registered under that same model — by the same org or a
+  different one, since nothing blocks that yet — inherits the existing
+  record unchanged; ownership is never reassigned by a subsequent write.
+- **Legacy models**: any model that already had a registered version
+  before this phase shipped (or is otherwise touched for the first time
+  post-Phase-2A with no `ownership.json` yet) is recorded as
+  `status="legacy_unowned"` with `organization_id=null` — **never**
+  guessed from actor strings or assigned to whichever org happens to
+  touch it next. Resolving these into real ownership is an explicit,
+  deferred, administrator/manual-assignment step (Phase 2B+), not
+  something this phase attempts. Run `omr migrate-ownership` to
+  proactively backfill this explicit marker for every legacy model in
+  one deterministic, repeatable, additive-only pass (safe to re-run).
+- **CLI**: `omr register --org-id <id>` lets an operator assign ownership
+  explicitly for a brand-new model when registering out-of-band (the CLI
+  has no JWT/IAM identity of its own); it has no effect on an
+  already-owned or legacy model.
+- **`POST /v1/register`'s response** now includes server-derived
+  `organization_id` and `ownership_status` fields (`"owned"`,
+  `"unowned"`, or `"legacy_unowned"`). No other endpoint's response
+  shape changed in this phase.
+
+**Not yet implemented** (tracked as Phase 2B/2C/2D): query-layer
+enforcement so org-B cannot read/modify org-A's model; an ownership
+check on `POST /v1/hf/push` (today, any `model.use` holder can push any
+model regardless of owner); `organization_id` on the `omr_*` tracking
+tables; resource-scoped `model.use`; a safe, audited path for an
+administrator to resolve a `legacy_unowned`/`unowned` model into real
+ownership.
 
 ### Observability side effects of every write
 
@@ -567,21 +642,35 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   now independently requires IAM authentication (`model.use`), closing
   the previously-unauthenticated read-path gap; see
   [Authentication](#authentication). Tenant/organization isolation is
-  explicitly **not** part of this phase — see Near Term below.
+  explicitly **not** part of this phase.
+- **HIPAA hardening Phase 2A** — durable, server-derived organization
+  ownership for newly registered models; see
+  [Organization Ownership](#organization-ownership-phase-2a).
+  Establishes *who owns this model*, server-controlled and
+  IAM-derived — it does **not** yet *enforce* that ownership anywhere.
+  `model.use` is unchanged (still flat, not resource-scoped). Legacy
+  models remain explicitly `legacy_unowned`, not guessed.
 
 ### Near Term
 
 - S3 / Azure Blob storage backends
 - Step-history sparklines in UI pulled from DB (currently single-point)
 - Model signature validation (input/output schema enforcement)
-- **HIPAA hardening Phase 2 — per-organization data isolation.**
-  `model.use` permission gating (see [Authentication](#authentication))
-  now covers every route, but it is still a flat, non-resource-scoped
-  permission: any caller holding it can read or mutate any org's models,
-  because the data model has no `organization_id`/ownership concept
-  anywhere and every org currently shares one flat model namespace. This
-  phase is deferred pending a product decision on the target ownership
-  model (see the tenant-isolation discovery audit).
+- **HIPAA hardening Phase 2B — query-layer tenant isolation.**
+  Phase 2A recorded ownership; this phase enforces it: block cross-org
+  reads/writes on the endpoints that currently allow them regardless of
+  the `ownership.json` owner, add an ownership check to `POST
+  /v1/hf/push` (today any `model.use` holder can push any org's model),
+  and decide whether/how `model.use` becomes resource- or org-scoped.
+  Also needs a safe, audited administrator path to resolve a
+  `legacy_unowned`/`unowned` model into real ownership — Phase 2A
+  deliberately does not provide one.
+- **HIPAA hardening Phase 2C — tracking-table scoping.** Extend
+  organization awareness to `omr_runs`/`omr_version_tags` (and by FK,
+  `omr_params`/`omr_metrics`/`omr_tags`) once Phase 2B's enforcement
+  model is settled — deliberately not modified in Phase 2A to avoid
+  introducing a second, possibly-diverging ownership source of truth
+  ahead of that decision.
 
 ### Mid Term
 

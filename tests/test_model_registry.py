@@ -4401,3 +4401,536 @@ class TestPhase1ReadEndpointsRequireAuth:
         client, _ = auth_client
         r = client.get("/v1/hf/settings")
         assert r.status_code == 200
+
+
+# ============================================================
+# Phase 2A — HIPAA hardening: organization-ownership foundation
+# ============================================================
+#
+# Establishes durable, server-derived organization ownership for models
+# (not versions -- versions inherit by construction, see ownership.py).
+# Deliberately NOT covered here (out of scope for Phase 2A): query-layer
+# cross-org enforcement, HF-push ownership check, model.use redesign,
+# public/private semantics. Those belong to later phases.
+
+
+class TestOwnershipModule:
+    """Unit-level coverage of ownership.py: the write-once record, legacy
+    detection, and the backfill migration utility -- independent of the
+    HTTP layer."""
+
+    def test_new_model_owned_by_given_org(self, env_root, tmp_path):
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        backend = LocalFS()
+        rec = ensure_model_ownership(
+            backend, env_root, "t", "m",
+            organization_id="org-A", actor="alice@a.com", model_pre_existing=False,
+        )
+        assert rec.organization_id == "org-A"
+        assert rec.status == "owned"
+        assert rec.registered_by == "alice@a.com"
+        assert rec.registered_at is not None
+        assert rec.discovered_at is None
+
+    def test_new_model_with_no_org_is_unowned_not_guessed(self, env_root):
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        backend = LocalFS()
+        rec = ensure_model_ownership(
+            backend, env_root, "t", "m",
+            organization_id=None, actor="system", model_pre_existing=False,
+        )
+        assert rec.organization_id is None
+        assert rec.status == "unowned"
+
+    def test_pre_existing_model_becomes_legacy_unowned_not_current_org(self, env_root):
+        """The caller's org must NEVER be assigned to a model that already
+        had versions before this call -- that would let anyone "claim" an
+        old model just by touching it."""
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        backend = LocalFS()
+        rec = ensure_model_ownership(
+            backend, env_root, "t", "old_model",
+            organization_id="org-X", actor="whoever@x.com", model_pre_existing=True,
+        )
+        assert rec.organization_id is None
+        assert rec.status == "legacy_unowned"
+        assert rec.registered_by is None
+        assert rec.discovered_at is not None
+
+    def test_ownership_is_write_once_second_call_does_not_overwrite(self, env_root):
+        from omnibioai_model_registry.ownership import ensure_model_ownership, read_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        backend = LocalFS()
+        first = ensure_model_ownership(
+            backend, env_root, "t", "m",
+            organization_id="org-A", actor="alice@a.com", model_pre_existing=False,
+        )
+        # A second call for the "same" model, now claiming pre_existing
+        # (as register_model would compute on a subsequent version) with
+        # a DIFFERENT org -- must be a no-op.
+        second = ensure_model_ownership(
+            backend, env_root, "t", "m",
+            organization_id="org-B", actor="mallory@b.com", model_pre_existing=True,
+        )
+        assert second == first
+        assert second.organization_id == "org-A"
+        on_disk = read_ownership(env_root, "t", "m")
+        assert on_disk == first
+
+    def test_read_ownership_none_when_never_established(self, env_root):
+        from omnibioai_model_registry.ownership import read_ownership
+        assert read_ownership(env_root, "t", "never_touched") is None
+
+    def test_write_once_text_second_writer_loses_race(self, env_root):
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        backend = LocalFS()
+        target = Path(env_root) / "race.json"
+        first = backend.write_once_text(target, "first\n")
+        second = backend.write_once_text(target, "second\n")
+        assert first is True
+        assert second is False
+        assert target.read_text() == "first\n"
+
+    def test_backfill_scans_and_migrates_only_unowned_models(self, env_root, tmp_path):
+        from omnibioai_model_registry import register_model
+        from omnibioai_model_registry.ownership import (
+            backfill_legacy_ownership,
+            read_ownership,
+        )
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+
+        # A properly-owned Phase-2A model.
+        register_model(
+            task="t", model_name="owned_model", version="v1",
+            artifacts_dir=str(src), metadata={}, set_alias=None,
+            organization_id="org-A", actor="alice@a.com",
+        )
+        # Two genuinely legacy models: real version directories with no
+        # ownership.json (simulating pre-Phase-2A data).
+        for name in ("legacy_one", "legacy_two"):
+            legacy_dir = (
+                env_root / "tasks" / "t" / "models" / name / "versions" / "v1"
+            )
+            legacy_dir.mkdir(parents=True)
+            for f in REQUIRED_FILES:
+                (legacy_dir / f).write_text("{}" if f.endswith(".json") else "x")
+
+        summary = backfill_legacy_ownership(env_root)
+        assert summary == {"scanned": 3, "migrated": 2, "already_had_ownership": 1}
+
+        assert read_ownership(env_root, "t", "owned_model").status == "owned"
+        assert read_ownership(env_root, "t", "legacy_one").status == "legacy_unowned"
+        assert read_ownership(env_root, "t", "legacy_two").status == "legacy_unowned"
+
+    def test_backfill_skips_task_dir_with_no_models_subdir(self, env_root):
+        """A task/ directory that exists but has no models/ subdirectory
+        yet (e.g. an empty task namespace) must be skipped, not error."""
+        from omnibioai_model_registry.ownership import backfill_legacy_ownership
+
+        (env_root / "tasks" / "empty_task").mkdir(parents=True)
+        summary = backfill_legacy_ownership(env_root)
+        assert summary == {"scanned": 0, "migrated": 0, "already_had_ownership": 0}
+
+    def test_backfill_is_idempotent_on_rerun(self, env_root):
+        from omnibioai_model_registry.ownership import backfill_legacy_ownership
+
+        legacy_dir = env_root / "tasks" / "t" / "models" / "legacy" / "versions" / "v1"
+        legacy_dir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (legacy_dir / f).write_text("{}" if f.endswith(".json") else "x")
+
+        first = backfill_legacy_ownership(env_root)
+        second = backfill_legacy_ownership(env_root)
+        assert first == {"scanned": 1, "migrated": 1, "already_had_ownership": 0}
+        assert second == {"scanned": 1, "migrated": 0, "already_had_ownership": 1}
+
+    def test_backfill_on_empty_registry_is_a_safe_noop(self, tmp_path, monkeypatch):
+        """MIGRATION TESTING: empty registry (no tasks/ dir at all yet)."""
+        from omnibioai_model_registry.ownership import backfill_legacy_ownership
+
+        empty_root = tmp_path / "brand_new_registry"
+        summary = backfill_legacy_ownership(empty_root)
+        assert summary == {"scanned": 0, "migrated": 0, "already_had_ownership": 0}
+        # Must not have created the tasks/ dir as a side effect.
+        assert not empty_root.exists() or not (empty_root / "tasks").exists()
+
+    def test_backfill_does_not_touch_existing_artifacts_or_data(self, env_root):
+        """MIGRATION TESTING: no existing model/version/artifact is lost
+        or modified -- the migration is additive-only."""
+        from omnibioai_model_registry.ownership import backfill_legacy_ownership
+
+        legacy_dir = env_root / "tasks" / "t" / "models" / "legacy" / "versions" / "v1"
+        legacy_dir.mkdir(parents=True)
+        contents_before = {}
+        for f in REQUIRED_FILES:
+            text = "{}" if f.endswith(".json") else "original-bytes"
+            (legacy_dir / f).write_text(text)
+            contents_before[f] = text
+
+        backfill_legacy_ownership(env_root)
+
+        for f, text in contents_before.items():
+            assert (legacy_dir / f).read_text() == text, f"{f} was modified by migration"
+        # Only the new ownership.json should have appeared alongside the
+        # existing versions/aliases/audit structure at the model root.
+        model_root_dir = env_root / "tasks" / "t" / "models" / "legacy"
+        assert (model_root_dir / "ownership.json").exists()
+        assert (model_root_dir / "versions" / "v1" / "model.pt").exists()
+
+
+class TestRegisterModelOwnership:
+    """api.py-level (ModelRegistry.register_model) ownership behavior --
+    below the HTTP layer, proving the core write-once/legacy contract the
+    HTTP tests below also exercise end-to-end."""
+
+    def test_register_response_includes_server_derived_ownership(self, env_root, tmp_path):
+        from omnibioai_model_registry import register_model
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        out = register_model(
+            task="t", model_name="m", version="v1", artifacts_dir=str(src),
+            metadata={}, set_alias=None, organization_id="org-A", actor="alice@a.com",
+        )
+        assert out["organization_id"] == "org-A"
+        assert out["ownership_status"] == "owned"
+
+    def test_second_version_under_existing_model_does_not_reassign_ownership(
+        self, env_root, tmp_path
+    ):
+        """Security requirement #6: existing model ownership cannot be
+        overwritten during version registration, even by a legitimately
+        authenticated different-org caller (Phase 2A does not yet BLOCK
+        this write -- that's a later phase -- but ownership attribution
+        itself must never drift)."""
+        from omnibioai_model_registry import register_model
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        out1 = register_model(
+            task="t", model_name="m", version="v1", artifacts_dir=str(src),
+            metadata={}, set_alias=None, organization_id="org-A", actor="alice@a.com",
+        )
+        out2 = register_model(
+            task="t", model_name="m", version="v2", artifacts_dir=str(src),
+            metadata={}, set_alias=None, organization_id="org-B", actor="mallory@b.com",
+        )
+        assert out1["organization_id"] == "org-A"
+        assert out2["organization_id"] == "org-A"  # NOT org-B
+        assert out2["ownership_status"] == "owned"
+
+    def test_metadata_body_organization_id_key_is_never_consulted(self, env_root, tmp_path):
+        """Security requirement #3: a client cannot influence ownership by
+        stuffing an organization_id (or any other) key into the free-form
+        metadata dict -- register_model() never reads it from there."""
+        from omnibioai_model_registry import register_model
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        out = register_model(
+            task="t", model_name="m", version="v1", artifacts_dir=str(src),
+            metadata={"organization_id": "org-SPOOFED", "team_id": "team-SPOOFED"},
+            set_alias=None, organization_id="org-A", actor="alice@a.com",
+        )
+        assert out["organization_id"] == "org-A"
+
+    def test_probe_via_resolve_before_registration_does_not_create_false_legacy(
+        self, env_root, tmp_path
+    ):
+        """Regression guard: resolve_model()/promote_model() also call
+        _ensure_model_dirs() as a side effect. A GET-style probe against a
+        model that was never registered must not cause the real, later
+        registration to be mistaken for a pre-existing (legacy) model."""
+        from omnibioai_model_registry import register_model, resolve_model
+        from omnibioai_model_registry.errors import ModelNotFound
+
+        with pytest.raises(ModelNotFound):
+            resolve_model(task="t", model_ref="brandnew@v1", verify=False)
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        out = register_model(
+            task="t", model_name="brandnew", version="v1", artifacts_dir=str(src),
+            metadata={}, set_alias=None, organization_id="org-A", actor="alice@a.com",
+        )
+        assert out["organization_id"] == "org-A"
+        assert out["ownership_status"] == "owned"
+
+    def test_organization_id_defaults_to_none_for_direct_api_callers(self, env_root, tmp_path):
+        """A caller with no IAM identity at all (direct Python API usage,
+        matching CLI behavior without --org-id) gets status=unowned, never
+        a guessed organization."""
+        from omnibioai_model_registry import register_model
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        out = register_model(
+            task="t", model_name="m", version="v1", artifacts_dir=str(src),
+            metadata={}, set_alias=None, actor="alice@a.com",
+        )
+        assert out["organization_id"] is None
+        assert out["ownership_status"] == "unowned"
+
+
+class TestPhase2AHTTPRegisterOwnership:
+    """HTTP/TestClient-level: proves organization_id can only ever come
+    from the verified JWT (via require_write_auth_with_context), never
+    from a header, body field, or query/path parameter."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    @pytest.fixture
+    def auth_client(self, tmp_path, monkeypatch):
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+    def _register_payload(self, tmp_path, **overrides):
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        payload = {
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": str(src), "metadata": {}, "set_alias": None,
+        }
+        payload.update(overrides)
+        return payload
+
+    def _as_org(self, monkeypatch, org_id, permissions=("model.use",)):
+        from iam_client.models import UserContext
+        return self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[],
+            permissions=list(permissions), valid=True, org_id=org_id,
+        ))
+
+    def test_register_authenticated_as_org_a_owns_model(self, auth_client, tmp_path, monkeypatch):
+        self._as_org(monkeypatch, "org-A")
+        client, _ = auth_client
+        r = client.post(
+            "/v1/register", json=self._register_payload(tmp_path),
+            headers={"Authorization": "Bearer sometoken"},
+        )
+        assert r.status_code == 200
+        assert r.json()["organization_id"] == "org-A"
+        assert r.json()["ownership_status"] == "owned"
+
+    def test_spoofed_x_organization_id_header_does_not_change_ownership(
+        self, auth_client, tmp_path, monkeypatch
+    ):
+        """Security requirement #2."""
+        self._as_org(monkeypatch, "org-A")
+        client, _ = auth_client
+        r = client.post(
+            "/v1/register", json=self._register_payload(tmp_path),
+            headers={
+                "Authorization": "Bearer sometoken",
+                "X-Organization-ID": "org-SPOOFED",
+            },
+        )
+        assert r.status_code == 200
+        assert r.json()["organization_id"] == "org-A"
+
+    def test_spoofed_x_team_id_header_does_not_change_ownership(
+        self, auth_client, tmp_path, monkeypatch
+    ):
+        """Security requirement #3."""
+        self._as_org(monkeypatch, "org-A")
+        client, _ = auth_client
+        r = client.post(
+            "/v1/register", json=self._register_payload(tmp_path),
+            headers={
+                "Authorization": "Bearer sometoken",
+                "X-Team-ID": "team-SPOOFED",
+            },
+        )
+        assert r.status_code == 200
+        assert r.json()["organization_id"] == "org-A"
+
+    def test_conflicting_metadata_body_field_is_rejected_server_derived_wins(
+        self, auth_client, tmp_path, monkeypatch
+    ):
+        self._as_org(monkeypatch, "org-A")
+        client, _ = auth_client
+        payload = self._register_payload(
+            tmp_path, metadata={"organization_id": "org-SPOOFED"}
+        )
+        r = client.post(
+            "/v1/register", json=payload,
+            headers={"Authorization": "Bearer sometoken"},
+        )
+        assert r.status_code == 200
+        assert r.json()["organization_id"] == "org-A"
+
+    def test_ownership_derived_only_after_jwt_verification_not_before(
+        self, auth_client, tmp_path, monkeypatch
+    ):
+        """An invalid/unverified token must never reach ownership logic at
+        all -- 401 before any registration or ownership write happens."""
+        self._mock_iam_client(monkeypatch, None)
+        client, root = auth_client
+        r = client.post(
+            "/v1/register", json=self._register_payload(tmp_path),
+            headers={
+                "Authorization": "Bearer invalidtoken",
+                "X-Organization-ID": "org-SPOOFED",
+            },
+        )
+        assert r.status_code == 401
+        from omnibioai_model_registry.ownership import read_ownership
+        assert read_ownership(root, "t", "m") is None
+
+    def test_second_org_registering_new_version_does_not_reassign_ownership_http(
+        self, auth_client, tmp_path, monkeypatch
+    ):
+        """Security requirement #6, end-to-end over HTTP."""
+        client, root = auth_client
+
+        self._as_org(monkeypatch, "org-A")
+        r1 = client.post(
+            "/v1/register", json=self._register_payload(tmp_path),
+            headers={"Authorization": "Bearer token-a"},
+        )
+        assert r1.status_code == 200
+        assert r1.json()["organization_id"] == "org-A"
+
+        self._as_org(monkeypatch, "org-B")
+        r2 = client.post(
+            "/v1/register",
+            json=self._register_payload(tmp_path, version="v2"),
+            headers={"Authorization": "Bearer token-b"},
+        )
+        assert r2.status_code == 200
+        assert r2.json()["organization_id"] == "org-A"  # still org-A, not org-B
+
+    def test_auth_disabled_register_is_unowned_not_a_new_bypass(self, tmp_path, monkeypatch):
+        """AUTH_ENABLED=false is the pre-existing dev/test switch (already
+        used by every write route since Phase 1) -- it still runs fully
+        open, attributing to the synthetic 'system' actor with no org.
+        This is unchanged, documented, existing behavior, not a new
+        insecure default introduced by Phase 2A."""
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        client = TestClient(_svc.app, raise_server_exceptions=False)
+
+        r = client.post("/v1/register", json=self._register_payload(tmp_path))
+        assert r.status_code == 200
+        assert r.json()["organization_id"] is None
+        assert r.json()["ownership_status"] == "unowned"
+
+    def test_audit_event_carries_ownership_metadata_smallest_compatible_change(
+        self, auth_client, tmp_path, monkeypatch
+    ):
+        """Reuses the existing AuditClient.log_event call site (no new
+        audit plumbing) -- the 'register_model' event's metadata now
+        includes organization_id/ownership_status."""
+        from unittest.mock import patch
+
+        self._as_org(monkeypatch, "org-A")
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_audit") as mock_audit:
+            r = client.post(
+                "/v1/register", json=self._register_payload(tmp_path),
+                headers={"Authorization": "Bearer sometoken"},
+            )
+        assert r.status_code == 200
+        mock_audit.log_event.assert_called_once()
+        _, kwargs = mock_audit.log_event.call_args
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+        assert kwargs["metadata"]["ownership_status"] == "owned"
+
+    def test_no_secrets_or_tokens_in_ownership_record(self, auth_client, tmp_path, monkeypatch):
+        """Security requirement #9: the JWT/Authorization header value
+        itself must never be persisted anywhere in the ownership record."""
+        self._as_org(monkeypatch, "org-A")
+        client, root = auth_client
+        r = client.post(
+            "/v1/register", json=self._register_payload(tmp_path),
+            headers={"Authorization": "Bearer super-secret-token-value"},
+        )
+        assert r.status_code == 200
+        from omnibioai_model_registry.ownership import read_ownership
+        rec = read_ownership(root, "t", "m")
+        assert "super-secret-token-value" not in rec.to_json()
+
+
+class TestMigrateOwnershipCLI:
+    """CLI-level coverage: --org-id on `omr register` (admin/operator
+    convenience for the out-of-band, non-HTTP path) and the
+    `omr migrate-ownership` backfill command."""
+
+    def test_register_with_org_id_flag(self, env_root, tmp_path, capsys):
+        from omnibioai_model_registry.cli.main import build_parser
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        parser = build_parser()
+        args = parser.parse_args([
+            "register", "--task", "t", "--model", "m", "--version", "v1",
+            "--artifacts", str(src), "--org-id", "org-A", "--set-alias", "",
+        ])
+        if args.set_alias == "":
+            args.set_alias = None
+        args.func(args)
+        out = capsys.readouterr().out
+        assert "organization_id=org-A" in out
+        assert "status=owned" in out
+
+    def test_migrate_ownership_cli_json_summary(self, env_root, capsys):
+        from omnibioai_model_registry.cli.main import build_parser
+
+        legacy_dir = env_root / "tasks" / "t" / "models" / "legacy" / "versions" / "v1"
+        legacy_dir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (legacy_dir / f).write_text("{}" if f.endswith(".json") else "x")
+
+        parser = build_parser()
+        args = parser.parse_args(["migrate-ownership", "--json"])
+        args.func(args)
+        out = capsys.readouterr().out
+        summary = json.loads(out)
+        assert summary == {"scanned": 1, "migrated": 1, "already_had_ownership": 0}
+
+    def test_migrate_ownership_cli_human_readable(self, env_root, capsys):
+        from omnibioai_model_registry.cli.main import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["migrate-ownership"])
+        args.func(args)
+        out = capsys.readouterr().out
+        assert "Scanned:" in out
+        assert "Migrated to legacy:" in out

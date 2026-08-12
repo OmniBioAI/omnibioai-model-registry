@@ -75,6 +75,13 @@ def cmd_register(args):
         set_alias=args.set_alias,
         actor=args.actor,
         reason=args.reason,
+        # Phase 2A: the CLI is an out-of-band, operator-run trusted tool
+        # with no IAM/JWT identity of its own (unlike the HTTP API, which
+        # always derives this from a verified token) -- --org-id lets an
+        # administrator explicitly assign ownership for a brand-new model
+        # at registration time. It has no effect on an already-owned or
+        # legacy model (ownership is write-once; see ownership.py).
+        organization_id=args.org_id,
     )
     if args.json:
         print(json.dumps(out, indent=2))
@@ -83,6 +90,27 @@ def cmd_register(args):
         print(f"Path: {out['package_path']}")
         if out.get("alias_set"):
             print(f"Alias set: {out['alias_set']}")
+        print(f"Ownership: organization_id={out.get('organization_id')} status={out.get('ownership_status')}")
+
+
+def cmd_migrate_ownership(args):
+    from omnibioai_model_registry.ownership import backfill_legacy_ownership
+
+    registry = ModelRegistry.from_env()
+    summary = backfill_legacy_ownership(registry.root)
+    if args.json:
+        print(json.dumps(summary, indent=2))
+    else:
+        print(f"Scanned:               {summary['scanned']}")
+        print(f"Migrated to legacy:    {summary['migrated']}")
+        print(f"Already had ownership: {summary['already_had_ownership']}")
+        if summary["migrated"]:
+            print(
+                "\nMigrated models are recorded as status=legacy_unowned "
+                "(organization_id=null). They require manual administrator "
+                "assignment in a later phase -- this command never guesses "
+                "an organization from actor strings or other weak evidence."
+            )
 
 
 def cmd_show(args):
@@ -446,6 +474,16 @@ def build_parser():
     p_register.add_argument(
         "--metadata-inline", default=None, help="Inline JSON string metadata to merge"
     )
+    p_register.add_argument(
+        "--org-id",
+        dest="org_id",
+        default=None,
+        help=(
+            "Organization ID to assign as owner if this is a brand-new "
+            "model (Phase 2A; operator/admin use only -- no effect on an "
+            "already-owned or legacy model)"
+        ),
+    )
     p_register.add_argument("--json", action="store_true", help="Print JSON result")
     p_register.set_defaults(func=cmd_register)
 
@@ -522,6 +560,18 @@ def build_parser():
     )
     p_compare.add_argument("--json", action="store_true", help="Print raw JSON")
     p_compare.set_defaults(func=cmd_compare)
+
+    # migrate-ownership (Phase 2A)
+    p_migrate = subparsers.add_parser(
+        "migrate-ownership",
+        help=(
+            "Backfill an explicit legacy_unowned ownership record for every "
+            "pre-existing model that has none. Deterministic, repeatable, "
+            "additive-only -- never guesses an organization."
+        ),
+    )
+    p_migrate.add_argument("--json", action="store_true", help="Print JSON summary")
+    p_migrate.set_defaults(func=cmd_migrate_ownership)
 
     return parser
 

@@ -65,6 +65,15 @@ def audit_root(registry_root: Path, task: str, model_name: str) -> Path:
     return model_root(registry_root, task, model_name) / "audit"
 
 
+def ownership_path(registry_root: Path, task: str, model_name: str) -> Path:
+    """Phase 2A: the single, model-level (not per-version) ownership
+    record. Sits as a flat file directly under the model root, a peer of
+    versions/ and aliases/ -- there is exactly one per model, unlike
+    aliases (many) or versions (many), so a subdirectory would be
+    unwarranted structure."""
+    return model_root(registry_root, task, model_name) / "ownership.json"
+
+
 def promotions_log_path(registry_root: Path, task: str, model_name: str) -> Path:
     return audit_root(registry_root, task, model_name) / "promotions.jsonl"
 

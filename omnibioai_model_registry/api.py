@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from .audit.audit_log import PromotionEvent, append_promotion_event, now_utc_iso
 from .config import RegistryConfig, load_config
 from .errors import ModelNotFound, ValidationError, VersionAlreadyExists
+from .ownership import ensure_model_ownership
 from .package import layout as L
 from .package.manifest import verify_sha256_manifest, write_sha256_manifest
 from .package.validate import validate_package_files
@@ -49,11 +50,40 @@ class ModelRegistry:
         set_alias: Optional[str] = "latest",
         actor: Optional[str] = None,
         reason: Optional[str] = None,
+        organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-
+        """
+        organization_id: Phase 2A ownership. Must be server-derived from
+        an already-verified IAM identity (UserContext.org_id) by the
+        caller -- this method never reads it from `metadata` or anywhere
+        else, so a client stuffing an "organization_id" key into the free
+        -form `metadata` dict has no effect on ownership. Defaults to
+        None for non-HTTP callers with no IAM identity at all (CLI,
+        direct Python API usage), which is recorded as status="unowned",
+        not guessed. See ownership.py for the full design rationale.
+        """
         artifacts_dir = Path(artifacts_dir).resolve()
         if not artifacts_dir.exists():
             raise ValidationError(f"artifacts_dir does not exist: {artifacts_dir}")
+
+        # Snapshot BEFORE _ensure_model_dirs() creates the model's
+        # directories -- this is the only reliable signal for whether
+        # this is a genuinely new model (ownership derived from the
+        # caller) or a pre-existing one (ownership never silently
+        # reassigned to the current caller; see ensure_model_ownership).
+        #
+        # Deliberately NOT "does the model root directory exist": both
+        # resolve_model() and promote_model() also call
+        # _ensure_model_dirs() as a side effect (e.g. a GET /v1/resolve
+        # for a not-yet-registered model creates the empty
+        # versions/aliases/audit skeleton before raising ModelNotFound).
+        # An empty skeleton from a read/probe must not be mistaken for a
+        # real prior registration -- the only trustworthy signal is
+        # whether at least one version directory actually exists.
+        versions_root_path = L.versions_root(self.root, task, model_name)
+        model_pre_existing = versions_root_path.exists() and any(
+            versions_root_path.iterdir()
+        )
 
         self._ensure_model_dirs(task, model_name)
 
@@ -98,6 +128,20 @@ class ModelRegistry:
 
         validate_package_files(dst)
 
+        # Phase 2A: establish (never overwrite) the model-level ownership
+        # record. Must happen only after the copy/validate above succeed,
+        # so a failed registration (bad artifacts, duplicate version) has
+        # no ownership side effect.
+        ownership = ensure_model_ownership(
+            self.backend,
+            self.root,
+            task,
+            model_name,
+            organization_id=organization_id,
+            actor=actor,
+            model_pre_existing=model_pre_existing,
+        )
+
         if set_alias:
             self.promote_model(
                 task,
@@ -116,6 +160,8 @@ class ModelRegistry:
             "package_path": str(dst),
             "hashes": hashes,
             "alias_set": set_alias,
+            "organization_id": ownership.organization_id,
+            "ownership_status": ownership.status,
         }
 
     def resolve_model(self, task: str, model_ref: str, verify: bool = True) -> Path:

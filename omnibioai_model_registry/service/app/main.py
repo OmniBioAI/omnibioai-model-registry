@@ -124,6 +124,11 @@ class RegisterResponse(BaseModel):
     version: str
     package_path: str
     alias_set: Optional[str] = None
+    # Phase 2A: server-derived ownership, never accepted from the
+    # request -- RegisterRequest above deliberately has no
+    # organization_id field. See ownership.py.
+    organization_id: Optional[str] = None
+    ownership_status: Optional[str] = None
 
 
 class PromoteRequest(BaseModel):
@@ -320,11 +325,19 @@ def api_register(req: RegisterRequest, user=Depends(require_write_auth_with_cont
             set_alias=req.set_alias,
             actor=actor,
             reason=req.reason,
+            # Phase 2A: server-derived only, from the same verified
+            # UserContext PR14.2B-3 already resolved -- never from
+            # req.metadata or any other client-supplied field.
+            organization_id=user.org_id,
         )
         _audit.log_event(
             "register_model", actor,
             f"{req.task}/{req.model_name}@{req.version}",
             task=req.task, model_name=req.model_name, version=req.version,
+            metadata={
+                "organization_id": out.get("organization_id"),
+                "ownership_status": out.get("ownership_status"),
+            },
         )
         _emit_usage_safe(emit_model_registered, organization_id=user.org_id, user_id=user.user_id)
         return RegisterResponse(**out)

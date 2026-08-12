@@ -215,10 +215,10 @@ curl -s -X POST http://127.0.0.1:8095/v1/verify \
 
 # Security Model
 
-This section describes the state as of the Phase 1 read-path
-authentication hardening. It supersedes the old "v0.1 — no
-authentication, assumes trusted internal network" description, which no
-longer reflects the code.
+This section describes the state as of the Phase 2A organization-
+ownership hardening. It supersedes the old "v0.1 — no authentication,
+assumes trusted internal network" description, which no longer reflects
+the code.
 
 * When `AUTH_ENABLED=true`, every non-informational endpoint — reads
   (`resolve`, `verify`, `show`, `models`, `runs/get`, `runs/list`,
@@ -239,10 +239,19 @@ longer reflects the code.
   no token required anywhere, every call attributed to a synthetic
   `system` actor. This is an explicit opt-in dev/test switch, not a
   production default; it is unchanged by the Phase 1 hardening.
-* **Not yet implemented**: organization/team ownership. `model.use` is a
-  flat permission, not scoped to a resource or an org — every
-  organization currently shares one flat model namespace, and any
-  authenticated caller holding `model.use` can read or mutate any
-  model. Per-org isolation is a separate, deferred phase (see the
-  tenant-isolation discovery audit and the root README's Roadmap).
+* **Organization ownership is now recorded, but not yet enforced**
+  (Phase 2A). `POST /v1/register` now records which organization owns a
+  newly-registered model, derived only from the caller's verified IAM
+  identity (`UserContext.org_id`) — never from a header, body field, or
+  query/path parameter. This is a durable, write-once, server-controlled
+  record (`ownership.json`, one per model). It does **not** yet gate
+  anything: `model.use` is still a flat permission, not scoped to a
+  resource or an org, and any authenticated caller holding it can still
+  read or mutate any model regardless of who owns it. Legacy models
+  (registered before this phase) are recorded as explicitly
+  `legacy_unowned`, never guessed. See the root README's
+  [Organization Ownership](../../README.md#organization-ownership-phase-2a)
+  section for the full design and the deferred Phase 2B/2C work
+  (query-layer enforcement, HF-push ownership check, tracking-table
+  scoping, resource-scoped `model.use`).
 
