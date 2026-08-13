@@ -13,11 +13,18 @@ package's client.py for the current implementation) -- no JWT decoding
 happens locally in this service anymore, matching the "do not duplicate
 IAM logic" instruction.
 
-Every authenticated call is authorized against the existing `model.use`
-IAM permission -- never by role name, username, or a hardcoded admin
-check (the old require_write_auth was a bare copy of require_auth with
-no permission check at all; this replaces both with real enforcement).
-No new permission name is introduced.
+Every authenticated call is authorized against an IAM permission --
+never by role name, username, or a hardcoded admin check (the old
+require_write_auth was a bare copy of require_auth with no permission
+check at all; this replaces both with real enforcement). Almost every
+route checks the existing `model.use` permission; Phase 2E adds exactly
+one narrowly-scoped exception, MODEL_RESOLVE_OWNERSHIP_PERMISSION
+("model.resolve_ownership", see verify_and_authorize()'s
+`required_permission` parameter and require_ownership_resolve_auth_
+with_context() below) -- a deliberately SEPARATE permission for
+resolving legacy_unowned model ownership, so that holding model.use
+alone is never sufficient for that one administrative action. Still no
+role-based check anywhere in this module.
 
 Organization scope: organization_id is extracted from the verified
 identity and included in every model_access audit event (see below), but
@@ -63,6 +70,16 @@ from .audit_client import AuditClient
 from .config import load_config
 
 MODEL_USE_PERMISSION = "model.use"
+# Phase 2E: deliberately separate from MODEL_USE_PERMISSION -- resolving
+# legacy_unowned ownership is a narrow, more privileged administrative
+# action, not part of "use the registry". A caller holding only
+# model.use must get 403 on POST /v1/ownership/resolve; a caller holding
+# only model.resolve_ownership is unaffected everywhere else (still
+# needs model.use for the ordinary read/write routes it doesn't grant).
+# NOT YET REGISTERED in omnibioai-auth's permission catalog as of this
+# change -- see README's Phase 2E section for why that's a required,
+# separate follow-up in that repo, out of scope here.
+MODEL_RESOLVE_OWNERSHIP_PERMISSION = "model.resolve_ownership"
 
 
 class AuthError(Exception):
@@ -90,13 +107,22 @@ def extract_token(authorization_header: str | None) -> str:
     return parts[1]
 
 
-async def verify_and_authorize(token: str, action: str) -> UserContext:
+async def verify_and_authorize(
+    token: str, action: str, *, required_permission: str = MODEL_USE_PERMISSION
+) -> UserContext:
     """Verifies `token` via the centralized IAM client (signature +
-    revocation -- see module docstring) and enforces the model.use
-    permission. Raises AuthError(401) for any invalid/expired/revoked
-    token, AuthError(403) if the identity lacks model.use. Logs a
+    revocation -- see module docstring) and enforces `required_permission`.
+    Raises AuthError(401) for any invalid/expired/revoked token,
+    AuthError(403) if the identity lacks that permission. Logs a
     model_access_success or model_access_denied audit event on every
     outcome, including organization_id when the identity carries one.
+
+    `required_permission` defaults to MODEL_USE_PERMISSION so every
+    pre-Phase-2E call site is completely unaffected; Phase 2E's
+    require_ownership_resolve_auth_with_context() is the one caller that
+    passes MODEL_RESOLVE_OWNERSHIP_PERMISSION instead -- same
+    verification path, same audit event shape, a different permission
+    name in the missing-permission branch.
 
     A fresh AsyncIAMClient per call, not a module-level singleton -- its
     httpx.AsyncClient binds its connection pool to whichever asyncio event
@@ -123,12 +149,16 @@ async def verify_and_authorize(token: str, action: str) -> UserContext:
         )
         raise AuthError("Invalid, expired, or revoked token", 401)
 
-    if MODEL_USE_PERMISSION not in (user.permissions or []):
+    if required_permission not in (user.permissions or []):
         audit.log_event(
             "model_access_denied", _actor_identifier(user), action,
-            metadata={"reason": "missing_permission", "organization_id": user.org_id},
+            metadata={
+                "reason": "missing_permission",
+                "organization_id": user.org_id,
+                "required_permission": required_permission,
+            },
         )
-        raise AuthError(f"Missing required permission: {MODEL_USE_PERMISSION}", 403)
+        raise AuthError(f"Missing required permission: {required_permission}", 403)
 
     audit.log_event(
         "model_access_success", _actor_identifier(user), action,
@@ -185,27 +215,38 @@ async def require_write_auth(
 
 async def _resolve_user_context(
     authorization: str | None,
+    *,
+    required_permission: str = MODEL_USE_PERMISSION,
 ) -> UserContext:
-    """Shared by require_auth_with_context and require_write_auth_with_context
-    -- both need the full verified UserContext (not just the actor string)
-    so callers can read org_id for Phase 2B ownership enforcement. Same
-    enforcement as require_auth/require_write_auth in every other respect.
+    """Shared by require_auth_with_context, require_write_auth_with_context,
+    and (Phase 2E) require_ownership_resolve_auth_with_context -- all need
+    the full verified UserContext (not just the actor string) so callers
+    can read org_id for ownership enforcement. Same enforcement as
+    require_auth/require_write_auth in every other respect, just against
+    whichever permission the caller asks for.
 
     When auth_enabled=False, returns a synthetic "system" UserContext with
-    org_id=None -- Phase 2B's check_model_ownership() treats a None
-    requesting_org_id as the pre-existing open/no-org dev-test mode
-    (matches only models themselves registered with no org), the same
-    behavior PR14.2B-3's usage-emission call already relies on.
+    org_id=None -- check_model_ownership() treats a None requesting_org_id
+    as the pre-existing open/no-org dev-test mode (matches only models
+    themselves registered with no org), the same behavior PR14.2B-3's
+    usage-emission call already relies on. The synthetic user is granted
+    exactly `required_permission` (not a fixed list) -- open mode remains
+    "no enforcement at all" for whichever permission is being checked,
+    the same unchanged philosophy every route in this service already has
+    in that mode, not a new asymmetric carve-out for Phase 2E's
+    permission specifically.
     """
     cfg = load_config()
     if not cfg.auth_enabled:
         return UserContext(
-            user_id="system", email="system", roles=[], permissions=[MODEL_USE_PERMISSION],
+            user_id="system", email="system", roles=[], permissions=[required_permission],
             valid=True, org_id=None,
         )
     try:
         token = extract_token(authorization)
-        return await verify_and_authorize(token, action="model_access")
+        return await verify_and_authorize(
+            token, action="model_access", required_permission=required_permission
+        )
     except AuthError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
@@ -234,3 +275,17 @@ async def require_write_auth_with_context(
     Phase 2B ownership (register/promote/tags/versions/patch/stage/hf
     push)."""
     return await _resolve_user_context(authorization)
+
+
+async def require_ownership_resolve_auth_with_context(
+    authorization: Annotated[str | None, Header()] = None,
+) -> UserContext:
+    """Phase 2E: gates POST /v1/ownership/resolve. Checks
+    MODEL_RESOLVE_OWNERSHIP_PERMISSION, NOT MODEL_USE_PERMISSION -- a
+    caller who holds only model.use (sufficient for every ordinary
+    read/write route) gets HTTPException(403) here. This is the sole
+    call site in this service that passes a `required_permission` other
+    than the default to _resolve_user_context()."""
+    return await _resolve_user_context(
+        authorization, required_permission=MODEL_RESOLVE_OWNERSHIP_PERMISSION
+    )

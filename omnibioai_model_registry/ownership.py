@@ -66,8 +66,10 @@ never client-supplied):
 - status="owned": allowed only if requesting_org_id is not None and
   equals the record's organization_id.
 - status="legacy_unowned": always denied, for every caller, including a
-  None org_id -- never silently claimed. No admin-reassignment workflow
-  exists yet (see README); resolving these is explicitly deferred.
+  None org_id -- never silently claimed. The ONLY way a legacy_unowned
+  record can ever become owned is the explicit, separately-permissioned
+  resolve_legacy_ownership() below (Phase 2E) -- never as a side effect
+  of an ordinary read/write attempt through this function.
 - status="unowned" (AUTH_ENABLED=false at registration time): allowed
   only when requesting_org_id is ALSO None -- i.e. the whole deployment
   is running in the open, no-org dev/test mode this repo has always
@@ -86,6 +88,7 @@ from pathlib import Path
 from typing import Optional
 
 from .audit.audit_log import now_utc_iso
+from .errors import ModelNotFound, OwnershipResolutionNotEligible, ValidationError
 from .package import layout as L
 from .storage.localfs import LocalFS
 
@@ -161,7 +164,8 @@ def ensure_model_ownership(
       is recorded as status="legacy_unowned" with no organization_id and
       no registered_by, identical in shape and effect to what the
       standalone backfill_legacy_ownership() utility produces for the
-      same model.
+      same model. See resolve_legacy_ownership() (Phase 2E) for the only
+      explicit, permissioned path out of this state.
     - ownership.json already exists (either case above, from an earlier
       call -- including an earlier Phase-2A registration by this or a
       different org): left untouched and read back as-is. Ownership is
@@ -318,3 +322,148 @@ def backfill_legacy_ownership(
             )
             summary["migrated"] += 1
     return summary
+
+
+# ---------------------------------------------------------------------------
+# Phase 2E -- explicit, permissioned legacy-ownership resolution
+# ---------------------------------------------------------------------------
+#
+# The only code path anywhere in this service that can move a model OUT
+# of status="legacy_unowned". Gated at the HTTP layer by a permission
+# deliberately separate from model.use (see auth.py's
+# MODEL_RESOLVE_OWNERSHIP_PERMISSION / require_ownership_resolve_auth_
+# with_context) -- holding model.use alone must never be sufficient.
+# Never invoked as a side effect of any read or write route; it has
+# exactly one caller, service/app/main.py's POST /v1/ownership/resolve.
+
+
+def resolve_legacy_ownership(
+    backend: LocalFS,
+    registry_root: Path,
+    task: str,
+    model_name: str,
+    *,
+    organization_id: str,
+    actor: Optional[str],
+) -> OwnershipRecord:
+    """Assigns real ownership to a status="legacy_unowned" model --
+    permanently and exactly once. `organization_id` MUST already be the
+    caller's own verified UserContext.org_id (never a header, body
+    field, query/path parameter, model metadata, or filesystem path --
+    this function has no knowledge of HTTP request data and performs no
+    verification of its own). There is deliberately no "target
+    organization" parameter: resolution is always self-scoped to
+    whichever organization the authorized resolver is themselves a
+    verified member of. This codebase has no existing, reviewed
+    mechanism for one identity to act on behalf of a DIFFERENT
+    organization, and inventing one is explicitly out of scope for this
+    change -- see the README for the two designs considered and why
+    neither was adopted without a product decision.
+
+    Eligibility (never inferred from actor strings, headers, metadata,
+    or paths -- purely the persisted ownership.json status):
+
+    - status="legacy_unowned": the only eligible state. Resolved to
+      `organization_id`, status becomes "owned".
+    - status="owned", organization_id == caller's own org: idempotent
+      no-op -- returns the existing record unchanged, not an error.
+      Repeating a resolution that already succeeded (including a
+      concurrent duplicate of THIS call, see below) must be safe.
+    - status="owned", organization_id != caller's own org: raises
+      OwnershipResolutionNotEligible. Ownership is never reassigned --
+      this holds regardless of who is asking or why.
+    - status="unowned": raises OwnershipResolutionNotEligible. This is a
+      real, already-established state from the open/no-org dev-test
+      mode (see the module docstring's PHASE 2B ADDENDUM), not an
+      orphaned record -- resolving it into a specific org would silently
+      narrow who can already access it (today, any other open-mode
+      caller), a materially different and out-of-scope operation from
+      resolving a genuinely orphaned legacy_unowned record.
+    - no ownership.json at all: raises ModelNotFound (nothing to
+      resolve).
+
+    CONCURRENCY: ownership.json for a legacy_unowned model already
+    exists on disk (unlike ensure_model_ownership()'s brand-new-model
+    case), so LocalFS.write_once_text() -- an exclusive CREATE -- cannot
+    be used on ownership_path() itself to arbitrate a race; the file is
+    already there. Instead, exactly one racing caller's organization_id
+    is decided via write_once_text() on a SEPARATE, dedicated marker
+    file (package.layout.ownership_resolution_marker_path() -- NOT a
+    second ownership source of truth; nothing else in this codebase ever
+    reads it to decide access, see that function's own docstring). Every
+    racing caller -- whether it created the marker or lost the race and
+    read back the winner's -- then computes and writes the IDENTICAL
+    final ownership.json content via the ordinary atomic_write_text()
+    (safe to "overwrite": every racing writer converges on the same
+    bytes regardless of write order, so interleaving is harmless). This
+    guarantees at most one organization_id is ever recorded as the
+    resolver, exactly like write_once_text() guarantees for a brand-new
+    model, via a different primitive suited to an already-existing file.
+    """
+    if not organization_id:
+        # Guard, not a reachable runtime path via the HTTP route: the
+        # auth dependency (auth.require_ownership_resolve_auth_with_
+        # context) only ever calls this with a verified UserContext's
+        # own org_id.
+        raise ValidationError(
+            "resolve_legacy_ownership requires a verified organization_id"
+        )
+
+    existing = read_ownership(registry_root, task, model_name)
+    if existing is None:
+        raise ModelNotFound(f"Model not found: task={task}, model_name={model_name}")
+
+    if existing.status == STATUS_OWNED:
+        if existing.organization_id == organization_id:
+            return existing
+        raise OwnershipResolutionNotEligible(
+            f"Model already owned by another organization: task={task}, model_name={model_name}"
+        )
+    if existing.status == STATUS_UNOWNED:
+        raise OwnershipResolutionNotEligible(
+            f"Model is not a legacy record eligible for resolution: task={task}, model_name={model_name}"
+        )
+
+    # existing.status == STATUS_LEGACY_UNOWNED here -- the only eligible case.
+    marker_path = L.ownership_resolution_marker_path(Path(registry_root), task, model_name)
+    marker_payload = json.dumps(
+        {
+            "organization_id": organization_id,
+            "resolved_by": actor,
+            "resolved_at": now_utc_iso(),
+        },
+        indent=2,
+    ) + "\n"
+
+    created = backend.write_once_text(marker_path, marker_payload)
+    if created:
+        winning_org_id = organization_id
+        winning_actor = actor
+    else:
+        # Lost the race -- another concurrent resolver's marker already
+        # won. Adopt THEIR winning organization_id/actor, never our own,
+        # so every racing caller converges on writing identical
+        # ownership.json content below.
+        winner_marker = json.loads(marker_path.read_text())
+        winning_org_id = winner_marker["organization_id"]
+        winning_actor = winner_marker.get("resolved_by")
+
+    if winning_org_id != organization_id:
+        raise OwnershipResolutionNotEligible(
+            f"Model already owned by another organization: task={task}, model_name={model_name}"
+        )
+
+    candidate = OwnershipRecord(
+        schema_version=SCHEMA_VERSION,
+        task=task,
+        model_name=model_name,
+        organization_id=winning_org_id,
+        status=STATUS_OWNED,
+        registered_by=winning_actor,
+        registered_at=now_utc_iso(),
+        discovered_at=existing.discovered_at,
+        note="Resolved from legacy_unowned via explicit administrative action.",
+    )
+    ownership_path = L.ownership_path(Path(registry_root), task, model_name)
+    backend.atomic_write_text(ownership_path, candidate.to_json())
+    return candidate

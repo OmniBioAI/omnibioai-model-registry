@@ -76,6 +76,20 @@ def ownership_path(registry_root: Path, task: str, model_name: str) -> Path:
     return model_root(registry_root, task, model_name) / "ownership.json"
 
 
+def ownership_resolution_marker_path(registry_root: Path, task: str, model_name: str) -> Path:
+    """Phase 2E: write-once race-resolution marker consumed internally by
+    ownership.resolve_legacy_ownership(). NOT a second ownership source
+    of truth -- ownership_path() above remains the only file any
+    read/write route ever checks to decide access; this file only ever
+    records which organization_id WON a concurrent resolution race for
+    one legacy_unowned model, so every racing caller converges on
+    writing the identical final ownership.json content. See
+    ownership.py's resolve_legacy_ownership() docstring for why
+    write_once_text() can't be used on ownership_path() itself here (it
+    already exists, as the legacy_unowned record being resolved)."""
+    return model_root(registry_root, task, model_name) / "ownership_resolution.json"
+
+
 def promotions_log_path(registry_root: Path, task: str, model_name: str) -> Path:
     return audit_root(registry_root, task, model_name) / "promotions.jsonl"
 
