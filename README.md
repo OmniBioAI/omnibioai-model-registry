@@ -28,8 +28,8 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ MySQL-backed metric + param storage
 - ✅ Immutable and verifiable model storage
 - ✅ Audit-ready promotion workflow
-- ✅ 21 REST endpoints (tracking + registry + governance + Hugging Face push)
-- ✅ 12 CLI commands
+- ✅ 22 REST endpoints (tracking + registry + governance + Hugging Face push)
+- ✅ 13 CLI commands
 - ✅ IAM-gated reads and writes (`model.use` permission, `omnibioai-iam-client`, enforced independently at the registry)
 - ✅ Usage metering + cross-service audit emission
 - ✅ ModelHub UI with Experiments tab + metric sparklines
@@ -37,6 +37,7 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ Organization ownership recorded (server-derived from verified IAM identity) and enforced on every model-bearing read/write route, including Hugging Face push; see [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b)
 - ✅ Run-tracking data (`omr_runs`/`omr_params`/`omr_metrics`/`omr_tags`/`omr_version_tags`) organization-isolated too; see [Tracking-Data Organization Isolation](#tracking-data-organization-isolation-phase-2c)
 - ✅ Filesystem path traversal closed for every task/model/version/alias/run/metric identifier, centrally enforced; see [Filesystem Path Safety](#filesystem-path-safety)
+- ✅ Legacy/unowned model ownership resolvable via a dedicated, non-role-based IAM permission, self-scoped and write-once; see [Legacy Ownership Resolution](#legacy-ownership-resolution-phase-2e)
 
 ---
 
@@ -360,6 +361,21 @@ Phase 2B, a `legacy_unowned` model is denied for every caller through
 every enforced route, not just left unassigned — see
 [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b).
 
+### Resolve legacy ownership (Phase 2E, operator/admin use)
+
+```bash
+omr resolve-ownership --task celltype_sc --model human_pbmc --org-id org-abc123
+```
+
+Assigns real ownership to a `status="legacy_unowned"` model. Write-once
+and idempotent for the same `--org-id`; refuses to reassign an
+already-owned model. The CLI has no IAM/JWT identity of its own, so
+`--org-id` is explicit here (same trust boundary as
+`omr register --org-id`) — the HTTP equivalent,
+`POST /v1/ownership/resolve`, has no such flag at all and always
+self-scopes to the caller's own verified organization. See
+[Legacy Ownership Resolution](#legacy-ownership-resolution-phase-2e).
+
 ---
 
 ## Python API Usage
@@ -430,6 +446,7 @@ curl -s http://127.0.0.1:8095/health | python -m json.tool
 | POST   | /v1/verify      | Verify SHA256 integrity              |
 | GET    | /v1/show        | Return model_meta.json for a ref     |
 | GET    | /v1/models      | List all registered model versions   |
+| POST   | /v1/ownership/resolve | Resolve a `legacy_unowned` model's ownership (requires `model.resolve_ownership`, not `model.use` — see [Legacy Ownership Resolution](#legacy-ownership-resolution-phase-2e)) |
 
 **Tracking** (requires MySQL — HTTP 503 if `DB_HOST` is unset)
 
@@ -630,44 +647,23 @@ through) calls before touching filesystem state:
   same message) a genuinely nonexistent model would return from that
   route. `legacy_unowned` models are denied for *every* caller,
   including one with no org context at all — never silently claimed by
-  whoever touches them next (still no admin-reassignment workflow; see
-  "Not yet implemented" below).
+  whoever touches them next; the only way out of that state is the
+  explicit, separately-permissioned resolution workflow — see
+  [Legacy Ownership Resolution](#legacy-ownership-resolution-phase-2e)
+  below.
 - **Audit**: `register_model`/`promote_model`/`set_tag`/`patch_version`/
   `set_stage`/`push_to_hf` events all carry `organization_id` directly in
   their metadata now, not only inferable by correlating with a separate
   `model_access_*` event.
 
-**Not yet implemented — and why (Phase 2D audit conclusion):**
+**Not yet implemented:**
 
-- **A legacy/unowned ownership-resolution workflow.** Phase 2D
-  explicitly audited this (see the Phase 2D PR description for the full
-  writeup) rather than building it, because this repo's own established
-  convention — stated in `auth.py`'s own module docstring — is
-  "authorize by permission, never by role," and neither candidate
-  IAM signal already available to this service cleanly satisfies that
-  without a cross-repo product decision:
-  - `UserContext.org_role` containing `"org_admin"` (omnibioai-auth's
-    standard per-org admin role, already present on the verified
-    `UserContext` this service already trusts) would work mechanically
-    and is naturally self-scoping (the admin's own `org_id` is exactly
-    the org they'd resolve resources into) — but it's a *role* name, not
-    a *permission*, a first-ever precedent-breaking pattern in this repo.
-  - `manage_all_orgs` (the existing platform-admin *permission*, which
-    genuinely does flow through the JWT `permissions` claim the same way
-    `model.use` does) fits the "permission, not role" precedent — but
-    it's platform-wide, not org-scoped, so using it here would require a
-    target `organization_id` to come from somewhere *other* than the
-    caller's own verified `org_id` for the first time ever in this
-    ownership model, breaking the "organization_id never client-supplied"
-    invariant every phase since 2A has held.
-
-  Either is implementable, but picking one is a product/IAM decision,
-  not something to invent unilaterally inside this repo.
 - Resource-scoped `model.use` (authorization is still
   ownership-check-plus-flat-permission, not a redesigned permission
-  model) — not needed for the above either way, since both candidate
-  designs use an *existing* IAM signal rather than requiring `model.use`
-  itself to change shape.
+  model). Not needed for legacy-ownership resolution either — see
+  [Legacy Ownership Resolution](#legacy-ownership-resolution-phase-2e),
+  which uses a second, independent, equally-flat permission rather than
+  requiring `model.use` itself to change shape.
 - A `platform`/public model namespace; model deletion.
 
 **Path traversal — fixed, in a dedicated follow-up PR, not Phase 2D
@@ -679,6 +675,105 @@ request fields had no `..`-sequence sanitization anywhere in `refs.py`/
 [Filesystem Path Safety](#filesystem-path-safety) below for the full
 design (a centralized allowlist validator, applied once in
 `package/layout.py`, inherited by every consumer).
+
+### Legacy Ownership Resolution (Phase 2E)
+
+Turns Phase 2A's `status="legacy_unowned"` marker into an explicit,
+permissioned, write-once, self-scoped resolution path — the
+"no admin-reassignment workflow exists yet" gap every phase since 2A had
+flagged and deliberately left unfilled, until now (with one remaining
+external dependency — see below).
+
+- **The permission — `model.resolve_ownership`, not a role.** Gated by
+  a **dedicated IAM permission**, checked completely independently of
+  `model.use` — holding `model.use` alone gets `403` on
+  `POST /v1/ownership/resolve`. This is a deliberate choice, not an
+  oversight: Phase 2D evaluated `UserContext.org_role` containing
+  `"org_admin"` (omnibioai-auth's standard per-org admin role) as an
+  alternative and rejected it, because checking a *role* name would have
+  been a first, precedent-breaking exception to this codebase's own
+  stated policy (`auth.py`'s module docstring) of authorizing by
+  *permission*, never by role. `model.resolve_ownership` keeps that
+  policy intact — same mechanism as `model.use` (a name in the verified
+  JWT's `permissions` claim), just a second, narrower one.
+- **Not yet registered in omnibioai-auth.** This permission is checked
+  by this service, but as of this change it does not yet exist in
+  omnibioai-auth's permission catalog (`app/core/permission_names.py`)
+  and cannot yet be granted to any role. Registering it there (and
+  deciding who gets it) is a **required, separate follow-up in that
+  repo** — out of scope here, the same way this repo has never
+  unilaterally edited omnibioai-auth for `model.use` either. Until that
+  follow-up ships, this endpoint is reachable but unusable in any
+  deployment with `AUTH_ENABLED=true` (nobody can hold a permission that
+  doesn't exist yet) — safe by construction, not a functional gap in
+  *this* repo's own contract. Note: `model.ownership.resolve` (a name
+  discussed early on) does not satisfy omnibioai-auth's own
+  permission-name format (`resource.action`, a single dot) —
+  `model.resolve_ownership` does, and is the name actually used
+  everywhere in this codebase.
+- **Self-scoped only — no target-organization parameter, anywhere.**
+  `POST /v1/ownership/resolve`'s request body has no `organization_id`
+  field; the CLI's `--org-id` is the one exception, and it exists only
+  because the CLI has no IAM/JWT identity of its own at all (same
+  established trust boundary as `omr register --org-id`). Over HTTP,
+  `organization_id` is exclusively the caller's own verified
+  `UserContext.org_id` — an authorized resolver can only ever resolve a
+  legacy model *to their own organization*, never to an arbitrary one.
+  This was the other design considered and rejected in Phase 2D: the
+  existing `manage_all_orgs` platform-admin permission *would* have kept
+  the "permission, not role" policy, but only by accepting a
+  client-supplied target `organization_id` for the first time ever in
+  this ownership model — breaking the "`organization_id` never
+  client-supplied" invariant every phase since 2A has held. Rejected for
+  that reason; not implemented.
+- **Eligibility** (`ownership.resolve_legacy_ownership()`), checked
+  against the persisted `ownership.json` status only — never actor
+  strings, headers, query parameters, model metadata, or filesystem
+  paths:
+  - `status="legacy_unowned"` — the only eligible state. Becomes
+    `status="owned"`, `organization_id=`<the resolver's own org>.
+  - `status="owned"`, already the resolver's own org — **idempotent**:
+    returns the current state unchanged, not an error (`already_resolved:
+    true` in the response). Repeating a resolution that already
+    succeeded must be safe.
+  - `status="owned"`, a *different* org — **denied**. Ownership is never
+    reassigned, full stop, regardless of who's asking.
+  - `status="unowned"` — **denied**. This is a real, already-established
+    state from the open/no-org dev-test mode (see
+    [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b)),
+    not an orphaned record; resolving it into a specific org would
+    silently narrow who can already access it (today, any other
+    open-mode caller) — a materially different, out-of-scope operation.
+  - No `ownership.json` at all — the model doesn't exist; denied.
+- **Write-once and race-safe via a dedicated marker, not a second
+  ownership source of truth.** `ownership.json` for a legacy model
+  already exists on disk (unlike a brand-new model's registration),
+  so the existing write-once primitive (`LocalFS.write_once_text`, an
+  exclusive `os.link`-based create) can't be used on `ownership.json`
+  itself to arbitrate a race — the file's already there. Instead,
+  exactly one concurrent resolver's `organization_id` is decided via
+  `write_once_text()` on a separate, dedicated
+  `ownership_resolution.json` marker; every racing caller — whether it
+  created that marker or lost the race and read back the winner's —
+  then computes and writes the *identical* final `ownership.json`
+  content. `check_model_ownership()`, the single function every
+  read/write route actually calls to decide access, never reads this
+  marker; it exists purely to arbitrate the race, not as a competing
+  authority. Verified with real concurrent threads, not just sequential
+  calls.
+- **Who may resolve**: only a verified identity holding
+  `model.resolve_ownership`, self-scoped to their own `org_id`. Ordinary
+  `model.use` holders — i.e. everyone who can read/write models day to
+  day — cannot invoke this at all.
+- **Audited on both success and failure**, unlike most routes in this
+  file (which only audit success): actor identity, authenticated
+  `organization_id`, task/model, previous ownership status/org,
+  resulting `organization_id`/status, `already_resolved`, and a
+  timestamp (added automatically by `AuditClient`) — no tokens or
+  secrets in any field.
+- **CLI**: `omr resolve-ownership --task T --model M --org-id ORG`
+  mirrors `omr register --org-id`'s existing, already-accepted
+  operator/administrator trust boundary — no new mechanism.
 
 ### Tracking-Data Organization Isolation (Phase 2C)
 
@@ -950,11 +1045,13 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   `GET /v1/hf/push/status/{job_id}` is now org-scoped too (see
   [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b)
   above). Audited legacy-ownership resolution end to end and
-  deliberately did **not** build it — see "Not yet implemented" above
-  for the two candidate IAM designs considered and why neither was
-  adopted without a product decision. Re-confirmed the pre-existing
-  path-traversal finding is unrelated to tenant isolation (doesn't
-  bypass any ownership check) and left it for its own dedicated PR.
+  deliberately did **not** build it in this phase — evaluated two
+  candidate IAM designs and picked neither without a product decision;
+  see [Legacy Ownership Resolution](#legacy-ownership-resolution-phase-2e)
+  (Phase 2E) for the decision that followed. Re-confirmed the
+  pre-existing path-traversal finding is unrelated to tenant isolation
+  (doesn't bypass any ownership check) and left it for its own dedicated
+  PR.
 - **Filesystem path traversal & storage boundary hardening** — the
   dedicated follow-up PR Phase 2D flagged; see
   [Filesystem Path Safety](#filesystem-path-safety). Centralized
@@ -967,21 +1064,33 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   for its own path construction. Symlink-aware, not symlink-hostile.
   Independent of, and layered underneath, Phase 2A–2D's organization
   enforcement — not a tenant-isolation change.
+- **HIPAA hardening Phase 2E** — the legacy-ownership-resolution product
+  decision Phase 2D deferred; see
+  [Legacy Ownership Resolution](#legacy-ownership-resolution-phase-2e).
+  Went with a dedicated `model.resolve_ownership` IAM permission
+  (checked completely independently of `model.use`) over the
+  `org_role`/`"org_admin"` alternative, keeping this repo's
+  permission-only (never role-based) authorization policy intact.
+  Self-scoped only — no client-supplied target organization anywhere in
+  the HTTP path. Write-once, idempotent for the resolver's own org,
+  race-safe via a dedicated marker file (not a second ownership source
+  of truth), audited on both success and failure. **Not yet usable in
+  any `AUTH_ENABLED=true` deployment**: the permission is checked here
+  but not yet registered in omnibioai-auth's permission catalog or
+  granted to any role — that's a required, separate follow-up in that
+  repo, out of scope here (see the Phase 2E section for why).
 
 ### Near Term
 
 - S3 / Azure Blob storage backends
 - Step-history sparklines in UI pulled from DB (currently single-point)
 - Model signature validation (input/output schema enforcement)
-- **HIPAA hardening Phase 2E (product/IAM decision needed first)** —
-  either adopt `org_role` containing `"org_admin"` as a legitimate
-  role-based signal for this service (a first, deliberate exception to
-  "authorize by permission, never by role"), or register + issue a new
-  org-scoped permission via omnibioai-auth's permission registry and
-  have this service check it instead — then build the actual
-  legacy/unowned ownership-resolution workflow (model *and* run) on top
-  of whichever is chosen. Resource-scoped `model.use`; `platform`/public
-  model namespace; model deletion remain separately unscoped.
+- **Register `model.resolve_ownership` in omnibioai-auth** (separate
+  repo) and grant it to an appropriate role — the only remaining step
+  before Phase 2E's resolution endpoint is usable in a deployment with
+  auth enabled.
+- Resource-scoped `model.use`; `platform`/public model namespace; model
+  deletion remain separately unscoped.
 
 ### Mid Term
 

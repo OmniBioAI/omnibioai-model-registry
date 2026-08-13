@@ -15,6 +15,21 @@ class VersionAlreadyExists(ModelRegistryError):
     pass
 
 
+class OwnershipResolutionNotEligible(ModelRegistryError):
+    """Phase 2E: raised by ownership.resolve_legacy_ownership() when the
+    target model is not eligible for legacy-ownership resolution --
+    either it is already owned by a DIFFERENT organization (ownership is
+    never reassigned), or its status is "unowned" (a real, already-
+    established state from the open/no-org dev-test mode, not an
+    orphaned record -- resolving it into a specific org would silently
+    narrow who can already access it, a materially different operation
+    from resolving a genuinely orphaned legacy_unowned record, and out
+    of scope here). Already owned by the CALLER's own organization is
+    NOT an error -- see resolve_legacy_ownership()'s idempotent-success
+    return path, which returns normally instead of raising this."""
+    pass
+
+
 class InvalidModelRef(ModelRegistryError):
     pass
 

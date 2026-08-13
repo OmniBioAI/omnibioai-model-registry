@@ -7507,3 +7507,700 @@ class TestPathSecurityHTTP:
         ]:
             assert resp.status_code == 200, f"{name} unexpectedly failed after path hardening: {resp.text}"
 
+
+
+# ============================================================
+# Phase 2E — legacy/unowned model ownership resolution
+# ============================================================
+#
+# Turns Phase 2A's ownership.json legacy_unowned marker into an
+# explicit, permissioned, write-once, self-scoped resolution path.
+# Uses a dedicated IAM permission (model.resolve_ownership), NOT a
+# role-based check -- see auth.py's module docstring and the README's
+# Phase 2E section for why org_role/"org_admin" (considered in Phase
+# 2D) was rejected in favor of this.
+
+
+class TestOwnershipResolutionUnit:
+    """Pure ownership.py-level coverage of resolve_legacy_ownership() --
+    independent of the HTTP layer."""
+
+    def _own(self, env_root, task, model_name, org_id, *, legacy=False):
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        ensure_model_ownership(
+            LocalFS(), env_root, task, model_name,
+            organization_id=None if legacy else org_id,
+            actor="alice", model_pre_existing=legacy,
+        )
+
+    def test_resolves_legacy_model_to_requesting_org(self, env_root):
+        from omnibioai_model_registry.ownership import resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        record = resolve_legacy_ownership(
+            LocalFS(), env_root, "t", "m", organization_id="org-A", actor="alice",
+        )
+        assert record.organization_id == "org-A"
+        assert record.status == "owned"
+
+    def test_resolution_persisted_to_ownership_json(self, env_root):
+        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        resolve_legacy_ownership(LocalFS(), env_root, "t", "m", organization_id="org-A", actor="alice")
+        persisted = read_ownership(env_root, "t", "m")
+        assert persisted.organization_id == "org-A"
+        assert persisted.status == "owned"
+
+    def test_repeated_resolution_by_same_org_is_idempotent(self, env_root):
+        from omnibioai_model_registry.ownership import resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        backend = LocalFS()
+        first = resolve_legacy_ownership(backend, env_root, "t", "m", organization_id="org-A", actor="alice")
+        second = resolve_legacy_ownership(backend, env_root, "t", "m", organization_id="org-A", actor="alice2")
+        assert first.organization_id == second.organization_id == "org-A"
+        assert second.status == "owned"
+
+    def test_already_owned_by_different_org_cannot_be_reassigned(self, env_root):
+        from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
+        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", "org-A")  # already owned, not legacy
+        backend = LocalFS()
+        with pytest.raises(OwnershipResolutionNotEligible):
+            resolve_legacy_ownership(backend, env_root, "t", "m", organization_id="org-B", actor="mallory")
+        # No mutation on denial.
+        assert read_ownership(env_root, "t", "m").organization_id == "org-A"
+
+    def test_legacy_model_resolved_once_second_org_denied(self, env_root):
+        from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
+        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        backend = LocalFS()
+        resolve_legacy_ownership(backend, env_root, "t", "m", organization_id="org-A", actor="alice")
+        with pytest.raises(OwnershipResolutionNotEligible):
+            resolve_legacy_ownership(backend, env_root, "t", "m", organization_id="org-B", actor="mallory")
+        assert read_ownership(env_root, "t", "m").organization_id == "org-A"
+
+    def test_unowned_status_not_eligible(self, env_root):
+        """Security requirement: only legacy_unowned records may be
+        resolved -- "unowned" (a real, already-established open-mode
+        state) is a different category, not an orphaned record."""
+        from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
+        from omnibioai_model_registry.ownership import resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=False)  # -> status="unowned"
+        with pytest.raises(OwnershipResolutionNotEligible):
+            resolve_legacy_ownership(LocalFS(), env_root, "t", "m", organization_id="org-A", actor="alice")
+
+    def test_nonexistent_model_not_found(self, env_root):
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.ownership import resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        with pytest.raises(ModelNotFound):
+            resolve_legacy_ownership(LocalFS(), env_root, "t", "never_registered", organization_id="org-A", actor="alice")
+
+    def test_requires_nonempty_organization_id(self, env_root):
+        from omnibioai_model_registry.errors import ValidationError
+        from omnibioai_model_registry.ownership import resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        with pytest.raises(ValidationError):
+            resolve_legacy_ownership(LocalFS(), env_root, "t", "m", organization_id="", actor="alice")
+        with pytest.raises(ValidationError):
+            resolve_legacy_ownership(LocalFS(), env_root, "t", "m", organization_id=None, actor="alice")
+
+    def test_never_infers_organization_from_actor_string(self, env_root):
+        """actor is recorded (audit metadata) but never consulted to
+        derive organization_id -- resolving with a wildly different
+        actor string still only ever assigns the explicitly-passed
+        organization_id."""
+        from omnibioai_model_registry.ownership import resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        record = resolve_legacy_ownership(
+            LocalFS(), env_root, "t", "m",
+            organization_id="org-A", actor="someone@org-totally-different.example",
+        )
+        assert record.organization_id == "org-A"
+
+    def test_resolution_marker_is_not_a_second_ownership_source(self, env_root):
+        """check_model_ownership() -- the actual authorization decision
+        every route uses -- never reads the resolution marker file, only
+        ownership.json."""
+        from omnibioai_model_registry.ownership import check_model_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.package import layout as L
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        resolve_legacy_ownership(LocalFS(), env_root, "t", "m", organization_id="org-A", actor="alice")
+        marker_path = L.ownership_resolution_marker_path(env_root, "t", "m")
+        assert marker_path.exists()
+
+        result = check_model_ownership(env_root, "t", "m", requesting_org_id="org-A")
+        assert result.allowed is True
+        result_other = check_model_ownership(env_root, "t", "m", requesting_org_id="org-B")
+        assert result_other.allowed is False
+
+    # ── concurrency: real threads ────────────────────────────────────────
+
+    def test_concurrent_resolution_has_exactly_one_winner(self, env_root, tmp_path):
+        """Security requirement: two concurrent resolution attempts must
+        not produce conflicting ownership records."""
+        import threading
+        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        backend = LocalFS()
+
+        n = 10
+        results = [None] * n
+        errors = [None] * n
+        barrier = threading.Barrier(n)
+
+        def worker(i):
+            try:
+                barrier.wait()
+                results[i] = resolve_legacy_ownership(
+                    backend, env_root, "t", "m", organization_id=f"org-{i}", actor=f"actor-{i}",
+                )
+            except Exception as exc:
+                errors[i] = exc
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join(timeout=30)
+
+        winners = {r.organization_id for r in results if r is not None}
+        assert len(winners) == 1, f"expected exactly one winning org, got {winners}"
+        assert all(
+            isinstance(e, OwnershipResolutionNotEligible) for e in errors if e is not None
+        )
+        final = read_ownership(env_root, "t", "m")
+        assert final.organization_id in winners
+        assert final.status == "owned"
+
+    def test_concurrent_resolution_by_same_org_all_succeed_consistently(self, env_root):
+        """A race where every concurrent caller passes the SAME org_id
+        (e.g. two admins both resolving to their shared org at once)
+        must have every caller succeed with identical results -- no
+        spurious denials among callers who agree."""
+        import threading
+        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        self._own(env_root, "t", "m", None, legacy=True)
+        backend = LocalFS()
+
+        n = 8
+        results = [None] * n
+        errors = [None] * n
+        barrier = threading.Barrier(n)
+
+        def worker(i):
+            try:
+                barrier.wait()
+                results[i] = resolve_legacy_ownership(
+                    backend, env_root, "t", "m", organization_id="org-A", actor=f"actor-{i}",
+                )
+            except Exception as exc:
+                errors[i] = exc
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join(timeout=30)
+
+        assert errors == [None] * n, f"unexpected errors: {errors}"
+        assert all(r.organization_id == "org-A" for r in results)
+        assert read_ownership(env_root, "t", "m").organization_id == "org-A"
+
+
+class TestPhase2EAuthPermission:
+    """auth.py-level: model.resolve_ownership is checked independently
+    of model.use. Follows this repo's own established convention for
+    testing these async dependencies directly (asyncio.run(...) inside a
+    plain test function -- see TestRequireWriteAuthWithContext /
+    TestVerifyAndAuthorize above), not pytest-asyncio (not a dependency
+    of this project)."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def test_model_use_alone_is_insufficient(self, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
+
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.use"],
+            valid=True, org_id="org-A",
+        ))
+        with pytest.raises(HTTPException) as excinfo:
+            asyncio.run(require_ownership_resolve_auth_with_context(authorization="Bearer sometoken"))
+        assert excinfo.value.status_code == 403
+
+    def test_resolve_ownership_permission_alone_is_sufficient(self, monkeypatch):
+        import asyncio
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
+
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.resolve_ownership"],
+            valid=True, org_id="org-A",
+        ))
+        user = asyncio.run(require_ownership_resolve_auth_with_context(authorization="Bearer sometoken"))
+        assert user.org_id == "org-A"
+
+    def test_no_permissions_at_all_denied(self, monkeypatch):
+        import asyncio
+        from fastapi import HTTPException
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
+
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=[],
+            valid=True, org_id="org-A",
+        ))
+        with pytest.raises(HTTPException) as excinfo:
+            asyncio.run(require_ownership_resolve_auth_with_context(authorization="Bearer sometoken"))
+        assert excinfo.value.status_code == 403
+
+    def test_ordinary_require_auth_with_context_unaffected(self, monkeypatch):
+        """Regression: every pre-Phase-2E dependency still checks
+        model.use exactly as before -- verify_and_authorize()'s new
+        required_permission parameter defaults correctly."""
+        import asyncio
+        from iam_client.models import UserContext
+        from omnibioai_model_registry.auth import require_auth_with_context
+
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+        self._mock_iam_client(monkeypatch, UserContext(
+            user_id="1", email="user@test.com", roles=[], permissions=["model.use"],
+            valid=True, org_id="org-A",
+        ))
+        user = asyncio.run(require_auth_with_context(authorization="Bearer sometoken"))
+        assert user.org_id == "org-A"
+
+    def test_open_mode_grants_only_the_requested_permission(self, monkeypatch):
+        """AUTH_ENABLED=false: the synthetic system user is granted
+        exactly the permission being checked, not a fixed list -- open
+        mode remains "no enforcement" for whichever permission a given
+        dependency checks."""
+        import asyncio
+        from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
+
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        user = asyncio.run(require_ownership_resolve_auth_with_context(authorization=None))
+        assert "model.resolve_ownership" in user.permissions
+        assert user.org_id is None
+
+
+class TestPhase2EOwnershipResolveHTTP:
+    """HTTP-level: POST /v1/ownership/resolve. Covers the full Phase 2E
+    security-test checklist."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def _as(self, monkeypatch, org_id, *, permissions=("model.use",), user_id="1"):
+        from iam_client.models import UserContext
+        return self._mock_iam_client(monkeypatch, UserContext(
+            user_id=user_id, email=f"user@{org_id}.example" if org_id else "user@open.example",
+            roles=[], permissions=list(permissions), valid=True, org_id=org_id,
+        ))
+
+    @pytest.fixture
+    def auth_client(self, tmp_path, monkeypatch):
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+    def _make_legacy_model(self, root, task="t", model_name="m"):
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        vdir = root / "tasks" / task / "models" / model_name / "versions" / "v1"
+        vdir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (vdir / f).write_text("{}" if f.endswith(".json") else "x")
+        ensure_model_ownership(
+            LocalFS(), root, task, model_name,
+            organization_id=None, actor=None, model_pre_existing=True,
+        )
+
+    def _make_owned_model(self, root, org_id, task="t", model_name="m"):
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        vdir = root / "tasks" / task / "models" / model_name / "versions" / "v1"
+        vdir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (vdir / f).write_text("{}" if f.endswith(".json") else "x")
+        ensure_model_ownership(
+            LocalFS(), root, task, model_name,
+            organization_id=org_id, actor="registrant", model_pre_existing=False,
+        )
+
+    # ── 1. unauthenticated -> 401 ────────────────────────────────────────
+
+    def test_unauthenticated_returns_401(self, auth_client, tmp_path):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        r = client.post("/v1/ownership/resolve", json={"task": "t", "model_name": "m"})
+        assert r.status_code == 401
+
+    # ── 2/3. authenticated but only model.use -> 403 ────────────────────
+
+    def test_model_use_only_returns_403(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.use",))
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 403
+
+    def test_no_permissions_returns_403(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=())
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 403
+
+    # ── 4. authorized resolver succeeds ─────────────────────────────────
+
+    def test_authorized_resolver_succeeds(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["organization_id"] == "org-A"
+        assert body["ownership_status"] == "owned"
+        assert body["already_resolved"] is False
+
+    # ── 5/6. spoofed headers no effect ──────────────────────────────────
+
+    def test_spoofed_x_organization_id_header_no_effect(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A", "X-Organization-ID": "org-SPOOFED"},
+        )
+        assert r.status_code == 200
+        assert r.json()["organization_id"] == "org-A"
+
+    def test_spoofed_x_team_id_header_no_effect(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A", "X-Team-ID": "team-SPOOFED"},
+        )
+        assert r.status_code == 200
+        assert r.json()["organization_id"] == "org-A"
+
+    def test_body_organization_id_field_ignored(self, auth_client, tmp_path, monkeypatch):
+        """ResolveOwnershipRequest has no organization_id field at all --
+        pydantic silently drops the unknown key."""
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r = client.post(
+            "/v1/ownership/resolve",
+            json={"task": "t", "model_name": "m", "organization_id": "org-SPOOFED"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 200
+        assert r.json()["organization_id"] == "org-A"
+
+    # ── 7. already-owned model cannot be reassigned ─────────────────────
+
+    def test_already_owned_by_other_org_cannot_be_reassigned(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-B", permissions=("model.resolve_ownership",))
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-B"},
+        )
+        assert r.status_code == 400
+        from omnibioai_model_registry.ownership import read_ownership
+        assert read_ownership(root, "t", "m").organization_id == "org-A"
+
+    # ── 8. legacy model resolved only once ──────────────────────────────
+
+    def test_legacy_model_resolved_only_once(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r1 = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r1.status_code == 200
+
+        self._as(monkeypatch, "org-B", permissions=("model.resolve_ownership",))
+        r2 = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-B"},
+        )
+        assert r2.status_code == 400
+        from omnibioai_model_registry.ownership import read_ownership
+        assert read_ownership(root, "t", "m").organization_id == "org-A"
+
+    # ── 9. repeated resolution is safe/idempotent ───────────────────────
+
+    def test_repeated_resolution_by_same_org_is_idempotent(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r1 = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r1.status_code == 200
+        assert r1.json()["already_resolved"] is False
+
+        r2 = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r2.status_code == 200
+        assert r2.json()["organization_id"] == "org-A"
+        assert r2.json()["already_resolved"] is True
+
+    # ── unowned (not legacy) also rejected ──────────────────────────────
+
+    def test_unowned_model_not_eligible(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        vdir = root / "tasks" / "t" / "models" / "m" / "versions" / "v1"
+        vdir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (vdir / f).write_text("{}" if f.endswith(".json") else "x")
+        ensure_model_ownership(
+            LocalFS(), root, "t", "m", organization_id=None, actor="system", model_pre_existing=False,
+        )
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 400
+
+    def test_nonexistent_model_returns_error(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "never_existed"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 400
+
+    def test_resolver_with_no_org_membership_rejected(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, None, permissions=("model.resolve_ownership",))
+        r = client.post(
+            "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+            headers={"Authorization": "Bearer noorg"},
+        )
+        assert r.status_code == 400
+
+    # ── 10/11. audit content, no secret leakage ─────────────────────────
+
+    def test_audit_event_contains_authenticated_organization_id(self, auth_client, tmp_path, monkeypatch):
+        from unittest.mock import patch
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_audit") as mock_audit:
+            r = client.post(
+                "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+                headers={"Authorization": "Bearer org-A"},
+            )
+        assert r.status_code == 200
+        mock_audit.log_event.assert_called_once()
+        args, kwargs = mock_audit.log_event.call_args
+        assert args[0] == "resolve_legacy_ownership"
+        assert args[1] == "user@org-A.example"  # actor identity
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+        assert kwargs["metadata"]["previous_ownership_status"] == "legacy_unowned"
+        assert kwargs["metadata"]["resulting_organization_id"] == "org-A"
+        assert kwargs["metadata"]["resulting_ownership_status"] == "owned"
+
+    def test_audit_event_on_denial_recorded_separately(self, auth_client, tmp_path, monkeypatch):
+        from unittest.mock import patch
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-B", permissions=("model.resolve_ownership",))
+        import omnibioai_model_registry.service.app.main as _svc
+        with patch.object(_svc, "_audit") as mock_audit:
+            r = client.post(
+                "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+                headers={"Authorization": "Bearer org-B"},
+            )
+        assert r.status_code == 400
+        mock_audit.log_event.assert_called_once()
+        args, kwargs = mock_audit.log_event.call_args
+        assert args[0] == "resolve_legacy_ownership_denied"
+        assert kwargs["metadata"]["organization_id"] == "org-B"
+
+    def test_no_secret_or_token_in_response_or_audit(self, auth_client, tmp_path, monkeypatch):
+        from unittest.mock import patch
+        client, root = auth_client
+        self._make_legacy_model(root)
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        import omnibioai_model_registry.service.app.main as _svc
+        secret_token = "super-secret-bearer-token-value"
+        with patch.object(_svc, "_audit") as mock_audit:
+            r = client.post(
+                "/v1/ownership/resolve", json={"task": "t", "model_name": "m"},
+                headers={"Authorization": f"Bearer {secret_token}"},
+            )
+        assert r.status_code == 200
+        assert secret_token not in r.text
+        _, kwargs = mock_audit.log_event.call_args
+        assert secret_token not in json.dumps(kwargs["metadata"])
+        from omnibioai_model_registry.ownership import read_ownership
+        assert secret_token not in read_ownership(root, "t", "m").to_json()
+
+    # ── every other protected route unaffected (Phase 1/2A-2D regression) ──
+
+    def test_ordinary_routes_unaffected_by_new_permission(self, auth_client, tmp_path, monkeypatch):
+        """model.use holders (without model.resolve_ownership) continue
+        to use every ordinary route exactly as before."""
+        client, root = auth_client
+        self._as(monkeypatch, "org-A", permissions=("model.use",))
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        r = client.post("/v1/register", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": str(src), "metadata": {},
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+    def test_resolve_ownership_permission_alone_cannot_use_ordinary_routes(self, auth_client, tmp_path, monkeypatch):
+        """The inverse: holding only model.resolve_ownership does not
+        grant model.use -- confirms the two permissions are genuinely
+        independent, not one a superset of the other."""
+        client, root = auth_client
+        self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
+        r = client.get("/v1/models", headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 403
+
+
+class TestOwnershipResolutionCLI:
+    """omr resolve-ownership -- operator/administrator use, same
+    out-of-band trust boundary as `omr register --org-id`."""
+
+    def test_cli_resolves_legacy_model(self, env_root, capsys):
+        from omnibioai_model_registry.cli.main import build_parser
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        vdir = env_root / "tasks" / "t" / "models" / "m" / "versions" / "v1"
+        vdir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (vdir / f).write_text("{}" if f.endswith(".json") else "x")
+        ensure_model_ownership(
+            LocalFS(), env_root, "t", "m", organization_id=None, actor=None, model_pre_existing=True,
+        )
+
+        parser = build_parser()
+        args = parser.parse_args([
+            "resolve-ownership", "--task", "t", "--model", "m", "--org-id", "org-A", "--json",
+        ])
+        args.func(args)
+        out = json.loads(capsys.readouterr().out)
+        assert out["organization_id"] == "org-A"
+        assert out["ownership_status"] == "owned"
+
+    def test_cli_cannot_reassign_already_owned_model(self, env_root, capsys):
+        from omnibioai_model_registry.cli.main import build_parser
+        from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        ensure_model_ownership(
+            LocalFS(), env_root, "t", "m", organization_id="org-A", actor="alice", model_pre_existing=False,
+        )
+        parser = build_parser()
+        args = parser.parse_args([
+            "resolve-ownership", "--task", "t", "--model", "m", "--org-id", "org-B",
+        ])
+        with pytest.raises(OwnershipResolutionNotEligible):
+            args.func(args)

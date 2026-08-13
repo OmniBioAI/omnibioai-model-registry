@@ -114,10 +114,37 @@ def cmd_migrate_ownership(args):
         if summary["migrated"]:
             print(
                 "\nMigrated models are recorded as status=legacy_unowned "
-                "(organization_id=null). They require manual administrator "
-                "assignment in a later phase -- this command never guesses "
-                "an organization from actor strings or other weak evidence."
+                "(organization_id=null). Use `omr resolve-ownership` (or "
+                "POST /v1/ownership/resolve, which requires the dedicated "
+                "model.resolve_ownership IAM permission) to assign real "
+                "ownership -- this command itself never guesses an "
+                "organization from actor strings or other weak evidence."
             )
+
+
+def cmd_resolve_ownership(args):
+    from omnibioai_model_registry.ownership import resolve_legacy_ownership
+
+    registry = ModelRegistry.from_env()
+    # Phase 2E: same out-of-band, operator-run trust boundary as
+    # `omr register --org-id` -- the CLI has no IAM/JWT identity of its
+    # own, so --org-id is how a local administrator supplies the
+    # organization being resolved TO. The HTTP route
+    # (POST /v1/ownership/resolve) never accepts this as a request field
+    # for exactly that reason: there, organization_id is exclusively the
+    # verified caller's own UserContext.org_id.
+    record = resolve_legacy_ownership(
+        registry.backend, registry.root, args.task, args.model,
+        organization_id=args.org_id, actor=args.actor,
+    )
+    if args.json:
+        print(json.dumps({
+            "task": args.task, "model_name": args.model,
+            "organization_id": record.organization_id, "ownership_status": record.status,
+        }, indent=2))
+    else:
+        print(f"Resolved: {args.task}/{args.model}")
+        print(f"Ownership: organization_id={record.organization_id} status={record.status}")
 
 
 def cmd_show(args):
@@ -579,6 +606,30 @@ def build_parser():
     )
     p_migrate.add_argument("--json", action="store_true", help="Print JSON summary")
     p_migrate.set_defaults(func=cmd_migrate_ownership)
+
+    # resolve-ownership (Phase 2E)
+    p_resolve_ownership = subparsers.add_parser(
+        "resolve-ownership",
+        help=(
+            "Assign real ownership to a status=legacy_unowned model. "
+            "Write-once and idempotent for the same --org-id; refuses to "
+            "reassign an already-owned model. Operator/administrator use "
+            "only -- the HTTP equivalent (POST /v1/ownership/resolve) "
+            "requires the dedicated model.resolve_ownership IAM permission "
+            "and always self-scopes to the caller's own verified "
+            "organization, unlike this command's explicit --org-id (the "
+            "CLI has no IAM/JWT identity of its own -- same trust boundary "
+            "`omr register --org-id` already uses)."
+        ),
+    )
+    p_resolve_ownership.add_argument("--task", required=True, help="Task name")
+    p_resolve_ownership.add_argument("--model", required=True, help="Model name")
+    p_resolve_ownership.add_argument(
+        "--org-id", dest="org_id", required=True, help="Organization to resolve ownership to"
+    )
+    p_resolve_ownership.add_argument("--actor", help="Actor recorded on the resolution")
+    p_resolve_ownership.add_argument("--json", action="store_true", help="Print JSON result")
+    p_resolve_ownership.set_defaults(func=cmd_resolve_ownership)
 
     return parser
 

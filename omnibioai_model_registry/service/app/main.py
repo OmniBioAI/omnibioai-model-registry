@@ -25,9 +25,10 @@ from omnibioai_model_registry.config import load_config
 from omnibioai_model_registry.auth import (
     _actor_identifier,
     require_auth_with_context,
+    require_ownership_resolve_auth_with_context,
     require_write_auth_with_context,
 )
-from omnibioai_model_registry.ownership import check_model_ownership
+from omnibioai_model_registry.ownership import check_model_ownership, read_ownership, resolve_legacy_ownership
 from omnibioai_model_registry.package import layout as L
 from omnibioai_model_registry.audit_client import AuditClient
 from omnibioai_model_registry.hf_routes import router as hf_router
@@ -151,6 +152,25 @@ class RegisterResponse(BaseModel):
     # organization_id field. See ownership.py.
     organization_id: Optional[str] = None
     ownership_status: Optional[str] = None
+
+
+class ResolveOwnershipRequest(BaseModel):
+    task: str
+    model_name: str
+    reason: Optional[str] = None
+    # Deliberately NO organization_id field -- see api_resolve_ownership()
+    # and ownership.resolve_legacy_ownership()'s docstrings. Resolution is
+    # always self-scoped to the caller's own verified UserContext.org_id;
+    # there is no "target organization" this request can ever specify.
+
+
+class ResolveOwnershipResponse(BaseModel):
+    ok: bool
+    task: str
+    model_name: str
+    organization_id: Optional[str]
+    ownership_status: str
+    already_resolved: bool
 
 
 class PromoteRequest(BaseModel):
@@ -392,6 +412,90 @@ def api_register(req: RegisterRequest, user=Depends(require_write_auth_with_cont
         return RegisterResponse(**out)
     except Exception as e:
         _handle_registry_error(e)
+
+
+@app.post(f"{DEFAULT_PREFIX}/ownership/resolve", response_model=ResolveOwnershipResponse)
+def api_resolve_ownership(
+    req: ResolveOwnershipRequest,
+    user: UserContext = Depends(require_ownership_resolve_auth_with_context),
+):
+    """Phase 2E: the only way a legacy_unowned model can become owned by
+    a real organization. Gated by require_ownership_resolve_auth_with_
+    context -- MODEL_RESOLVE_OWNERSHIP_PERMISSION ("model.resolve_
+    ownership"), a permission deliberately separate from model.use; a
+    caller holding only model.use gets 403 here (never reaches this
+    function body -- FastAPI's dependency injection runs the auth check
+    before the route body executes).
+
+    organization_id is exclusively user.org_id, the verified identity's
+    own organization -- ResolveOwnershipRequest has no organization_id
+    field at all, so there is nothing for a client to spoof; resolution
+    is always self-scoped (see ownership.resolve_legacy_ownership()'s
+    docstring for why there is no "target organization" parameter).
+    """
+    actor = _actor_identifier(user)
+    if not user.org_id:
+        # A verified identity with no organization membership at all --
+        # there is no org to resolve ownership TO. Distinct from the
+        # (also rejected) AUTH_ENABLED=false synthetic "system" identity
+        # case: that one is caught by the auth dependency's own
+        # permission check upstream in normal operation, this guards the
+        # case where a real, permissioned identity simply has no org_id.
+        raise HTTPException(
+            status_code=400,
+            detail="Resolving ownership requires the caller's own verified organization membership.",
+        )
+
+    previous = read_ownership(Path(registry.root), req.task, req.model_name)
+    previous_status = previous.status if previous else "not_found"
+    previous_organization_id = previous.organization_id if previous else None
+
+    try:
+        record = resolve_legacy_ownership(
+            registry.backend, Path(registry.root), req.task, req.model_name,
+            organization_id=user.org_id, actor=actor,
+        )
+    except Exception as e:
+        # Audited on failure too (requirement: "success/failure where
+        # supported by the existing audit architecture") -- most other
+        # routes in this file only audit success; ownership resolution
+        # is explicitly an administrative action worth recording either
+        # way. Never includes a token/secret -- there are none in scope
+        # here at all.
+        _audit.log_event(
+            "resolve_legacy_ownership_denied", actor,
+            f"{req.task}/{req.model_name}",
+            task=req.task, model_name=req.model_name,
+            metadata={
+                "organization_id": user.org_id,
+                "previous_ownership_status": previous_status,
+                "previous_organization_id": previous_organization_id,
+                "reason": str(e),
+            },
+        )
+        _handle_registry_error(e)
+        return  # pragma: no cover - _handle_registry_error always raises
+
+    already_resolved = previous_status == "owned"
+    _audit.log_event(
+        "resolve_legacy_ownership", actor,
+        f"{req.task}/{req.model_name}",
+        task=req.task, model_name=req.model_name,
+        metadata={
+            "organization_id": user.org_id,
+            "previous_ownership_status": previous_status,
+            "previous_organization_id": previous_organization_id,
+            "resulting_organization_id": record.organization_id,
+            "resulting_ownership_status": record.status,
+            "already_resolved": already_resolved,
+            "reason": req.reason,
+        },
+    )
+    return ResolveOwnershipResponse(
+        ok=True, task=req.task, model_name=req.model_name,
+        organization_id=record.organization_id, ownership_status=record.status,
+        already_resolved=already_resolved,
+    )
 
 
 @app.post(f"{DEFAULT_PREFIX}/promote")
