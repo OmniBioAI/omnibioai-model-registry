@@ -48,6 +48,26 @@ def _make_minimal_package(dir_path: Path, *, meta: dict | None = None) -> None:
     (dir_path / "sha256sums.txt").write_text("", encoding="utf-8")
 
 
+def _write_unowned_ownership(root: Path, task: str, model_name: str) -> None:
+    """Phase 2B test helper: several older tests construct model/version
+    directories directly on the filesystem (bypassing register_model) to
+    isolate route/parsing logic under test, independent of registration.
+    Since Phase 2B, every read/write route requires an ownership.json to
+    exist at all -- a model with no ownership record is denied for every
+    caller, the same as legacy_unowned (see ownership.py's
+    check_model_ownership) -- so these fixtures now need one. This writes
+    exactly the record register_model() itself would have produced for
+    the same auth-disabled ("system", org_id=None) scenario these tests
+    already run under."""
+    from omnibioai_model_registry.ownership import ensure_model_ownership
+    from omnibioai_model_registry.storage.localfs import LocalFS
+
+    ensure_model_ownership(
+        LocalFS(), root, task, model_name,
+        organization_id=None, actor="test", model_pre_existing=False,
+    )
+
+
 @pytest.fixture
 def env_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     root = tmp_path / "registry_root"
@@ -1898,6 +1918,7 @@ class TestServicePhase3Routes:
 
     def test_get_aliases_returns_entries(self, svc_client):
         client, root = svc_client
+        _write_unowned_ownership(root, "t", "m")
         aliases_dir = root / "tasks" / "t" / "models" / "m" / "aliases"
         aliases_dir.mkdir(parents=True)
         (aliases_dir / "latest.json").write_text(json.dumps({
@@ -1913,10 +1934,12 @@ class TestServicePhase3Routes:
         assert data["aliases"][0]["version"] == "v1"
 
     def test_get_aliases_empty_model(self, svc_client):
+        """Phase 2B: a model with no ownership record at all (never
+        registered) is denied the same anti-enumerating way an
+        other-org-owned model would be -- 404, not a soft empty list."""
         client, root = svc_client
         r = client.get("/v1/aliases", params={"task": "t", "model": "nomodel"})
-        assert r.status_code == 200
-        assert r.json()["aliases"] == []
+        assert r.status_code == 404
 
     # POST /v1/stage ----------------------------------------------------
 
@@ -1969,6 +1992,7 @@ class TestServicePhase3Routes:
 
     def test_get_compare_returns_metrics_for_both_versions(self, svc_client):
         client, root = svc_client
+        _write_unowned_ownership(root, "t", "m")
         for ver, acc in [("v1", 0.9), ("v2", 0.85)]:
             vdir = root / "tasks" / "t" / "models" / "m" / "versions" / ver
             vdir.mkdir(parents=True)
@@ -1997,6 +2021,7 @@ class TestServicePhase3Routes:
 
     def test_get_models_metric_gte_filters_correctly(self, svc_client):
         client, root = svc_client
+        _write_unowned_ownership(root, "t", "m")
         for ver, acc in [("v1", 0.95), ("v2", 0.80)]:
             vdir = root / "tasks" / "t" / "models" / "m" / "versions" / ver
             vdir.mkdir(parents=True)
@@ -2013,6 +2038,7 @@ class TestServicePhase3Routes:
 
     def test_get_models_without_metric_gte_returns_all(self, svc_client):
         client, root = svc_client
+        _write_unowned_ownership(root, "t", "m")
         for ver in ["v1", "v2"]:
             vdir = root / "tasks" / "t" / "models" / "m" / "versions" / ver
             vdir.mkdir(parents=True)
@@ -3808,6 +3834,7 @@ class TestServiceCoverageGaps:
             (vdir / "model_meta.json").write_text(
                 json.dumps({"task": task, "model_name": "m", "version": ver})
             )
+            _write_unowned_ownership(root, task, "m")
         r = client.get("/v1/models", params={"task": "task_a"})
         assert r.status_code == 200
         tasks = [m["task"] for m in r.json()]
@@ -3823,6 +3850,7 @@ class TestServiceCoverageGaps:
             (vdir / "model_meta.json").write_text(
                 json.dumps({"task": "t", "model_name": mn, "version": ver})
             )
+            _write_unowned_ownership(root, "t", mn)
         r = client.get("/v1/models", params={"model_name": "model_a"})
         assert r.status_code == 200
         names = [m["model_name"] for m in r.json()]
@@ -3834,6 +3862,7 @@ class TestServiceCoverageGaps:
         vdir = root / "tasks" / "t" / "models" / "no_metrics" / "versions" / "v1"
         vdir.mkdir(parents=True)
         (vdir / "model_meta.json").write_text(json.dumps({"task": "t", "model_name": "no_metrics"}))
+        _write_unowned_ownership(root, "t", "no_metrics")
         r = client.get("/v1/models", params={"metric_gte": "accuracy:0.5"})
         assert r.status_code == 200
         assert r.json() == []
@@ -4008,6 +4037,7 @@ class TestServiceCoverageGaps:
     def test_aliases_skips_malformed_alias_file(self, full_svc_client):
         """Cover lines 600-601: continue when alias file has bad JSON."""
         client, root = full_svc_client
+        _write_unowned_ownership(root, "t", "m")
         aliases_dir = root / "tasks" / "t" / "models" / "m" / "aliases"
         aliases_dir.mkdir(parents=True)
         (aliases_dir / "bad.json").write_text("{{{ invalid")
@@ -4072,6 +4102,7 @@ class TestServiceCoverageGaps:
     def test_compare_bad_metrics_json_uses_empty_dict(self, full_svc_client):
         """Cover lines 751-754: except Exception → entry['metrics'] = {}."""
         client, root = full_svc_client
+        _write_unowned_ownership(root, "t", "m")
         for ver in ["v1", "v2"]:
             vdir = root / "tasks" / "t" / "models" / "m" / "versions" / ver
             vdir.mkdir(parents=True)
@@ -4087,6 +4118,7 @@ class TestServiceCoverageGaps:
     def test_compare_bad_meta_json_graceful(self, full_svc_client):
         """Cover lines 761-762: except Exception → pass when meta read fails."""
         client, root = full_svc_client
+        _write_unowned_ownership(root, "t", "m")
         for ver in ["v1", "v2"]:
             vdir = root / "tasks" / "t" / "models" / "m" / "versions" / ver
             vdir.mkdir(parents=True)
@@ -4808,7 +4840,13 @@ class TestPhase2AHTTPRegisterOwnership:
     def test_second_org_registering_new_version_does_not_reassign_ownership_http(
         self, auth_client, tmp_path, monkeypatch
     ):
-        """Security requirement #6, end-to-end over HTTP."""
+        """Security requirement #6, end-to-end over HTTP. Phase 2A recorded
+        this as "ownership attribution never drifts, but the write is not
+        yet BLOCKED"; Phase 2B closes that gap -- org-B's attempt is now
+        denied outright (register_model(enforce_ownership=True)), so
+        ownership not only stays org-A's, the version is never written at
+        all (see TestPhase2BOrgEnforcement for the filesystem-mutation
+        assertion)."""
         client, root = auth_client
 
         self._as_org(monkeypatch, "org-A")
@@ -4825,8 +4863,9 @@ class TestPhase2AHTTPRegisterOwnership:
             json=self._register_payload(tmp_path, version="v2"),
             headers={"Authorization": "Bearer token-b"},
         )
-        assert r2.status_code == 200
-        assert r2.json()["organization_id"] == "org-A"  # still org-A, not org-B
+        assert r2.status_code == 400  # denied, not silently reattributed
+        from omnibioai_model_registry.ownership import read_ownership
+        assert read_ownership(root, "t", "m").organization_id == "org-A"
 
     def test_auth_disabled_register_is_unowned_not_a_new_bypass(self, tmp_path, monkeypatch):
         """AUTH_ENABLED=false is the pre-existing dev/test switch (already
@@ -4934,3 +4973,680 @@ class TestMigrateOwnershipCLI:
         out = capsys.readouterr().out
         assert "Scanned:" in out
         assert "Migrated to legacy:" in out
+
+
+# ============================================================
+# Phase 2B — HIPAA hardening: organization-scoped enforcement
+# ============================================================
+#
+# Builds on Phase 2A's ownership foundation (TestOwnershipModule /
+# TestRegisterModelOwnership / TestPhase2AHTTPRegisterOwnership above):
+# check_model_ownership() is now wired into every read/write route (see
+# ownership.py's "PHASE 2B ADDENDUM" and api.py/main.py/hf_routes.py's
+# call sites), turning the write-once record into real cross-org denial.
+
+
+class TestCheckModelOwnership:
+    """Unit-level coverage of check_model_ownership() itself -- the single
+    centralized authorization decision every route above goes through."""
+
+    def test_owned_model_matching_org_allowed(self, env_root):
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership, ensure_model_ownership,
+        )
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        ensure_model_ownership(
+            LocalFS(), env_root, "t", "m",
+            organization_id="org-A", actor="alice", model_pre_existing=False,
+        )
+        result = check_model_ownership(env_root, "t", "m", requesting_org_id="org-A")
+        assert result.allowed is True
+        assert result.reason == "owned_by_caller"
+
+    def test_owned_model_different_org_denied(self, env_root):
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership, ensure_model_ownership,
+        )
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        ensure_model_ownership(
+            LocalFS(), env_root, "t", "m",
+            organization_id="org-A", actor="alice", model_pre_existing=False,
+        )
+        result = check_model_ownership(env_root, "t", "m", requesting_org_id="org-B")
+        assert result.allowed is False
+        assert result.reason == "owned_by_other_org"
+        # Server-side visibility into who actually owns it is preserved
+        # for audit -- just never exposed to the denied caller by any
+        # route above.
+        assert result.ownership.organization_id == "org-A"
+
+    def test_unowned_model_open_mode_caller_allowed(self, env_root):
+        """AUTH_ENABLED=false registrant, AUTH_ENABLED=false caller: both
+        sides genuinely have no org context -- unchanged pre-Phase-2B dev
+        mode."""
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership, ensure_model_ownership,
+        )
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        ensure_model_ownership(
+            LocalFS(), env_root, "t", "m",
+            organization_id=None, actor="system", model_pre_existing=False,
+        )
+        result = check_model_ownership(env_root, "t", "m", requesting_org_id=None)
+        assert result.allowed is True
+        assert result.reason == "open_mode_match"
+
+    def test_unowned_model_real_org_caller_denied(self, env_root):
+        """A real org_id reaching into a None-org model is NOT treated as
+        'everyone's' -- denied the same as any other org mismatch."""
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership, ensure_model_ownership,
+        )
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        ensure_model_ownership(
+            LocalFS(), env_root, "t", "m",
+            organization_id=None, actor="system", model_pre_existing=False,
+        )
+        result = check_model_ownership(env_root, "t", "m", requesting_org_id="org-A")
+        assert result.allowed is False
+        assert result.reason == "owned_by_other_org"
+
+    def test_legacy_unowned_denied_for_every_caller(self, env_root):
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership, ensure_model_ownership,
+        )
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        ensure_model_ownership(
+            LocalFS(), env_root, "t", "old_model",
+            organization_id="org-X", actor="whoever", model_pre_existing=True,
+        )
+        for requesting_org_id in ("org-A", None):
+            result = check_model_ownership(
+                env_root, "t", "old_model", requesting_org_id=requesting_org_id
+            )
+            assert result.allowed is False
+            assert result.reason == "legacy_unowned"
+
+    def test_nonexistent_model_denied_not_a_crash(self, env_root):
+        from omnibioai_model_registry.ownership import check_model_ownership
+
+        result = check_model_ownership(env_root, "t", "never_registered", requesting_org_id="org-A")
+        assert result.allowed is False
+        assert result.reason == "model_not_found"
+        assert result.ownership is None
+
+
+class TestPhase2BOrgEnforcement:
+    """HTTP/TestClient-level: two organizations, one model owned by org-A
+    -- every read/write route must independently enforce
+    verified_user.org_id == model_owner.organization_id, denying org-B
+    the same anti-enumerating way a genuinely nonexistent model would be
+    denied, with zero behavior change for org-A itself."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def _as_org(self, monkeypatch, org_id, *, permissions=("model.use",)):
+        from iam_client.models import UserContext
+        return self._mock_iam_client(monkeypatch, UserContext(
+            user_id=f"user-{org_id}", email=f"user@{org_id}.example",
+            roles=[], permissions=list(permissions), valid=True, org_id=org_id,
+        ))
+
+    @pytest.fixture
+    def auth_client(self, tmp_path, monkeypatch):
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        import omnibioai_model_registry.hf_routes as _hf
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        # hf_routes.py builds its own ModelRegistry once at import time
+        # (module-level _registry, unrelated to _svc.registry) -- keep
+        # both pointed at the same per-test root.
+        monkeypatch.setattr(_hf, "_registry", new_reg)
+
+        class _SyncThread:
+            """Deterministic stand-in for threading.Thread: hf_push's
+            background push runs synchronously so tests don't need
+            sleeps/polling to observe its effect (or its absence)."""
+            def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+                self._target = target
+                self._args = args
+                self._kwargs = kwargs or {}
+
+            def start(self):
+                self._target(*self._args, **self._kwargs)
+
+        class _FakeThreadingModule:
+            Thread = _SyncThread
+
+        # Rebinds only hf_routes.py's own `threading` name -- the real
+        # stdlib threading module (used by audit_client.py and everything
+        # else) is untouched.
+        monkeypatch.setattr(_hf, "threading", _FakeThreadingModule())
+
+        return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+    def _register(
+        self, client, tmp_path, monkeypatch, org_id, *,
+        task="t", model_name="m", version="v1", token=None, set_alias="latest",
+    ):
+        self._as_org(monkeypatch, org_id)
+        src = tmp_path / f"src_{task}_{model_name}_{version}_{org_id}"
+        _make_minimal_package(src)
+        r = client.post(
+            "/v1/register",
+            json={
+                "task": task, "model_name": model_name, "version": version,
+                "artifacts_dir": str(src), "metadata": {}, "set_alias": set_alias,
+            },
+            headers={"Authorization": f"Bearer {token or org_id}"},
+        )
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    @pytest.fixture
+    def org_a_model(self, auth_client, tmp_path, monkeypatch):
+        """task=t, model_name=m, v1 registered by org-A with alias
+        'latest'."""
+        client, root = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        return client, root
+
+    # ── reads: org-A allowed, org-B denied, across every read route ────────
+
+    def test_resolve_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 400  # ModelNotFound -> _handle_registry_error
+
+    def test_show_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/show", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.get("/v1/show", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 400
+
+    def test_verify_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/verify", json={"task": "t", "ref": "m@v1"},
+                         headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.post("/v1/verify", json={"task": "t", "ref": "m@v1"},
+                         headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 400
+
+    def test_artifacts_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 400
+
+    def test_metrics_org_b_denied(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-B")
+        r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 400
+
+    def test_aliases_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/aliases", params={"task": "t", "model": "m"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        assert len(r.json()["aliases"]) == 1
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.get("/v1/aliases", params={"task": "t", "model": "m"},
+                        headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 404
+
+    def test_compare_org_a_allowed_org_b_denied(self, org_a_model, tmp_path, monkeypatch):
+        client, _ = org_a_model
+        self._register(client, tmp_path, monkeypatch, "org-A", version="v2", set_alias=None)
+
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/compare", params={"task": "t", "model": "m", "versions": ["v1", "v2"]},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.get("/v1/compare", params={"task": "t", "model": "m", "versions": ["v1", "v2"]},
+                        headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 404
+
+    def test_models_list_returns_only_caller_owned(self, org_a_model, tmp_path, monkeypatch):
+        """Security requirement #8."""
+        client, _ = org_a_model
+        self._register(client, tmp_path, monkeypatch, "org-B", model_name="m_b")
+
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/models", headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        names = {m["model_name"] for m in r.json()}
+        assert names == {"m"}
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.get("/v1/models", headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 200
+        names = {m["model_name"] for m in r.json()}
+        assert names == {"m_b"}
+
+    def test_models_list_skips_malformed_meta_missing_model_name(self, org_a_model):
+        """A model_meta.json with no task/model_name (corrupt/malformed)
+        is skipped defensively before it ever reaches
+        check_model_ownership -- which would otherwise be asked to build
+        an ownership.json path out of a None component."""
+        client, root = org_a_model
+        bad_dir = root / "tasks" / "t" / "models" / "corrupt" / "versions" / "v1"
+        bad_dir.mkdir(parents=True)
+        (bad_dir / "model_meta.json").write_text(json.dumps({"version": "v1"}))
+
+        r = client.get("/v1/models", headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        assert "corrupt" not in {m.get("model_name") for m in r.json()}
+
+    # ── writes: org-A allowed, org-B denied ─────────────────────────────────
+
+    def test_register_new_version_org_a_allowed_org_b_denied(self, org_a_model, tmp_path, monkeypatch):
+        client, root = org_a_model
+        out = self._register(client, tmp_path, monkeypatch, "org-A", version="v2", set_alias=None)
+        assert out["organization_id"] == "org-A"
+
+        v3dir = root / "tasks" / "t" / "models" / "m" / "versions" / "v3"
+        assert not v3dir.exists()
+        self._as_org(monkeypatch, "org-B")
+        src = tmp_path / "src_org_b_v3"
+        _make_minimal_package(src)
+        r = client.post(
+            "/v1/register",
+            json={"task": "t", "model_name": "m", "version": "v3",
+                  "artifacts_dir": str(src), "metadata": {}, "set_alias": None},
+            headers={"Authorization": "Bearer org-B"},
+        )
+        assert r.status_code == 400
+        # Security requirement #13: cross-org denial mutates nothing.
+        assert not v3dir.exists()
+        from omnibioai_model_registry.ownership import read_ownership
+        assert read_ownership(root, "t", "m").organization_id == "org-A"
+
+    def test_promote_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "alias": "staging", "version": "v1",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "alias": "production", "version": "v1",
+        }, headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 400
+
+    def test_tags_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, root = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.put("/v1/tags", json={
+            "task": "t", "model_name": "m", "version": "v1", "key": "team", "value": "bioml",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.put("/v1/tags", json={
+            "task": "t", "model_name": "m", "version": "v1", "key": "team", "value": "attacker",
+        }, headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 404
+        meta_path = root / "tasks" / "t" / "models" / "m" / "versions" / "v1" / "model_meta.json"
+        meta = json.loads(meta_path.read_text())
+        assert meta.get("tags", {}).get("team") == "bioml"  # org-B's write never landed
+
+    def test_versions_patch_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, root = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/versions/patch", json={
+            "task": "t", "model_name": "m", "version": "v1", "description": "org-A note",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.post("/v1/versions/patch", json={
+            "task": "t", "model_name": "m", "version": "v1", "description": "attacker note",
+        }, headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 404
+        meta_path = root / "tasks" / "t" / "models" / "m" / "versions" / "v1" / "model_meta.json"
+        meta = json.loads(meta_path.read_text())
+        assert meta.get("description") == "org-A note"  # org-B's write never landed
+
+    def test_stage_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/stage", json={
+            "task": "t", "model_name": "m", "version": "v1", "stage": "staging",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.post("/v1/stage", json={
+            "task": "t", "model_name": "m", "version": "v1", "stage": "production",
+        }, headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 404
+
+    # ── HF push ──────────────────────────────────────────────────────────────
+
+    def test_hf_push_org_a_allowed(self, org_a_model, monkeypatch):
+        import omnibioai_model_registry.hf_routes as hf_mod
+        from unittest.mock import MagicMock
+
+        client, _ = org_a_model
+        mock_run_push = MagicMock()
+        monkeypatch.setattr(hf_mod, "_run_push", mock_run_push)
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/hf/push", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "repo_id": "org-a-space/model", "token": "hf_faketoken",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+        mock_run_push.assert_called_once()
+
+    def test_hf_push_org_b_denied_no_push_started(self, org_a_model, monkeypatch):
+        """Security requirements #7/#14: HF push cannot be used to
+        exfiltrate another organization's model artifacts, and a denial
+        never reaches the HF API at all."""
+        import omnibioai_model_registry.hf_routes as hf_mod
+        from unittest.mock import MagicMock
+
+        client, _ = org_a_model
+        mock_run_push = MagicMock()
+        monkeypatch.setattr(hf_mod, "_run_push", mock_run_push)
+        self._as_org(monkeypatch, "org-B")
+        r = client.post("/v1/hf/push", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "repo_id": "attacker-space/exfiltrated", "token": "hf_faketoken",
+        }, headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 404
+        mock_run_push.assert_not_called()
+
+    def test_hf_push_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        import omnibioai_model_registry.hf_routes as hf_mod
+        from unittest.mock import MagicMock, patch
+
+        client, _ = org_a_model
+        monkeypatch.setattr(hf_mod, "_run_push", MagicMock())
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(hf_mod, "_audit") as mock_audit:
+            r = client.post("/v1/hf/push", json={
+                "task": "t", "model_name": "m", "version": "v1",
+                "repo_id": "org-a-space/model", "token": "hf_faketoken",
+            }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        mock_audit.log_event.assert_called_once()
+        _, kwargs = mock_audit.log_event.call_args
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+
+    # ── legacy_unowned: never auto-claimed ──────────────────────────────────
+
+    def _write_legacy_model(self, root, task, model_name):
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        vdir = root / "tasks" / task / "models" / model_name / "versions" / "v1"
+        vdir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (vdir / f).write_text("{}" if f.endswith(".json") else "x")
+        ensure_model_ownership(
+            LocalFS(), root, task, model_name,
+            organization_id=None, actor=None, model_pre_existing=True,
+        )
+
+    def test_legacy_unowned_model_not_auto_claimed_by_authenticated_org(self, auth_client, monkeypatch):
+        """Security requirement #9."""
+        client, root = auth_client
+        self._write_legacy_model(root, "t", "old_model")
+
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "old_model@v1"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400  # denied, not silently claimed by org-A
+
+        from omnibioai_model_registry.ownership import read_ownership
+        rec = read_ownership(root, "t", "old_model")
+        assert rec.status == "legacy_unowned"
+        assert rec.organization_id is None  # still unclaimed after the read attempt
+
+    def test_legacy_unowned_model_denied_even_in_open_mode(self, tmp_path, monkeypatch):
+        """A None org_id does not match legacy_unowned either -- open-mode
+        callers are not a backdoor around the "never auto-claim" rule."""
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        self._write_legacy_model(new_reg.root, "t", "old_model")
+        client = TestClient(_svc.app, raise_server_exceptions=False)
+
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "old_model@v1"})
+        assert r.status_code == 400
+
+    # ── header/query/body spoofing cannot bypass ownership ──────────────────
+
+    def test_spoofed_x_organization_id_header_cannot_bypass_read(self, org_a_model, monkeypatch):
+        """Security requirement #10."""
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-B")
+        r = client.get(
+            "/v1/resolve", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-B", "X-Organization-ID": "org-A"},
+        )
+        assert r.status_code == 400
+
+    def test_query_param_organization_id_cannot_bypass_read(self, org_a_model, monkeypatch):
+        """Security requirement #11: no read route has an organization_id
+        query parameter at all -- one supplied anyway is simply ignored,
+        never consulted for authorization."""
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-B")
+        r = client.get(
+            "/v1/resolve",
+            params={"task": "t", "ref": "m@v1", "organization_id": "org-A"},
+            headers={"Authorization": "Bearer org-B"},
+        )
+        assert r.status_code == 400
+
+    def test_body_organization_id_cannot_bypass_promote(self, org_a_model, monkeypatch):
+        """Security requirement #11: PromoteRequest has no organization_id
+        field -- FastAPI/pydantic silently drops the unknown key, so it
+        can never reach ownership logic."""
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-B")
+        r = client.post(
+            "/v1/promote",
+            json={"task": "t", "model_name": "m", "alias": "production", "version": "v1",
+                  "organization_id": "org-A"},
+            headers={"Authorization": "Bearer org-B"},
+        )
+        assert r.status_code == 400
+
+    # ── audit org_id propagation (security requirement #16) ────────────────
+
+    def test_promote_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        from unittest.mock import patch
+        client, _ = org_a_model
+        import omnibioai_model_registry.service.app.main as _svc
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_audit") as mock_audit:
+            r = client.post("/v1/promote", json={
+                "task": "t", "model_name": "m", "alias": "staging", "version": "v1",
+            }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        _, kwargs = mock_audit.log_event.call_args
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+
+    def test_tag_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        from unittest.mock import patch
+        client, _ = org_a_model
+        import omnibioai_model_registry.service.app.main as _svc
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_audit") as mock_audit:
+            r = client.put("/v1/tags", json={
+                "task": "t", "model_name": "m", "version": "v1", "key": "k", "value": "v",
+            }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        _, kwargs = mock_audit.log_event.call_args
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+
+    def test_patch_version_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        from unittest.mock import patch
+        client, _ = org_a_model
+        import omnibioai_model_registry.service.app.main as _svc
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_audit") as mock_audit:
+            r = client.post("/v1/versions/patch", json={
+                "task": "t", "model_name": "m", "version": "v1", "description": "d",
+            }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        mock_audit.log_event.assert_called_once()
+        _, kwargs = mock_audit.log_event.call_args
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+
+    def test_stage_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        from unittest.mock import patch
+        client, _ = org_a_model
+        import omnibioai_model_registry.service.app.main as _svc
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_audit") as mock_audit:
+            r = client.post("/v1/stage", json={
+                "task": "t", "model_name": "m", "version": "v1", "stage": "staging",
+            }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        _, kwargs = mock_audit.log_event.call_args
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+
+    # ── same-org / Phase-1 regression guard ─────────────────────────────────
+
+    def test_same_org_full_lifecycle_unchanged(self, org_a_model, monkeypatch):
+        """Security requirement #18: owning-org behavior is a pure
+        superset of Phase 2A -- register, promote, tag, patch, stage, all
+        succeed exactly as before for the org that actually owns the
+        model."""
+        client, root = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "alias": "staging", "version": "v1",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        r = client.put("/v1/tags", json={
+            "task": "t", "model_name": "m", "version": "v1", "key": "k", "value": "v",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        r = client.post("/v1/versions/patch", json={
+            "task": "t", "model_name": "m", "version": "v1", "description": "d",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        r = client.post("/v1/stage", json={
+            "task": "t", "model_name": "m", "version": "v1", "stage": "production",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+
+class TestPhase2BConcurrency:
+    """Security requirement #19: concurrent registration does not create
+    ownership races or duplicate records -- real OS threads, not just the
+    single-call write_once_text race already covered in
+    TestOwnershipModule."""
+
+    def test_concurrent_brand_new_model_registration_has_one_consistent_winner(
+        self, env_root, tmp_path
+    ):
+        import threading
+        from omnibioai_model_registry import register_model
+        from omnibioai_model_registry.ownership import read_ownership
+
+        n = 8
+        srcs = []
+        for i in range(n):
+            src = tmp_path / f"src_{i}"
+            _make_minimal_package(src)
+            srcs.append(src)
+
+        results = [None] * n
+        errors = []
+        start = threading.Barrier(n)
+
+        def worker(i):
+            try:
+                start.wait()
+                results[i] = register_model(
+                    task="t", model_name="m", version=f"v{i}",
+                    artifacts_dir=str(srcs[i]), metadata={}, set_alias=None,
+                    organization_id=f"org-{i}", actor=f"actor-{i}",
+                )
+            except Exception as exc:  # pragma: no cover - failure path
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join(timeout=30)
+
+        assert not errors, f"unexpected errors under concurrent registration: {errors}"
+        assert all(r is not None for r in results)
+
+        winner_org = read_ownership(env_root, "t", "m").organization_id
+        assert winner_org in {f"org-{i}" for i in range(n)}
+        # Every thread's own response must agree on who won -- no thread
+        # observed a different/duplicate ownership record.
+        assert all(r["organization_id"] == winner_org for r in results)
+        # All n versions were still written (registration itself is
+        # per-version, only the model-level ownership.json is racy/write-
+        # once) -- concurrency didn't drop or corrupt any version.
+        for i in range(n):
+            assert (env_root / "tasks" / "t" / "models" / "m" / "versions" / f"v{i}").exists()

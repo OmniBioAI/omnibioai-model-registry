@@ -43,6 +43,40 @@ No query-layer enforcement, no cross-org read/write blocking, no HF-push
 ownership check, no model.use redesign, no public/private semantics.
 Establishing the record is the entire scope -- see the root README's
 Roadmap for what is deferred to Phase 2B/2C/2D.
+
+---
+
+PHASE 2B ADDENDUM -- ENFORCEMENT
+==================================
+
+check_model_ownership() below is the single centralized authorization
+decision every route/storage-layer function uses, so
+`if user.org_id != ownership.organization_id` is never duplicated ad
+hoc. It is pure data (no FastAPI/HTTP dependency) -- callers translate
+`not result.allowed` into whatever "not found"-shaped response that
+specific route already uses for a genuinely missing model, so a denial
+is anti-enumerating: indistinguishable from the model not existing at
+all. See api.py (resolve_model/promote_model/register_model) and
+service/app/main.py (routes that bypass ModelRegistry entirely) for the
+call sites.
+
+Matching rule (requesting_org_id is always a verified UserContext.org_id,
+never client-supplied):
+
+- status="owned": allowed only if requesting_org_id is not None and
+  equals the record's organization_id.
+- status="legacy_unowned": always denied, for every caller, including a
+  None org_id -- never silently claimed. No admin-reassignment workflow
+  exists yet (see README); resolving these is explicitly deferred.
+- status="unowned" (AUTH_ENABLED=false at registration time): allowed
+  only when requesting_org_id is ALSO None -- i.e. the whole deployment
+  is running in the open, no-org dev/test mode this repo has always
+  supported, unchanged. A real org_id reaching into a None-org model is
+  treated the same as reaching into a different org's model (denied) --
+  "unowned" is not "everyone's".
+- ownership record does not exist at all (never registered or migrated):
+  denied, same as "legacy_unowned" -- this should not normally happen
+  post-Phase-2A, but is handled the same safe way if it does.
 """
 from __future__ import annotations
 
@@ -181,6 +215,62 @@ def ensure_model_ownership(
             "write and read-back"
         )
     return existing
+
+
+REASON_OWNED_BY_CALLER = "owned_by_caller"
+REASON_OPEN_MODE_MATCH = "open_mode_match"
+REASON_MODEL_NOT_FOUND = "model_not_found"
+REASON_LEGACY_UNOWNED = "legacy_unowned"
+REASON_OWNED_BY_OTHER_ORG = "owned_by_other_org"
+
+
+@dataclass(frozen=True)
+class OwnershipCheckResult:
+    allowed: bool
+    reason: str
+    # The actual record, even when denied -- useful for server-side audit
+    # logging (e.g. "org-B tried to touch org-A's model"). Callers MUST
+    # NOT expose this to the client on a denial; only `allowed` may
+    # influence the HTTP response, and only via the anti-enumerating
+    # "not found"-shaped response the route already uses for a genuinely
+    # missing model. None only when no record exists at all.
+    ownership: Optional[OwnershipRecord]
+
+
+def check_model_ownership(
+    registry_root: Path,
+    task: str,
+    model_name: str,
+    *,
+    requesting_org_id: Optional[str],
+) -> OwnershipCheckResult:
+    """The single centralized Phase 2B authorization decision. See the
+    module docstring's "PHASE 2B ADDENDUM" for the full matching rule.
+
+    `requesting_org_id` must already be a verified IAM identity's org_id
+    (UserContext.org_id) -- this function has no knowledge of HTTP
+    request data, headers, or JWTs, and performs no verification of its
+    own. It only ever reads ownership.json; it never writes.
+    """
+    record = read_ownership(registry_root, task, model_name)
+    if record is None:
+        return OwnershipCheckResult(False, REASON_MODEL_NOT_FOUND, None)
+
+    if record.status == STATUS_LEGACY_UNOWNED:
+        return OwnershipCheckResult(False, REASON_LEGACY_UNOWNED, record)
+
+    # status is STATUS_OWNED or STATUS_UNOWNED here.
+    if requesting_org_id is not None and requesting_org_id == record.organization_id:
+        return OwnershipCheckResult(True, REASON_OWNED_BY_CALLER, record)
+
+    if requesting_org_id is None and record.organization_id is None:
+        # Both sides have no org context: the pre-existing AUTH_ENABLED=
+        # false / fully-open dev-test mode, unchanged by Phase 2B. Not
+        # the same as legacy_unowned -- this model was created in this
+        # same no-org mode, not merely discovered without a record.
+        return OwnershipCheckResult(True, REASON_OPEN_MODE_MATCH, record)
+
+    return OwnershipCheckResult(False, REASON_OWNED_BY_OTHER_ORG, record)
 
 
 def backfill_legacy_ownership(

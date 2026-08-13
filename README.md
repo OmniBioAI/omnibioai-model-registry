@@ -34,7 +34,7 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ Usage metering + cross-service audit emission
 - ✅ ModelHub UI with Experiments tab + metric sparklines
 - ✅ Local-first, cloud-ready design
-- ✅ Organization ownership recorded for newly registered models (server-derived from verified IAM identity) — recorded, not yet enforced; see [Organization Ownership](#organization-ownership-phase-2a)
+- ✅ Organization ownership recorded (server-derived from verified IAM identity) and enforced on every model-bearing read/write route, including Hugging Face push; see [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b)
 
 ---
 
@@ -219,8 +219,9 @@ tasks/<task>/models/<model_name>/
     ownership.json
 ```
 
-`ownership.json` (Phase 2A) is write-once and model-level, not per-version
-— see [Organization Ownership](#organization-ownership-phase-2a).
+`ownership.json` (Phase 2A) is write-once and model-level, not per-version,
+and enforced on every model-bearing route (Phase 2B) — see
+[Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b).
 
 This guarantees deterministic loading, integrity validation, and cross-environment portability.
 
@@ -352,8 +353,10 @@ omr migrate-ownership --json
 
 Deterministic, repeatable, additive-only: writes an explicit
 `status="legacy_unowned"` `ownership.json` for every pre-existing model
-that has none yet. Never guesses an organization. Safe to re-run — see
-[Organization Ownership](#organization-ownership-phase-2a).
+that has none yet. Never guesses an organization. Safe to re-run. As of
+Phase 2B, a `legacy_unowned` model is denied for every caller through
+every enforced route, not just left unassigned — see
+[Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b).
 
 ---
 
@@ -521,18 +524,19 @@ standard as one that arrives via the Gateway. `GET /v1/auth/status`,
 `GET /v1/hf/settings`, and `GET /health` remain public — they carry no
 registry data, only service/mode metadata.
 
-**Scope note:** authorization is permission-based, not org-scoped, and
-`model.use` remains the existing flat, non-resource-scoped permission —
-it has **not** become org-aware. As of Phase 2A, newly registered models
-*record* organization ownership (see
-[Organization Ownership](#organization-ownership-phase-2a) below), but
-nothing yet *enforces* it: any caller holding `model.use` can still read
-or mutate any model regardless of which org owns it. Full tenant
-isolation — query-layer filtering, cross-org read/write blocking,
-resource-scoped `model.use` — is real future work (see Roadmap), not
-something this phase or `AUTH_ENABLED=true` provides today.
+**Scope note:** authorization is still permission-based first —
+`model.use` remains the existing flat, non-resource-scoped permission,
+unchanged and not redesigned by Phase 2B. On top of that, every
+model-bearing read/write route now independently enforces organization
+ownership (see
+[Organization Ownership](#organization-ownership-and-enforcement-phase-2a-phase-2b) below):
+holding `model.use` is necessary but no longer sufficient — the caller's
+verified `org_id` must also match the model's recorded owner. `omr_*`
+tracking-table scoping (`omr_runs`/`omr_params`/`omr_metrics`/
+`omr_tags`/`omr_version_tags`) is still real future work (Phase 2C, see
+Roadmap), not something this phase provides.
 
-### Organization Ownership (Phase 2A)
+### Organization Ownership and Enforcement (Phase 2A, Phase 2B)
 
 Every newly registered model now has a durable, server-derived
 organization-ownership record, stored as `ownership.json` at the model
@@ -559,9 +563,11 @@ write-once file next to `aliases/` and `audit/`.
   dict) — none of those are ever consulted.
 - **Write-once**: the very first successful registration of a given
   `task`/`model_name` establishes ownership permanently. Every later
-  version registered under that same model — by the same org or a
-  different one, since nothing blocks that yet — inherits the existing
-  record unchanged; ownership is never reassigned by a subsequent write.
+  version registered under that same model inherits the existing record
+  unchanged; ownership is never reassigned by a subsequent write. As of
+  Phase 2B, a different org's attempt to register a version under an
+  existing model is also actively **denied** (not just ignored) — see
+  below.
 - **Legacy models**: any model that already had a registered version
   before this phase shipped (or is otherwise touched for the first time
   post-Phase-2A with no `ownership.json` yet) is recorded as
@@ -581,13 +587,44 @@ write-once file next to `aliases/` and `audit/`.
   `"unowned"`, or `"legacy_unowned"`). No other endpoint's response
   shape changed in this phase.
 
-**Not yet implemented** (tracked as Phase 2B/2C/2D): query-layer
-enforcement so org-B cannot read/modify org-A's model; an ownership
-check on `POST /v1/hf/push` (today, any `model.use` holder can push any
-model regardless of owner); `organization_id` on the `omr_*` tracking
-tables; resource-scoped `model.use`; a safe, audited path for an
-administrator to resolve a `legacy_unowned`/`unowned` model into real
-ownership.
+**Phase 2B — enforcement.** Every model-bearing read/write route above
+now independently checks
+`verified_user.org_id == model_owner.organization_id` via
+`ownership.check_model_ownership()`, the single centralized decision
+function every route (or the underlying `ModelRegistry` method it goes
+through) calls before touching filesystem state:
+
+- **Reads**: `resolve`, `verify`, `show`, `models` (list — filtered
+  during the same filesystem walk that already reads each entry, not
+  fetched-then-hidden in the response), `compare`, `artifacts`,
+  `aliases`, `metrics`.
+- **Writes**: `register` (a version under an *existing* model requires
+  belonging to its owner; a brand-new model is unaffected — see
+  Write-once above), `promote`, `tags`, `versions/patch`, `stage`.
+- **`POST /v1/hf/push`**: resolves the model/version and checks
+  ownership *before* any Hugging Face API call — a cross-org push is
+  denied before an artifact is ever read, let alone uploaded.
+- **Denial shape**: anti-enumerating by construction — a cross-org
+  caller gets the exact same "not found" response (same status code,
+  same message) a genuinely nonexistent model would return from that
+  route. `legacy_unowned` models are denied for *every* caller,
+  including one with no org context at all — never silently claimed by
+  whoever touches them next (still no admin-reassignment workflow; see
+  "Not yet implemented" below).
+- **Audit**: `register_model`/`promote_model`/`set_tag`/`patch_version`/
+  `set_stage`/`push_to_hf` events all carry `organization_id` directly in
+  their metadata now, not only inferable by correlating with a separate
+  `model_access_*` event.
+
+**Not yet implemented** (tracked as Phase 2C/2D): `organization_id` on
+the `omr_*` tracking tables (`omr_runs`/`omr_params`/`omr_metrics`/
+`omr_tags`/`omr_version_tags`) — Phase 2C; resource-scoped `model.use`
+(authorization is still ownership-check-plus-flat-permission, not a
+redesigned permission model); a safe, audited path for an administrator
+to resolve a `legacy_unowned`/`unowned` model into real ownership — no
+such mechanism exists yet in this codebase, and Phase 2B deliberately
+does not invent one; a `platform`/public model namespace; model
+deletion.
 
 ### Observability side effects of every write
 
@@ -645,30 +682,32 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   explicitly **not** part of this phase.
 - **HIPAA hardening Phase 2A** — durable, server-derived organization
   ownership for newly registered models; see
-  [Organization Ownership](#organization-ownership-phase-2a).
+  [Organization Ownership](#organization-ownership-and-enforcement-phase-2a-phase-2b).
   Establishes *who owns this model*, server-controlled and
   IAM-derived — it does **not** yet *enforce* that ownership anywhere.
   `model.use` is unchanged (still flat, not resource-scoped). Legacy
   models remain explicitly `legacy_unowned`, not guessed.
+- **HIPAA hardening Phase 2B** — turns Phase 2A's ownership record into
+  real enforcement; see
+  [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b).
+  Every model-bearing read/write route (including `POST /v1/hf/push`)
+  now independently denies a caller whose verified `org_id` doesn't
+  match the model's owner, anti-enumerating by construction.
+  `legacy_unowned` models remain unclaimed by design — still no
+  admin-reassignment workflow (deliberately not invented in this phase
+  either; needs its own product/audit decision). `model.use` remains
+  unchanged (flat, not resource-scoped) — org enforcement sits alongside
+  it, not inside a redesigned permission model.
 
 ### Near Term
 
 - S3 / Azure Blob storage backends
 - Step-history sparklines in UI pulled from DB (currently single-point)
 - Model signature validation (input/output schema enforcement)
-- **HIPAA hardening Phase 2B — query-layer tenant isolation.**
-  Phase 2A recorded ownership; this phase enforces it: block cross-org
-  reads/writes on the endpoints that currently allow them regardless of
-  the `ownership.json` owner, add an ownership check to `POST
-  /v1/hf/push` (today any `model.use` holder can push any org's model),
-  and decide whether/how `model.use` becomes resource- or org-scoped.
-  Also needs a safe, audited administrator path to resolve a
-  `legacy_unowned`/`unowned` model into real ownership — Phase 2A
-  deliberately does not provide one.
 - **HIPAA hardening Phase 2C — tracking-table scoping.** Extend
   organization awareness to `omr_runs`/`omr_version_tags` (and by FK,
-  `omr_params`/`omr_metrics`/`omr_tags`) once Phase 2B's enforcement
-  model is settled — deliberately not modified in Phase 2A to avoid
+  `omr_params`/`omr_metrics`/`omr_tags`) now that Phase 2B's enforcement
+  model is settled — deliberately not modified in Phase 2A/2B to avoid
   introducing a second, possibly-diverging ownership source of truth
   ahead of that decision.
 

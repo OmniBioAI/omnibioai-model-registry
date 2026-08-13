@@ -8,11 +8,12 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from iam_client.models import UserContext
 from pydantic import BaseModel
 
 from .api import ModelRegistry
 from .audit_client import AuditClient
-from .auth import require_auth, require_write_auth
+from .auth import _actor_identifier, require_auth, require_write_auth_with_context
 
 router = APIRouter()
 
@@ -106,7 +107,8 @@ def _run_push(
 
 
 @router.post("/push", response_model=HFPushResponse)
-def hf_push(req: HFPushRequest, actor: str = Depends(require_write_auth)):
+def hf_push(req: HFPushRequest, user: UserContext = Depends(require_write_auth_with_context)):
+    actor = _actor_identifier(user)
     token = (req.token or os.environ.get("HF_TOKEN", "")).strip()
     if not token:
         raise HTTPException(
@@ -114,10 +116,19 @@ def hf_push(req: HFPushRequest, actor: str = Depends(require_write_auth)):
             detail="No HuggingFace token provided and HF_TOKEN is not configured on the server.",
         )
 
+    # Phase 2B: resolve_model's own enforce_ownership check (reads
+    # ownership.json, compares against user.org_id) runs before this
+    # returns a vdir at all -- a cross-org caller gets the same
+    # "not found" response a genuinely missing model/version would, and
+    # nothing below (artifact read, HF API calls) ever executes. This is
+    # the entire "authenticate -> resolve -> read ownership -> compare ->
+    # deny -> only then push" sequence the HF push threat model requires,
+    # in one call.
     try:
         vdir = Path(
             _registry.resolve_model(
-                task=req.task, model_ref=f"{req.model_name}@{req.version}", verify=False
+                task=req.task, model_ref=f"{req.model_name}@{req.version}", verify=False,
+                enforce_ownership=True, requesting_org_id=user.org_id,
             )
         )
     except Exception as exc:
@@ -140,7 +151,7 @@ def hf_push(req: HFPushRequest, actor: str = Depends(require_write_auth)):
         task=req.task,
         model_name=req.model_name,
         version=req.version,
-        metadata={"repo_id": req.repo_id, "job_id": job_id},
+        metadata={"repo_id": req.repo_id, "job_id": job_id, "organization_id": user.org_id},
     )
     return HFPushResponse(ok=True, job_id=job_id)
 
