@@ -76,9 +76,10 @@ MODEL_USE_PERMISSION = "model.use"
 # model.use must get 403 on POST /v1/ownership/resolve; a caller holding
 # only model.resolve_ownership is unaffected everywhere else (still
 # needs model.use for the ordinary read/write routes it doesn't grant).
-# NOT YET REGISTERED in omnibioai-auth's permission catalog as of this
-# change -- see README's Phase 2E section for why that's a required,
-# separate follow-up in that repo, out of scope here.
+# Registered in omnibioai-auth's permission catalog
+# (app/core/permission_names.py) and granted to that repo's org_admin
+# role via omnibioai-auth PR #57 -- usable in AUTH_ENABLED=true
+# deployments. See README's Phase 2E section for the full history.
 MODEL_RESOLVE_OWNERSHIP_PERMISSION = "model.resolve_ownership"
 
 
