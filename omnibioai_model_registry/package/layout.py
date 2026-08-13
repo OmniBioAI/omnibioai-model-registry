@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..path_safety import safe_component
+
 REQUIRED_FILES = [
     "model.pt",
     "model_genes.txt",
@@ -38,11 +40,11 @@ class PackagePaths:
 
 
 def task_root(registry_root: Path, task: str) -> Path:
-    return registry_root / "tasks" / task
+    return registry_root / "tasks" / safe_component(task, "task")
 
 
 def model_root(registry_root: Path, task: str, model_name: str) -> Path:
-    return task_root(registry_root, task) / "models" / model_name
+    return task_root(registry_root, task) / "models" / safe_component(model_name, "model_name")
 
 
 def versions_root(registry_root: Path, task: str, model_name: str) -> Path:
@@ -50,7 +52,7 @@ def versions_root(registry_root: Path, task: str, model_name: str) -> Path:
 
 
 def version_dir(registry_root: Path, task: str, model_name: str, version: str) -> Path:
-    return versions_root(registry_root, task, model_name) / version
+    return versions_root(registry_root, task, model_name) / safe_component(version, "version")
 
 
 def aliases_root(registry_root: Path, task: str, model_name: str) -> Path:
@@ -58,7 +60,7 @@ def aliases_root(registry_root: Path, task: str, model_name: str) -> Path:
 
 
 def alias_path(registry_root: Path, task: str, model_name: str, alias: str) -> Path:
-    return aliases_root(registry_root, task, model_name) / f"{alias}.json"
+    return aliases_root(registry_root, task, model_name) / f"{safe_component(alias, 'alias')}.json"
 
 
 def audit_root(registry_root: Path, task: str, model_name: str) -> Path:
@@ -85,7 +87,7 @@ def runs_root(registry_root: Path, task: str, model_name: str) -> Path:
 
 
 def run_dir(registry_root: Path, task: str, model_name: str, run_id: str) -> Path:
-    return runs_root(registry_root, task, model_name) / run_id
+    return runs_root(registry_root, task, model_name) / safe_component(run_id, "run_id")
 
 
 def run_params_path(registry_root: Path, task: str, model_name: str, run_id: str) -> Path:
@@ -99,7 +101,10 @@ def run_tags_path(registry_root: Path, task: str, model_name: str, run_id: str) 
 def run_metric_log_path(
     registry_root: Path, task: str, model_name: str, run_id: str, metric_key: str
 ) -> Path:
-    return run_dir(registry_root, task, model_name, run_id) / "metrics" / f"{metric_key}.jsonl"
+    return (
+        run_dir(registry_root, task, model_name, run_id)
+        / "metrics" / f"{safe_component(metric_key, 'metric_key')}.jsonl"
+    )
 
 
 # ── Version-level extras ──────────────────────────────────────────────────────

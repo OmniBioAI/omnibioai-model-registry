@@ -15,6 +15,19 @@ class RegistryConfig:
     iam_redis_url: str = "redis://localhost:6379/0"  # from IAM_REDIS_URL, falling back to REDIS_URL
     audit_url: str = ""        # from AUDIT_URL env var
     auth_enabled: bool = False  # from AUTH_ENABLED env var ("true"/"false")
+    # Security PR (filesystem path hardening): optional, operator-chosen
+    # allowlist of server-local directory trees `register_model()`'s
+    # `artifacts_dir` is permitted to be under. Comma-separated absolute
+    # paths, from OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS.
+    # Empty (the default) means unrestricted -- today's existing
+    # behavior, preserved on purpose: this service has no established
+    # convention for where training-output directories live on a given
+    # deployment's filesystem, so picking a mandatory default here would
+    # be inventing a policy rather than enforcing one a deployment
+    # already has. Always enforced regardless of this setting:
+    # artifacts_dir may never resolve to a location inside `root` itself
+    # -- see api.py's register_model().
+    artifacts_allowed_roots: tuple[str, ...] = ()
 
 
 def load_config() -> RegistryConfig:
@@ -43,6 +56,11 @@ def load_config() -> RegistryConfig:
     ).strip()
     audit_url = os.getenv("AUDIT_URL", "").strip()
     auth_enabled = os.getenv("AUTH_ENABLED", "").strip().lower() == "true"
+    artifacts_allowed_roots = tuple(
+        p.strip()
+        for p in os.getenv("OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS", "").split(",")
+        if p.strip()
+    )
     return RegistryConfig(
         root=root,
         backend=backend,
@@ -52,4 +70,5 @@ def load_config() -> RegistryConfig:
         iam_redis_url=iam_redis_url,
         audit_url=audit_url,
         auth_enabled=auth_enabled,
+        artifacts_allowed_roots=artifacts_allowed_roots,
     )

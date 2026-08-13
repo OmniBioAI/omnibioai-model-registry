@@ -36,6 +36,7 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ Local-first, cloud-ready design
 - ✅ Organization ownership recorded (server-derived from verified IAM identity) and enforced on every model-bearing read/write route, including Hugging Face push; see [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b)
 - ✅ Run-tracking data (`omr_runs`/`omr_params`/`omr_metrics`/`omr_tags`/`omr_version_tags`) organization-isolated too; see [Tracking-Data Organization Isolation](#tracking-data-organization-isolation-phase-2c)
+- ✅ Filesystem path traversal closed for every task/model/version/alias/run/metric identifier, centrally enforced; see [Filesystem Path Safety](#filesystem-path-safety)
 
 ---
 
@@ -669,24 +670,15 @@ through) calls before touching filesystem state:
   itself to change shape.
 - A `platform`/public model namespace; model deletion.
 
-**Known, independent, deliberately-not-fixed finding (path traversal):**
-`task`/`model_name`/`version`/`alias` request fields are plain `str`
-with no `..`-sequence sanitization anywhere in `refs.py`/
-`package/layout.py`/`storage/localfs.py`, and none of Phases 2A–2D
-touched that code. Phase 2D re-confirmed (rather than re-flagged blind)
-that this does **not** provide a *cross-org* ownership bypass — every
-route's ownership check and its actual filesystem access consume the
-identical unsanitized string, so a traversal payload is evaluated
-consistently by both, and a mismatched-org attempt is still denied.
-What it *does* allow: an authenticated, `model.use`-holding caller
-*acting entirely within their own org* can supply e.g.
-`model_name="../../../../tmp/evil"` at registration time and have
-artifacts written outside `OMNIBIOAI_MODEL_REGISTRY_ROOT` — an
-arbitrary-filesystem-write primitive, gated only by authentication, not
-by organization. Independent of tenant isolation (it would exist in a
-single-tenant deployment too), so fixing it was out of Phase 2D's scope
-by its own charter; tracked here as a concrete, actionable item for a
-dedicated security PR.
+**Path traversal — fixed, in a dedicated follow-up PR, not Phase 2D
+itself.** Phase 2D identified (but by its own explicit charter did not
+fix, since it is independent of tenant isolation — it would exist in a
+single-tenant deployment too) that `task`/`model_name`/`version`/`alias`
+request fields had no `..`-sequence sanitization anywhere in `refs.py`/
+`package/layout.py`/`storage/localfs.py`. That gap is now closed — see
+[Filesystem Path Safety](#filesystem-path-safety) below for the full
+design (a centralized allowlist validator, applied once in
+`package/layout.py`, inherited by every consumer).
 
 ### Tracking-Data Organization Isolation (Phase 2C)
 
@@ -756,6 +748,114 @@ question.
   event deliberately never includes the logged `value` (caller-supplied
   `Any`, unlike a metric's plain float) to avoid a param value that
   happens to be a secret ending up in the audit trail.
+
+### Filesystem Path Safety
+
+A standalone security hardening pass, independent of (and layered
+*underneath*, not instead of) the organization-ownership enforcement
+above — this section is about **where on disk** a request is allowed to
+touch, not **which organization** is allowed to touch it. This is not a
+HIPAA compliance claim or certification of any kind; it is a description
+of what this specific hardening pass does and does not cover.
+
+**The invariant**: no user-controlled model/task/version/alias/run/
+metric identifier may cause any filesystem operation to resolve outside
+the configured `OMNIBIOAI_MODEL_REGISTRY_ROOT`, except the CLI (which
+already has direct filesystem access and is not reachable over HTTP/JWT
+at all — the same trust boundary Phase 2A's `omr register --org-id`
+precedent already established).
+
+**Design — allowlist, not blocklist.** `path_safety.py`'s
+`safe_component()` requires every identifier (task, model_name, version,
+alias, run_id, metric_key) to match a strict character allowlist
+(letters, digits, `_`, `-`, and interior `.`; must start and end with an
+alphanumeric character; ≤128 characters) *before* it is ever joined into
+a `Path`. Rejecting known-bad patterns one at a time (`..`, absolute
+paths, encoded variants, backslashes, repeated separators, ...) is
+inherently incomplete — there is always another variant; a component
+that satisfies the allowlist is *lexically* incapable of forming a path
+separator, a traversal sequence, or an absolute-path prefix on any
+platform, which is a stronger guarantee than "reject `..` after the
+fact". Legitimate identifiers this system's own docs/tests already use
+(`human_pbmc`, `2026-02-13_001`, `staging`) are unaffected.
+
+**Where it's applied**: once, centrally, inside `package/layout.py`'s
+path-builder functions — the single choke point every filesystem path in
+this codebase is already constructed through (confirmed by inspection:
+no other module builds a task/model/version/alias/run path by hand).
+Every consumer (`api.py`, `ownership.py`, `service/app/main.py`,
+`run.py`, `cli/main.py`) inherits this automatically, with no
+per-call-site change needed. `refs.py`'s `parse_model_ref()` also
+validates model_name/selector directly, for an earlier, clearer error —
+defense-in-depth, since every path it feeds into validates independently
+anyway.
+
+**Defense-in-depth**: `path_safety.py`'s `assert_contained()` is a
+second, independent layer at the handful of actual mutating/returning
+operations in `api.py` (`register_model`'s copy destination,
+`promote_model`'s alias write, `resolve_model`'s returned version
+directory) — re-verifies against the real, symlink-resolved filesystem
+location, catching a hypothetical future bug in the allowlist itself,
+not serving as the primary defense.
+
+**Symlink policy**: symlink-*aware*, not symlink-*hostile*.
+`assert_contained()` uses `Path.resolve()` (the same mechanism
+`config.py`/`run.py`'s own `_resolve_registry_root()` already uses for
+`registry_root` itself), so a symlinked registry root — a plausible
+legitimate deployment layout, e.g. network-mounted storage — is
+*followed*, not rejected, as long as the real, final location is still
+under the real, resolved root. A symlink placed *inside* the managed
+tree that points outside the root is rejected, because its real
+destination fails that same containment check. This service does not
+itself create any symlinks anywhere in the tree it manages, so there is
+no legitimate in-repo symlink layout to special-case beyond "the root
+itself may be one."
+
+**Invalid-path error behavior**: a rejected identifier raises
+`PathTraversalError` (a `ValidationError`/`ModelRegistryError`), which
+every route either already maps to a generic HTTP 400 via the existing
+`_handle_registry_error` handler, or — for the couple of routes
+(`aliases`, `compare`) that construct paths directly without a local
+`try`/`except` — a dedicated FastAPI exception handler in
+`service/app/main.py` catches directly, so the outcome is identical
+either way. The error message names only the *field* (e.g. `"Invalid
+model_name"`) — never the submitted value, a resolved filesystem path,
+internal directory structure, or a stack trace.
+
+**`artifacts_dir` trust boundary** (`register_model()`'s server-local
+source directory, not an identifier — a fixed character allowlist
+doesn't apply to it the way it does to task/model_name/version, since it
+legitimately needs to be anywhere a training job wrote its output on the
+server's own filesystem):
+
+- **Always enforced, no configuration**: `artifacts_dir` may never
+  resolve to a location *inside* the registry root itself. Without this,
+  any authenticated `model.use` holder could point `artifacts_dir` at an
+  *already-registered* version directory — including one belonging to a
+  different organization — and have it copied into a brand-new
+  registration they own, then read it back via their own,
+  legitimately-authorized `/v1/artifacts` or `/v1/resolve`: a complete,
+  silent bypass of every Phase 2A–2D ownership check through a path no
+  ownership check ever inspects. Never a legitimate use case under any
+  deployment, so this is a structural rule, not a policy choice.
+- **Optional, operator-configured**: `OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS`
+  (comma-separated absolute paths) further restricts *which* server-local
+  directory trees `artifacts_dir` may be under. Unset (the default) is
+  intentionally unrestricted, preserving every existing deployment's
+  behavior — this service has no established convention for where
+  training-output directories live on a given server, so picking a
+  mandatory default would be inventing a policy rather than enforcing
+  one a deployment already has; operators who want this narrowed can opt
+  in.
+
+**Not covered by this hardening pass** (unchanged, and out of scope by
+this PR's own charter): SQL parameterization (`tracking.py`'s queries
+were already parameterized, not string-built, and untouched here);
+resource exhaustion / disk-fill from a very large `artifacts_dir` when
+no allowlist is configured; anything about *which organization* may
+access a given, validly-contained path — that remains entirely governed
+by Phase 2A–2D's `check_model_ownership()`/`check_run_ownership()`,
+unmodified and unweakened by this pass.
 
 ### Observability side effects of every write
 
@@ -855,6 +955,18 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   adopted without a product decision. Re-confirmed the pre-existing
   path-traversal finding is unrelated to tenant isolation (doesn't
   bypass any ownership check) and left it for its own dedicated PR.
+- **Filesystem path traversal & storage boundary hardening** — the
+  dedicated follow-up PR Phase 2D flagged; see
+  [Filesystem Path Safety](#filesystem-path-safety). Centralized
+  allowlist validation for every task/model/version/alias/run/metric
+  identifier (`path_safety.py`, applied once in `package/layout.py`),
+  defense-in-depth containment checks, a closed `artifacts_dir`
+  cross-org-ingestion vector (unrelated to but discovered alongside the
+  originally-flagged issue), and a fixed `/v1/metrics` fallback that
+  previously trusted attacker-influenceable `model_meta.json` fields
+  for its own path construction. Symlink-aware, not symlink-hostile.
+  Independent of, and layered underneath, Phase 2A–2D's organization
+  enforcement — not a tenant-isolation change.
 
 ### Near Term
 
@@ -870,12 +982,6 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   legacy/unowned ownership-resolution workflow (model *and* run) on top
   of whichever is chosen. Resource-scoped `model.use`; `platform`/public
   model namespace; model deletion remain separately unscoped.
-- **Path-traversal remediation (independent security PR, not phase-
-  numbered)** — sanitize `task`/`model_name`/`version`/`alias` against
-  `..` sequences in `refs.py`/`package/layout.py`, or add a containment
-  check before any filesystem write in `storage/localfs.py`. Not a
-  tenant-isolation bypass (see Phase 2D above), but a real
-  authenticated-same-org arbitrary-filesystem-write primitive.
 
 ### Mid Term
 

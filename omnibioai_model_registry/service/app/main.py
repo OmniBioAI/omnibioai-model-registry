@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional, List
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.requests import Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from iam_client.models import UserContext
 
@@ -18,7 +20,7 @@ from omnibioai_model_registry import (
     resolve_model,
     verify_model_ref,
 )
-from omnibioai_model_registry.errors import ModelRegistryError, RegistryNotConfigured
+from omnibioai_model_registry.errors import ModelRegistryError, PathTraversalError, RegistryNotConfigured
 from omnibioai_model_registry.config import load_config
 from omnibioai_model_registry.auth import (
     _actor_identifier,
@@ -26,6 +28,7 @@ from omnibioai_model_registry.auth import (
     require_write_auth_with_context,
 )
 from omnibioai_model_registry.ownership import check_model_ownership
+from omnibioai_model_registry.package import layout as L
 from omnibioai_model_registry.audit_client import AuditClient
 from omnibioai_model_registry.hf_routes import router as hf_router
 from omnibioai_model_registry.usage_emit import emit_model_registered
@@ -74,6 +77,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.exception_handler(PathTraversalError)
+def _handle_path_traversal_error(request: Request, exc: PathTraversalError) -> JSONResponse:
+    """Global safety net for path_safety.py's PathTraversalError.
+
+    Most routes already wrap their filesystem calls in
+    `except Exception as e: _handle_registry_error(e)`, which already
+    maps any ModelRegistryError (PathTraversalError included) to this
+    same 400 shape -- this handler exists for the handful of routes
+    (aliases/compare, which construct paths directly via package.layout
+    outside of any local try/except) that don't, so a rejected
+    identifier is *always* a safe, generic 400 everywhere in this
+    service, never an unhandled 500 with a stack trace. `str(exc)`
+    already contains only a field name (see path_safety.py) -- never a
+    resolved filesystem path, request value, or other internal detail.
+    """
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
 # ==========================================================
 # Shared registry instance for UI/API
 # ==========================================================
@@ -729,14 +750,32 @@ def api_metrics(task: str, ref: str, user: UserContext = Depends(require_auth_wi
             finally:
                 conn.close()
         except RegistryNotConfigured:
-            # Filesystem fallback — read *.jsonl written by RunLogger
-            run_metrics_dir = (
-                Path(registry.root)
-                / "tasks" / meta.get("task", task)
-                / "models" / meta.get("model_name", "")
-                / "runs" / run_id / "metrics"
-            )
-            if run_metrics_dir.exists():
+            # Filesystem fallback — read *.jsonl written by RunLogger.
+            #
+            # Security: model_name is derived from `vdir` itself (the
+            # real, already-resolved, ownership-checked directory
+            # resolve_model() returned above -- .../models/<model_name>/
+            # versions/<version>), and `run_id` is routed through the
+            # same path_safety validation every other run_dir() caller
+            # gets. Deliberately NOT meta.get("task")/
+            # meta.get("model_name"): those live inside model_meta.json,
+            # itself part of the free-form `metadata` dict a caller
+            # supplies at registration time (register_model() only ever
+            # *defaults* task/model_name into it with setdefault(), it
+            # never overwrites an attacker-supplied "task"/"model_name"
+            # key already present in that dict) -- trusting them here
+            # would let a same-org caller read an arbitrary
+            # attacker-chosen *.jsonl path via a poisoned
+            # model_meta.json rather than this model's real identity. A
+            # malformed run_id (or one with simply no such directory)
+            # yields no run history, same as today -- this fallback has
+            # always been best-effort.
+            real_model_name = vdir.parent.parent.name
+            try:
+                run_metrics_dir = L.run_dir(Path(registry.root), task, real_model_name, run_id) / "metrics"
+            except PathTraversalError:
+                run_metrics_dir = None
+            if run_metrics_dir is not None and run_metrics_dir.exists():
                 for jf in sorted(run_metrics_dir.glob("*.jsonl")):
                     entries = []
                     for line in jf.read_text().splitlines():
