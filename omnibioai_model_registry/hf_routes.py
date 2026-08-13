@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from .api import ModelRegistry
 from .audit_client import AuditClient
-from .auth import _actor_identifier, require_auth, require_write_auth_with_context
+from .auth import _actor_identifier, require_auth_with_context, require_write_auth_with_context
 
 router = APIRouter()
 
@@ -135,7 +135,15 @@ def hf_push(req: HFPushRequest, user: UserContext = Depends(require_write_auth_w
         raise HTTPException(status_code=404, detail=f"Model version not found: {exc}")
 
     job_id = str(uuid.uuid4())
-    _set_job(job_id, status="queued", url=None, error=None, repo_id=req.repo_id)
+    # Phase 2D: the job itself now carries the same organization_id that
+    # already gated the resolve_model() call above, so hf_push_status()
+    # can enforce the same boundary when a different caller later polls
+    # this job_id -- closes the gap hf_push_status()'s own docstring
+    # flagged since Phase 1 ("deferred to the tenant-isolation phase").
+    _set_job(
+        job_id, status="queued", url=None, error=None, repo_id=req.repo_id,
+        organization_id=user.org_id,
+    )
 
     t = threading.Thread(
         target=_run_push,
@@ -157,17 +165,26 @@ def hf_push(req: HFPushRequest, user: UserContext = Depends(require_write_auth_w
 
 
 @router.get("/push/status/{job_id}", response_model=HFPushStatusResponse)
-def hf_push_status(job_id: str, actor: str = Depends(require_auth)):
-    # Phase 1: authentication only, no ownership check yet -- _JOBS has no
-    # actor/org field to check against (in-memory, keyed only by uuid4
-    # job_id). Any authenticated model.use holder can currently poll any
-    # job_id's status. job_id is unguessable (uuid4) and the response never
-    # contains the HF token, so this is a bounded enumeration/status-leak
-    # risk, not a secret-disclosure one. Ownership-scoping (ties status to
-    # the actor who created the job) is deferred to the tenant-isolation
-    # phase along with the rest of per-resource ownership.
+def hf_push_status(job_id: str, user: UserContext = Depends(require_auth_with_context)):
+    # Phase 2D: the job's organization_id (set at creation in hf_push()
+    # above, from the same verified UserContext that already gated the
+    # push itself) must match the polling caller's own org_id -- a
+    # cross-org caller gets the exact same 404 a genuinely unknown
+    # job_id already returned, so this remains a non-enumerating
+    # "unknown job_id" either way, never distinguishing "doesn't exist"
+    # from "not yours". job_id is also unguessable (uuid4) and the
+    # response never contains the HF token, so this closes the
+    # previously-accepted "bounded enumeration/status-leak" gap this
+    # docstring flagged since Phase 1, rather than merely narrowing it.
     job = _get_job(job_id)
     if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job_id")
+
+    job_org_id = job.get("organization_id")
+    if not (
+        (user.org_id is not None and user.org_id == job_org_id)
+        or (user.org_id is None and job_org_id is None)
+    ):
         raise HTTPException(status_code=404, detail="Unknown job_id")
     return HFPushStatusResponse(
         ok=True, status=job.get("status", "unknown"), url=job.get("url"), error=job.get("error")

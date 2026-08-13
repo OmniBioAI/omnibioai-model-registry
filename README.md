@@ -616,6 +616,14 @@ through) calls before touching filesystem state:
 - **`POST /v1/hf/push`**: resolves the model/version and checks
   ownership *before* any Hugging Face API call — a cross-org push is
   denied before an artifact is ever read, let alone uploaded.
+  **`GET /v1/hf/push/status/{job_id}`** is org-scoped too as of Phase 2D
+  — the job itself now carries the `organization_id` of whoever started
+  the push (recorded at `POST /v1/hf/push` time), and polling status
+  requires the same match; previously any `model.use` holder could poll
+  any job_id (a documented, bounded enumeration/status-leak gap, never a
+  secret-disclosure one — job_id is an unguessable uuid4 and the response
+  never contains the HF token — but explicitly flagged since Phase 1 as
+  "deferred to the tenant-isolation phase").
 - **Denial shape**: anti-enumerating by construction — a cross-org
   caller gets the exact same "not found" response (same status code,
   same message) a genuinely nonexistent model would return from that
@@ -628,13 +636,57 @@ through) calls before touching filesystem state:
   their metadata now, not only inferable by correlating with a separate
   `model_access_*` event.
 
-**Not yet implemented** (tracked as Phase 2D): resource-scoped
-`model.use` (authorization is still ownership-check-plus-flat-permission,
-not a redesigned permission model); a safe, audited path for an
-administrator to resolve a `legacy_unowned`/`unowned` model (or run --
-see Phase 2C below) into real ownership — no such mechanism exists yet in
-this codebase, and neither Phase 2B nor 2C invents one; a
-`platform`/public model namespace; model deletion.
+**Not yet implemented — and why (Phase 2D audit conclusion):**
+
+- **A legacy/unowned ownership-resolution workflow.** Phase 2D
+  explicitly audited this (see the Phase 2D PR description for the full
+  writeup) rather than building it, because this repo's own established
+  convention — stated in `auth.py`'s own module docstring — is
+  "authorize by permission, never by role," and neither candidate
+  IAM signal already available to this service cleanly satisfies that
+  without a cross-repo product decision:
+  - `UserContext.org_role` containing `"org_admin"` (omnibioai-auth's
+    standard per-org admin role, already present on the verified
+    `UserContext` this service already trusts) would work mechanically
+    and is naturally self-scoping (the admin's own `org_id` is exactly
+    the org they'd resolve resources into) — but it's a *role* name, not
+    a *permission*, a first-ever precedent-breaking pattern in this repo.
+  - `manage_all_orgs` (the existing platform-admin *permission*, which
+    genuinely does flow through the JWT `permissions` claim the same way
+    `model.use` does) fits the "permission, not role" precedent — but
+    it's platform-wide, not org-scoped, so using it here would require a
+    target `organization_id` to come from somewhere *other* than the
+    caller's own verified `org_id` for the first time ever in this
+    ownership model, breaking the "organization_id never client-supplied"
+    invariant every phase since 2A has held.
+
+  Either is implementable, but picking one is a product/IAM decision,
+  not something to invent unilaterally inside this repo.
+- Resource-scoped `model.use` (authorization is still
+  ownership-check-plus-flat-permission, not a redesigned permission
+  model) — not needed for the above either way, since both candidate
+  designs use an *existing* IAM signal rather than requiring `model.use`
+  itself to change shape.
+- A `platform`/public model namespace; model deletion.
+
+**Known, independent, deliberately-not-fixed finding (path traversal):**
+`task`/`model_name`/`version`/`alias` request fields are plain `str`
+with no `..`-sequence sanitization anywhere in `refs.py`/
+`package/layout.py`/`storage/localfs.py`, and none of Phases 2A–2D
+touched that code. Phase 2D re-confirmed (rather than re-flagged blind)
+that this does **not** provide a *cross-org* ownership bypass — every
+route's ownership check and its actual filesystem access consume the
+identical unsanitized string, so a traversal payload is evaluated
+consistently by both, and a mismatched-org attempt is still denied.
+What it *does* allow: an authenticated, `model.use`-holding caller
+*acting entirely within their own org* can supply e.g.
+`model_name="../../../../tmp/evil"` at registration time and have
+artifacts written outside `OMNIBIOAI_MODEL_REGISTRY_ROOT` — an
+arbitrary-filesystem-write primitive, gated only by authentication, not
+by organization. Independent of tenant isolation (it would exist in a
+single-tenant deployment too), so fixing it was out of Phase 2D's scope
+by its own charter; tracked here as a concrete, actionable item for a
+dedicated security PR.
 
 ### Tracking-Data Organization Isolation (Phase 2C)
 
@@ -791,17 +843,39 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   backfilled by string-matching `task`/`model_name` against
   `ownership.json` (a real, considered, and rejected option — see the
   section above for why).
+- **HIPAA hardening Phase 2D** — final tenant-isolation audit across
+  every model/run/version-tag/HF-push route from Phases 2A–2C (no
+  bypass, alternate-org-source, gateway-header-trust, mutation-after-
+  denial, or enumeration-oracle found), plus one real fix it surfaced:
+  `GET /v1/hf/push/status/{job_id}` is now org-scoped too (see
+  [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b)
+  above). Audited legacy-ownership resolution end to end and
+  deliberately did **not** build it — see "Not yet implemented" above
+  for the two candidate IAM designs considered and why neither was
+  adopted without a product decision. Re-confirmed the pre-existing
+  path-traversal finding is unrelated to tenant isolation (doesn't
+  bypass any ownership check) and left it for its own dedicated PR.
 
 ### Near Term
 
 - S3 / Azure Blob storage backends
 - Step-history sparklines in UI pulled from DB (currently single-point)
 - Model signature validation (input/output schema enforcement)
-- **HIPAA hardening Phase 2D** — resource-scoped `model.use`; a safe,
-  audited administrator path to resolve a `legacy_unowned`/`unowned`
-  model *or run* into real ownership (no such mechanism exists yet, and
-  none of Phase 2B/2C invents one); `platform`/public model namespace;
-  model deletion.
+- **HIPAA hardening Phase 2E (product/IAM decision needed first)** —
+  either adopt `org_role` containing `"org_admin"` as a legitimate
+  role-based signal for this service (a first, deliberate exception to
+  "authorize by permission, never by role"), or register + issue a new
+  org-scoped permission via omnibioai-auth's permission registry and
+  have this service check it instead — then build the actual
+  legacy/unowned ownership-resolution workflow (model *and* run) on top
+  of whichever is chosen. Resource-scoped `model.use`; `platform`/public
+  model namespace; model deletion remain separately unscoped.
+- **Path-traversal remediation (independent security PR, not phase-
+  numbered)** — sanitize `task`/`model_name`/`version`/`alias` against
+  `..` sequences in `refs.py`/`package/layout.py`, or add a containment
+  check before any filesystem write in `storage/localfs.py`. Not a
+  tenant-isolation bypass (see Phase 2D above), but a real
+  authenticated-same-org arbitrary-filesystem-write primitive.
 
 ### Mid Term
 

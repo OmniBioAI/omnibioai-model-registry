@@ -6530,3 +6530,256 @@ class TestPhase2CHTTPRunTracking:
         assert r.status_code == 200
         r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"})
         assert r.status_code == 200
+
+
+# ============================================================
+# Phase 2D — legacy ownership audit & final tenant-isolation hardening
+# ============================================================
+#
+# Step 3's audit (see PR description) found no IAM signal that fits this
+# repo's own "authorize by permission, never by role" precedent for a
+# legacy-ownership-resolution endpoint, so none was built -- see the PR
+# description for the two candidate designs considered and rejected in
+# favor of an explicit product/IAM decision. What Phase 2D actually
+# changes in code is narrow: GET /v1/hf/push/status/{job_id} (Phase 1
+# authenticated only, explicitly flagged in hf_routes.py since Phase 1 as
+# "deferred to the tenant-isolation phase") now enforces the same
+# organization boundary every other route already does. This class
+# covers that; TestPhase2DFinalConsistencyAudit below is a consolidated,
+# single-pass regression guard across every route Phase 2A-2C already
+# protect, run once more here as the final tenant-isolation audit this
+# phase is about.
+
+
+class TestPhase2DHFPushStatusOwnership:
+    """GET /v1/hf/push/status/{job_id} -- org-scoped as of Phase 2D."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def _as_org(self, monkeypatch, org_id, *, permissions=("model.use",)):
+        from iam_client.models import UserContext
+        return self._mock_iam_client(monkeypatch, UserContext(
+            user_id=f"user-{org_id}" if org_id else "user-open",
+            email=f"user@{org_id}.example" if org_id else "user@open.example",
+            roles=[], permissions=list(permissions), valid=True, org_id=org_id,
+        ))
+
+    @pytest.fixture
+    def auth_client(self, tmp_path, monkeypatch):
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        import omnibioai_model_registry.hf_routes as _hf
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        monkeypatch.setattr(_hf, "_registry", new_reg)
+
+        class _SyncThread:
+            def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+                self._target = target
+                self._args = args
+                self._kwargs = kwargs or {}
+
+            def start(self):
+                self._target(*self._args, **self._kwargs)
+
+        class _FakeThreadingModule:
+            Thread = _SyncThread
+
+        monkeypatch.setattr(_hf, "threading", _FakeThreadingModule())
+
+        return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+    def _push_and_get_job_id(self, client, tmp_path, monkeypatch, org_id, *, task="t", model_name="m", version="v1"):
+        import omnibioai_model_registry.hf_routes as hf_mod
+        from unittest.mock import MagicMock
+
+        self._as_org(monkeypatch, org_id)
+        src = tmp_path / f"src_{org_id}_{task}_{model_name}_{version}"
+        _make_minimal_package(src)
+        r = client.post(
+            "/v1/register",
+            json={"task": task, "model_name": model_name, "version": version,
+                  "artifacts_dir": str(src), "metadata": {}, "set_alias": None},
+            headers={"Authorization": f"Bearer {org_id or 'open'}"},
+        )
+        assert r.status_code == 200, r.text
+
+        monkeypatch.setattr(hf_mod, "_run_push", MagicMock())
+        self._as_org(monkeypatch, org_id)
+        r = client.post(
+            "/v1/hf/push",
+            json={"task": task, "model_name": model_name, "version": version,
+                  "repo_id": "some/repo", "token": "hf_faketoken"},
+            headers={"Authorization": f"Bearer {org_id or 'open'}"},
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["job_id"]
+
+    def test_org_a_can_poll_its_own_job(self, auth_client, tmp_path, monkeypatch):
+        client, _ = auth_client
+        job_id = self._push_and_get_job_id(client, tmp_path, monkeypatch, "org-A")
+        self._as_org(monkeypatch, "org-A")
+        r = client.get(f"/v1/hf/push/status/{job_id}", headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+    def test_org_b_cannot_poll_org_a_job_same_shape_as_unknown(self, auth_client, tmp_path, monkeypatch):
+        """Security requirement: no enumeration oracle -- a cross-org
+        job_id and a genuinely unknown job_id must be indistinguishable."""
+        client, _ = auth_client
+        job_id = self._push_and_get_job_id(client, tmp_path, monkeypatch, "org-A")
+
+        self._as_org(monkeypatch, "org-B")
+        r_cross_org = client.get(f"/v1/hf/push/status/{job_id}", headers={"Authorization": "Bearer org-B"})
+        r_unknown = client.get(
+            "/v1/hf/push/status/00000000-0000-0000-0000-000000000000",
+            headers={"Authorization": "Bearer org-B"},
+        )
+        assert r_cross_org.status_code == r_unknown.status_code == 404
+        assert r_cross_org.json() == r_unknown.json()
+
+    def test_spoofed_x_organization_id_header_cannot_bypass_push_status(self, auth_client, tmp_path, monkeypatch):
+        client, _ = auth_client
+        job_id = self._push_and_get_job_id(client, tmp_path, monkeypatch, "org-A")
+        self._as_org(monkeypatch, "org-B")
+        r = client.get(
+            f"/v1/hf/push/status/{job_id}",
+            headers={"Authorization": "Bearer org-B", "X-Organization-ID": "org-A"},
+        )
+        assert r.status_code == 404
+
+    def test_open_mode_job_pollable_only_in_open_mode(self, auth_client, tmp_path, monkeypatch):
+        """A job created with no org context (AUTH_ENABLED technically on
+        here, but the identity itself carries org_id=None) is pollable by
+        another org_id=None identity -- matches every other resource's
+        'both sides have no org context' precedent -- but not by a real
+        org."""
+        client, _ = auth_client
+        job_id = self._push_and_get_job_id(client, tmp_path, monkeypatch, None)
+
+        self._as_org(monkeypatch, None)
+        r_open = client.get(f"/v1/hf/push/status/{job_id}", headers={"Authorization": "Bearer open"})
+        assert r_open.status_code == 200
+
+        self._as_org(monkeypatch, "org-A")
+        r_real_org = client.get(f"/v1/hf/push/status/{job_id}", headers={"Authorization": "Bearer org-A"})
+        assert r_real_org.status_code == 404
+
+    def test_push_status_without_authorization_returns_401(self, auth_client):
+        """Phase 1 authentication requirement is preserved, not weakened,
+        by the Phase 2D org-scoping change."""
+        client, _ = auth_client
+        r = client.get("/v1/hf/push/status/some-job-id")
+        assert r.status_code == 401
+
+
+class TestPhase2DFinalConsistencyAudit:
+    """Step 4's final route/resource consistency pass, run as one
+    consolidated regression guard: org-B must be denied on every
+    protected route against org-A's model/run in a single pass, using
+    exactly the same JWT-derived org_id every other Phase 2A-2C test
+    already relies on -- no gateway header, no body/query field, no
+    alternate lookup path."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def _as_org(self, monkeypatch, org_id, *, permissions=("model.use",)):
+        from iam_client.models import UserContext
+        return self._mock_iam_client(monkeypatch, UserContext(
+            user_id=f"user-{org_id}", email=f"user@{org_id}.example",
+            roles=[], permissions=list(permissions), valid=True, org_id=org_id,
+        ))
+
+    @pytest.fixture
+    def org_a_model(self, tmp_path, monkeypatch):
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        import omnibioai_model_registry.hf_routes as _hf
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        monkeypatch.setattr(_hf, "_registry", new_reg)
+        client = TestClient(_svc.app, raise_server_exceptions=False)
+
+        self._as_org(monkeypatch, "org-A")
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        r = client.post(
+            "/v1/register",
+            json={"task": "t", "model_name": "m", "version": "v1",
+                  "artifacts_dir": str(src), "metadata": {}, "set_alias": "latest"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 200
+        return client, new_reg.root
+
+    def test_every_model_route_denies_org_b(self, org_a_model, monkeypatch):
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-B")
+        headers = {"Authorization": "Bearer org-B"}
+
+        checks = [
+            ("resolve", client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"}, headers=headers), 400),
+            ("show", client.get("/v1/show", params={"task": "t", "ref": "m@v1"}, headers=headers), 400),
+            ("verify", client.post("/v1/verify", json={"task": "t", "ref": "m@v1"}, headers=headers), 400),
+            ("artifacts", client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"}, headers=headers), 400),
+            ("metrics", client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"}, headers=headers), 400),
+            ("aliases", client.get("/v1/aliases", params={"task": "t", "model": "m"}, headers=headers), 404),
+            ("compare", client.get("/v1/compare", params={"task": "t", "model": "m", "versions": ["v1", "v1"]}, headers=headers), 404),
+            ("promote", client.post("/v1/promote", json={"task": "t", "model_name": "m", "alias": "staging", "version": "v1"}, headers=headers), 400),
+            ("tags", client.put("/v1/tags", json={"task": "t", "model_name": "m", "version": "v1", "key": "k", "value": "v"}, headers=headers), 404),
+            ("versions/patch", client.post("/v1/versions/patch", json={"task": "t", "model_name": "m", "version": "v1", "description": "x"}, headers=headers), 404),
+            ("stage", client.post("/v1/stage", json={"task": "t", "model_name": "m", "version": "v1", "stage": "staging"}, headers=headers), 404),
+        ]
+        failures = [(name, resp.status_code, expected) for name, resp, expected in checks if resp.status_code != expected]
+        assert failures == [], f"routes that didn't deny org-B as expected: {failures}"
+
+        # /v1/models: org-B's list must not contain org-A's model at all.
+        r = client.get("/v1/models", headers=headers)
+        assert r.status_code == 200
+        assert "m" not in {m.get("model_name") for m in r.json()}
+
+    def test_every_model_route_still_works_for_org_a(self, org_a_model, monkeypatch):
+        """The other half of the final audit: none of the above denials
+        are a blanket regression -- org-A's own access is fully intact."""
+        client, _ = org_a_model
+        self._as_org(monkeypatch, "org-A")
+        headers = {"Authorization": "Bearer org-A"}
+
+        for name, resp in [
+            ("resolve", client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"}, headers=headers)),
+            ("show", client.get("/v1/show", params={"task": "t", "ref": "m@v1"}, headers=headers)),
+            ("artifacts", client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"}, headers=headers)),
+            ("aliases", client.get("/v1/aliases", params={"task": "t", "model": "m"}, headers=headers)),
+            ("models", client.get("/v1/models", headers=headers)),
+        ]:
+            assert resp.status_code == 200, f"{name} unexpectedly denied for the owning org: {resp.text}"
