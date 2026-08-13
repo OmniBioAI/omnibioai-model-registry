@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from .audit.audit_log import PromotionEvent, append_promotion_event, now_utc_iso
 from .config import RegistryConfig, load_config
 from .errors import ModelNotFound, ValidationError, VersionAlreadyExists
-from .ownership import ensure_model_ownership
+from .ownership import check_model_ownership, ensure_model_ownership
 from .package import layout as L
 from .package.manifest import verify_sha256_manifest, write_sha256_manifest
 from .package.validate import validate_package_files
@@ -40,6 +40,31 @@ class ModelRegistry:
         self.backend.ensure_dirs(L.aliases_root(self.root, task, model_name))
         self.backend.ensure_dirs(L.audit_root(self.root, task, model_name))
 
+    def _enforce_ownership_or_not_found(
+        self,
+        task: str,
+        model_name: str,
+        *,
+        enforce_ownership: bool,
+        requesting_org_id: Optional[str],
+    ) -> None:
+        """Phase 2B: the single call site every storage-layer method
+        below uses before touching a model that must already exist.
+        Raises ModelNotFound (the exact same exception/shape already
+        raised for a genuinely nonexistent model) when the caller's
+        organization does not own it -- anti-enumerating by construction,
+        not by a second, separately-maintained response path. A no-op
+        when enforce_ownership=False (the default -- CLI/direct Python
+        API callers with no IAM identity at all are unaffected, matching
+        Phase 2A's existing --org-id/CLI trust-boundary precedent)."""
+        if not enforce_ownership:
+            return
+        check = check_model_ownership(
+            self.root, task, model_name, requesting_org_id=requesting_org_id
+        )
+        if not check.allowed:
+            raise ModelNotFound(f"Model not found: task={task}, model_name={model_name}")
+
     def register_model(
         self,
         task: str,
@@ -51,6 +76,8 @@ class ModelRegistry:
         actor: Optional[str] = None,
         reason: Optional[str] = None,
         organization_id: Optional[str] = None,
+        *,
+        enforce_ownership: bool = False,
     ) -> Dict[str, Any]:
         """
         organization_id: Phase 2A ownership. Must be server-derived from
@@ -61,6 +88,16 @@ class ModelRegistry:
         None for non-HTTP callers with no IAM identity at all (CLI,
         direct Python API usage), which is recorded as status="unowned",
         not guessed. See ownership.py for the full design rationale.
+
+        enforce_ownership (Phase 2B): when True, registering a version
+        under an EXISTING model requires organization_id to match that
+        model's recorded owner -- denied (ModelNotFound, no filesystem
+        mutation at all) otherwise. Registering a genuinely NEW model is
+        never blocked by this (there is nothing to match against yet);
+        organization_id is simply recorded as its owner, same as Phase
+        2A. Defaults to False so CLI/direct Python API callers (no IAM
+        identity) are unaffected, matching the enforce_ownership default
+        already used by resolve_model/promote_model/verify_model_ref.
         """
         artifacts_dir = Path(artifacts_dir).resolve()
         if not artifacts_dir.exists():
@@ -83,6 +120,20 @@ class ModelRegistry:
         versions_root_path = L.versions_root(self.root, task, model_name)
         model_pre_existing = versions_root_path.exists() and any(
             versions_root_path.iterdir()
+        )
+
+        # Phase 2B: adding a version to an EXISTING model requires
+        # belonging to its owning org -- checked before any directory
+        # creation, artifact copy, or ownership read/write below, so a
+        # denial leaves the filesystem completely untouched (matches
+        # register_model's own promise: ownership is only ever
+        # established/confirmed after a successful copy+validate). A
+        # brand-new model (model_pre_existing=False) is never blocked
+        # here -- there is no prior owner to conflict with.
+        self._enforce_ownership_or_not_found(
+            task, model_name,
+            enforce_ownership=enforce_ownership and model_pre_existing,
+            requesting_org_id=organization_id,
         )
 
         self._ensure_model_dirs(task, model_name)
@@ -164,9 +215,26 @@ class ModelRegistry:
             "ownership_status": ownership.status,
         }
 
-    def resolve_model(self, task: str, model_ref: str, verify: bool = True) -> Path:
+    def resolve_model(
+        self,
+        task: str,
+        model_ref: str,
+        verify: bool = True,
+        *,
+        enforce_ownership: bool = False,
+        requesting_org_id: Optional[str] = None,
+    ) -> Path:
         ref = parse_model_ref(model_ref)
         self._ensure_model_dirs(task, ref.model_name)
+
+        # Phase 2B: checked before any alias/version resolution, so a
+        # denial reveals nothing about the specific alias or version
+        # requested either -- just "not found", identical to a genuinely
+        # nonexistent model at every subsequent step.
+        self._enforce_ownership_or_not_found(
+            task, ref.model_name,
+            enforce_ownership=enforce_ownership, requesting_org_id=requesting_org_id,
+        )
 
         alias_file = L.alias_path(self.root, task, ref.model_name, ref.selector)
         if alias_file.exists():
@@ -195,9 +263,21 @@ class ModelRegistry:
         version: str,
         actor: Optional[str] = None,
         reason: Optional[str] = None,
+        *,
+        enforce_ownership: bool = False,
+        requesting_org_id: Optional[str] = None,
     ) -> None:
 
         self._ensure_model_dirs(task, model_name)
+
+        # Phase 2B: promote always operates on an existing model (there
+        # is no "create" case here, unlike register_model) -- checked
+        # before the version-existence check below, so a denial doesn't
+        # even confirm whether the requested version exists.
+        self._enforce_ownership_or_not_found(
+            task, model_name,
+            enforce_ownership=enforce_ownership, requesting_org_id=requesting_org_id,
+        )
 
         vdir = L.version_dir(self.root, task, model_name, version)
         if not vdir.exists():
@@ -234,8 +314,18 @@ class ModelRegistry:
             L.promotions_log_path(self.root, task, model_name), ev
         )
 
-    def verify_model_ref(self, task: str, model_ref: str) -> None:
-        _ = self.resolve_model(task, model_ref, verify=True)
+    def verify_model_ref(
+        self,
+        task: str,
+        model_ref: str,
+        *,
+        enforce_ownership: bool = False,
+        requesting_org_id: Optional[str] = None,
+    ) -> None:
+        _ = self.resolve_model(
+            task, model_ref, verify=True,
+            enforce_ownership=enforce_ownership, requesting_org_id=requesting_org_id,
+        )
 
 
 # -------------------------
@@ -250,9 +340,11 @@ def register_model(*args, **kwargs) -> Dict[str, Any]:
     return _default_registry().register_model(*args, **kwargs)
 
 
-def resolve_model(task: str, model_ref: str, verify: bool = True) -> str:
+def resolve_model(task: str, model_ref: str, verify: bool = True, **kwargs) -> str:
     return str(
-        _default_registry().resolve_model(task=task, model_ref=model_ref, verify=verify)
+        _default_registry().resolve_model(
+            task=task, model_ref=model_ref, verify=verify, **kwargs
+        )
     )
 
 
@@ -260,5 +352,5 @@ def promote_model(*args, **kwargs) -> None:
     return _default_registry().promote_model(*args, **kwargs)
 
 
-def verify_model_ref(task: str, model_ref: str) -> None:
-    return _default_registry().verify_model_ref(task=task, model_ref=model_ref)
+def verify_model_ref(task: str, model_ref: str, **kwargs) -> None:
+    return _default_registry().verify_model_ref(task=task, model_ref=model_ref, **kwargs)

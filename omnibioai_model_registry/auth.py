@@ -183,21 +183,19 @@ async def require_write_auth(
     return await require_auth(authorization)
 
 
-async def require_write_auth_with_context(
-    authorization: Annotated[str | None, Header()] = None,
+async def _resolve_user_context(
+    authorization: str | None,
 ) -> UserContext:
-    """PR14.2B-3: same enforcement as require_write_auth, but returns the
-    full UserContext instead of just the actor string -- for the one call
-    site that needs organization_id (api_register(), for usage-event
-    emission). Additive, not a signature change to require_write_auth
-    itself: every other require_write_auth-dependent route
-    (promote/set_tag/patch_version/set_stage) is unaffected, unchanged,
-    still gets a bare str.
+    """Shared by require_auth_with_context and require_write_auth_with_context
+    -- both need the full verified UserContext (not just the actor string)
+    so callers can read org_id for Phase 2B ownership enforcement. Same
+    enforcement as require_auth/require_write_auth in every other respect.
 
-    When auth_enabled=False, returns a synthetic "system" UserContext
-    with org_id=None -- api_register()'s usage-emission call already
-    treats organization_id=None as "skip emission, don't block the
-    request" the same way every other PR14.2B producer does.
+    When auth_enabled=False, returns a synthetic "system" UserContext with
+    org_id=None -- Phase 2B's check_model_ownership() treats a None
+    requesting_org_id as the pre-existing open/no-org dev-test mode
+    (matches only models themselves registered with no org), the same
+    behavior PR14.2B-3's usage-emission call already relies on.
     """
     cfg = load_config()
     if not cfg.auth_enabled:
@@ -210,3 +208,29 @@ async def require_write_auth_with_context(
         return await verify_and_authorize(token, action="model_access")
     except AuthError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+async def require_auth_with_context(
+    authorization: Annotated[str | None, Header()] = None,
+) -> UserContext:
+    """Phase 2B: read-side counterpart to require_write_auth_with_context.
+    Every read route that must enforce organization-scoped ownership
+    (resolve/show/models/compare/artifacts/aliases/metrics/verify) depends
+    on this instead of require_auth, so it has org_id to check against
+    check_model_ownership() -- not just the actor string. Enforcement
+    itself (model.use permission, token verification) is identical to
+    require_auth."""
+    return await _resolve_user_context(authorization)
+
+
+async def require_write_auth_with_context(
+    authorization: Annotated[str | None, Header()] = None,
+) -> UserContext:
+    """PR14.2B-3: same enforcement as require_write_auth, but returns the
+    full UserContext instead of just the actor string -- originally for
+    the one call site that needed organization_id (api_register(), for
+    usage-event emission); now also the write-side counterpart of
+    require_auth_with_context for every mutation route that must enforce
+    Phase 2B ownership (register/promote/tags/versions/patch/stage/hf
+    push)."""
+    return await _resolve_user_context(authorization)

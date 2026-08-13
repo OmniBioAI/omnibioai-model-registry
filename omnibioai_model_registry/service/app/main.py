@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional, List
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
+from iam_client.models import UserContext
 
 from omnibioai_model_registry import (
     ModelRegistry,
@@ -22,9 +23,10 @@ from omnibioai_model_registry.config import load_config
 from omnibioai_model_registry.auth import (
     _actor_identifier,
     require_auth,
-    require_write_auth,
+    require_auth_with_context,
     require_write_auth_with_context,
 )
+from omnibioai_model_registry.ownership import check_model_ownership
 from omnibioai_model_registry.audit_client import AuditClient
 from omnibioai_model_registry.hf_routes import router as hf_router
 from omnibioai_model_registry.usage_emit import emit_model_registered
@@ -281,6 +283,27 @@ def _handle_registry_error(e: Exception):
     raise HTTPException(status_code=500, detail=str(e))
 
 
+def _require_model_ownership(task: str, model_name: str, user: UserContext) -> None:
+    """Phase 2B: single call site for every route below that touches a
+    model's filesystem state directly (compare/aliases/tags/versions-patch
+    /stage) rather than through ModelRegistry.resolve_model/promote_model
+    /register_model (those already enforce ownership internally via
+    ModelRegistry._enforce_ownership_or_not_found -- see api.py). Raises
+    the same 404 shape those routes already use (or would use) for a
+    genuinely missing model -- anti-enumerating: a cross-org caller cannot
+    distinguish "doesn't exist" from "not yours". user.org_id is always
+    the verified UserContext's own field, never a header/body/query value.
+    """
+    check = check_model_ownership(
+        Path(registry.root), task, model_name, requesting_org_id=user.org_id
+    )
+    if not check.allowed:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model not found: task={task}, model_name={model_name}",
+        )
+
+
 def _get_db_conn():
     """Return a DB connection or raise HTTP 503 if DB is not configured."""
     if _db is None:
@@ -309,11 +332,12 @@ def health():
 @app.post(f"{DEFAULT_PREFIX}/register", response_model=RegisterResponse)
 def api_register(req: RegisterRequest, user=Depends(require_write_auth_with_context)):
     # PR14.2B-3: require_write_auth_with_context (not require_write_auth)
-    # so organization_id is available for usage-event emission -- every
-    # other require_write_auth-dependent route is untouched. actor is
-    # derived the same way require_auth's own _actor_identifier() already
-    # does, preserving the exact str value every other route/call site
-    # (register_model(actor=...), _audit.log_event(...)) already expects.
+    # so organization_id is available for usage-event emission; Phase 2B
+    # now reuses the same UserContext for ownership enforcement below.
+    # actor is derived the same way require_auth's own
+    # _actor_identifier() already does, preserving the exact str value
+    # every other route/call site (register_model(actor=...),
+    # _audit.log_event(...)) already expects.
     actor = _actor_identifier(user)
     try:
         out = register_model(
@@ -329,6 +353,11 @@ def api_register(req: RegisterRequest, user=Depends(require_write_auth_with_cont
             # UserContext PR14.2B-3 already resolved -- never from
             # req.metadata or any other client-supplied field.
             organization_id=user.org_id,
+            # Phase 2B: registering a version under an EXISTING model now
+            # requires belonging to its owning org (ModelNotFound -> 400,
+            # no filesystem mutation). A brand-new model is never blocked
+            # -- see ModelRegistry.register_model's own docstring.
+            enforce_ownership=True,
         )
         _audit.log_event(
             "register_model", actor,
@@ -346,7 +375,8 @@ def api_register(req: RegisterRequest, user=Depends(require_write_auth_with_cont
 
 
 @app.post(f"{DEFAULT_PREFIX}/promote")
-def api_promote(req: PromoteRequest, actor: str = Depends(require_write_auth)):
+def api_promote(req: PromoteRequest, user: UserContext = Depends(require_write_auth_with_context)):
+    actor = _actor_identifier(user)
     try:
         promote_model(
             task=req.task,
@@ -355,11 +385,16 @@ def api_promote(req: PromoteRequest, actor: str = Depends(require_write_auth)):
             version=req.version,
             actor=actor,
             reason=req.reason,
+            # Phase 2B: promote always targets an existing model -- caller
+            # must belong to its owning org (ModelNotFound -> 400).
+            enforce_ownership=True,
+            requesting_org_id=user.org_id,
         )
         _audit.log_event(
             "promote_model", actor,
             f"{req.task}/{req.model_name}@{req.alias}",
             task=req.task, model_name=req.model_name, version=req.version,
+            metadata={"organization_id": user.org_id},
         )
         return {"ok": True}
     except Exception as e:
@@ -367,33 +402,40 @@ def api_promote(req: PromoteRequest, actor: str = Depends(require_write_auth)):
 
 
 @app.get(f"{DEFAULT_PREFIX}/resolve", response_model=ResolveResponse)
-def api_resolve(task: str, ref: str, verify: bool = True, actor: str = Depends(require_auth)):
+def api_resolve(task: str, ref: str, verify: bool = True, user: UserContext = Depends(require_auth_with_context)):
     try:
-        path = resolve_model(task=task, model_ref=ref, verify=verify)
+        path = resolve_model(
+            task=task, model_ref=ref, verify=verify,
+            enforce_ownership=True, requesting_org_id=user.org_id,
+        )
         return ResolveResponse(ok=True, path=str(path))
     except Exception as e:
         _handle_registry_error(e)
 
 
 @app.post(f"{DEFAULT_PREFIX}/verify", response_model=VerifyResponse)
-def api_verify(req: VerifyRequest, actor: str = Depends(require_auth)):
+def api_verify(req: VerifyRequest, user: UserContext = Depends(require_auth_with_context)):
     # POST but read-only/data-bearing (acts as an existence+integrity
     # oracle for a task/ref pair) -- discovered during the Phase 1
     # route-by-route review and protected on the same basis as the
     # explicitly listed GET endpoints, per the "every non-informational
     # endpoint" objective.
     try:
-        verify_model_ref(task=req.task, model_ref=req.ref)
+        verify_model_ref(
+            task=req.task, model_ref=req.ref,
+            enforce_ownership=True, requesting_org_id=user.org_id,
+        )
         return VerifyResponse(ok=True)
     except Exception as e:
         _handle_registry_error(e)
 
 
 @app.get(f"{DEFAULT_PREFIX}/show", response_model=ShowResponse)
-def api_show(task: str, ref: str, verify: bool = False, actor: str = Depends(require_auth)):
+def api_show(task: str, ref: str, verify: bool = False, user: UserContext = Depends(require_auth_with_context)):
     try:
         vdir = ModelRegistry.from_env().resolve_model(
-            task=task, model_ref=ref, verify=verify
+            task=task, model_ref=ref, verify=verify,
+            enforce_ownership=True, requesting_org_id=user.org_id,
         )
         meta_path = Path(vdir) / "model_meta.json"
         if not meta_path.exists():
@@ -414,7 +456,7 @@ def list_models(
     task: Optional[str] = Query(None, description="filter by task"),
     model_name: Optional[str] = Query(None, description="filter by model name"),
     metric_gte: Optional[str] = Query(None, description="metric filter, format key:threshold"),
-    actor: str = Depends(require_auth),
+    user: UserContext = Depends(require_auth_with_context),
 ):
     """
     UI endpoint for dashboard:
@@ -445,6 +487,21 @@ def list_models(
             if task and meta.get("task") != task:
                 continue
             if model_name and meta.get("model_name") != model_name:
+                continue
+
+            # Phase 2B: ownership-aware filtering in the same filesystem
+            # walk that already reads this entry -- a denied model is
+            # never appended to `models`, not fetched-then-hidden in the
+            # response. Skip entries with no task/model_name (malformed
+            # meta) the same way the pre-existing filters implicitly do.
+            m_task = meta.get("task")
+            m_model_name = meta.get("model_name")
+            if not m_task or not m_model_name:
+                continue
+            check = check_model_ownership(
+                root, m_task, m_model_name, requesting_org_id=user.org_id
+            )
+            if not check.allowed:
                 continue
 
             if _metric_key is not None:
@@ -564,9 +621,12 @@ def api_runs_list(task: str, model: str, actor: str = Depends(require_auth)):
 # ==========================================================
 
 @app.get(f"{DEFAULT_PREFIX}/metrics", response_model=MetricsResponse)
-def api_metrics(task: str, ref: str, actor: str = Depends(require_auth)):
+def api_metrics(task: str, ref: str, user: UserContext = Depends(require_auth_with_context)):
     try:
-        vdir = Path(registry.resolve_model(task=task, model_ref=ref, verify=False))
+        vdir = Path(registry.resolve_model(
+            task=task, model_ref=ref, verify=False,
+            enforce_ownership=True, requesting_org_id=user.org_id,
+        ))
     except Exception as e:
         _handle_registry_error(e)
 
@@ -632,8 +692,13 @@ def api_metrics(task: str, ref: str, actor: str = Depends(require_auth)):
 
 
 @app.get(f"{DEFAULT_PREFIX}/aliases", response_model=AliasesResponse)
-def api_aliases(task: str, model: str, actor: str = Depends(require_auth)):
+def api_aliases(task: str, model: str, user: UserContext = Depends(require_auth_with_context)):
     from omnibioai_model_registry.package.layout import aliases_root as _aliases_root
+
+    # Phase 2B: alias resolution is model metadata retrieval -- reads the
+    # filesystem directly, bypassing ModelRegistry.resolve_model entirely,
+    # so it needs its own ownership check.
+    _require_model_ownership(task, model, user)
 
     aliases_dir = _aliases_root(Path(registry.root), task, model)
     entries: List[AliasEntry] = []
@@ -653,8 +718,13 @@ def api_aliases(task: str, model: str, actor: str = Depends(require_auth)):
 
 
 @app.put(f"{DEFAULT_PREFIX}/tags")
-def api_set_tag(req: SetTagRequest, actor: str = Depends(require_write_auth)):
+def api_set_tag(req: SetTagRequest, user: UserContext = Depends(require_write_auth_with_context)):
     import tempfile
+
+    actor = _actor_identifier(user)
+    # Phase 2B: checked before either the DB write or the filesystem
+    # write below, so a cross-org caller mutates nothing at all.
+    _require_model_ownership(req.task, req.model_name, user)
 
     # Persist to DB when available (best-effort; never blocks the filesystem write)
     if _db is not None:
@@ -691,14 +761,19 @@ def api_set_tag(req: SetTagRequest, actor: str = Depends(require_write_auth)):
         "set_tag", actor,
         f"{req.task}/{req.model_name}@{req.version}",
         task=req.task, model_name=req.model_name, version=req.version,
-        metadata={"key": req.key, "value": req.value},
+        metadata={"key": req.key, "value": req.value, "organization_id": user.org_id},
     )
     return {"ok": True}
 
 
 @app.post(f"{DEFAULT_PREFIX}/versions/patch")
-def api_patch_version(req: PatchVersionRequest, actor: str = Depends(require_write_auth)):
+def api_patch_version(req: PatchVersionRequest, user: UserContext = Depends(require_write_auth_with_context)):
     import tempfile
+
+    # Phase 2B: checked before the meta_path existence probe below, so a
+    # cross-org caller can't distinguish "not yours" from "genuinely
+    # missing" -- both are the same 404.
+    _require_model_ownership(req.task, req.model_name, user)
 
     from omnibioai_model_registry.package.layout import version_dir as _vdir_fn
     vdir = _vdir_fn(Path(registry.root), req.task, req.model_name, req.version)
@@ -726,18 +801,30 @@ def api_patch_version(req: PatchVersionRequest, actor: str = Depends(require_wri
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    _audit.log_event(
+        "patch_version", _actor_identifier(user),
+        f"{req.task}/{req.model_name}@{req.version}",
+        task=req.task, model_name=req.model_name, version=req.version,
+        metadata={"organization_id": user.org_id},
+    )
     return {"ok": True}
 
 
 @app.post(f"{DEFAULT_PREFIX}/stage")
-def api_set_stage(req: SetStageRequest, actor: str = Depends(require_write_auth)):
+def api_set_stage(req: SetStageRequest, user: UserContext = Depends(require_write_auth_with_context)):
     import tempfile
 
+    actor = _actor_identifier(user)
     if req.stage not in _VALID_STAGES:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid stage '{req.stage}'. Must be one of: {sorted(_VALID_STAGES)}",
         )
+
+    # Phase 2B: checked before the vdir existence probe below, so a
+    # cross-org caller can't distinguish "not yours" from "genuinely
+    # missing version" -- both are the same 404.
+    _require_model_ownership(req.task, req.model_name, user)
 
     from omnibioai_model_registry.package.layout import version_dir as _vdir_fn
     vdir = _vdir_fn(Path(registry.root), req.task, req.model_name, req.version)
@@ -768,6 +855,12 @@ def api_set_stage(req: SetStageRequest, actor: str = Depends(require_write_auth)
                 version=req.version,
                 actor=actor,
                 reason=req.reason or "stage transition",
+                # Defense in depth: this route already enforced ownership
+                # above, but promote_model is the shared library call site
+                # every other caller (including the standalone /v1/promote
+                # route) also goes through -- keep it consistent here too.
+                enforce_ownership=True,
+                requesting_org_id=user.org_id,
             )
         except Exception as e:
             _handle_registry_error(e)
@@ -776,6 +869,7 @@ def api_set_stage(req: SetStageRequest, actor: str = Depends(require_write_auth)
         "set_stage", actor,
         f"{req.task}/{req.model_name}@{req.stage}",
         task=req.task, model_name=req.model_name, version=req.version,
+        metadata={"organization_id": user.org_id},
     )
     return {"ok": True, "stage": req.stage, "version": req.version}
 
@@ -785,13 +879,19 @@ def api_compare(
     task: str,
     model: str,
     versions: List[str] = Query(default=[]),
-    actor: str = Depends(require_auth),
+    user: UserContext = Depends(require_auth_with_context),
 ):
     if len(versions) < 2:
         raise HTTPException(
             status_code=400,
             detail={"ok": False, "error": "At least 2 versions required"},
         )
+    # Phase 2B: compare reads version_dir metadata directly, bypassing
+    # ModelRegistry.resolve_model -- own ownership check required. One
+    # model per request (all versions belong to it), so a single check
+    # covers every version listed.
+    _require_model_ownership(task, model, user)
+
     from omnibioai_model_registry.package.layout import version_dir as _vdir_fn
 
     result: Dict[str, Dict[str, Any]] = {}
@@ -820,9 +920,12 @@ def api_compare(
 
 
 @app.get(f"{DEFAULT_PREFIX}/artifacts", response_model=ArtifactsResponse)
-def api_artifacts(task: str, ref: str, actor: str = Depends(require_auth)):
+def api_artifacts(task: str, ref: str, user: UserContext = Depends(require_auth_with_context)):
     try:
-        vdir = Path(registry.resolve_model(task=task, model_ref=ref, verify=False))
+        vdir = Path(registry.resolve_model(
+            task=task, model_ref=ref, verify=False,
+            enforce_ownership=True, requesting_org_id=user.org_id,
+        ))
     except Exception as e:
         _handle_registry_error(e)
 
