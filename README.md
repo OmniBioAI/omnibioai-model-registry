@@ -35,6 +35,7 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ ModelHub UI with Experiments tab + metric sparklines
 - ✅ Local-first, cloud-ready design
 - ✅ Organization ownership recorded (server-derived from verified IAM identity) and enforced on every model-bearing read/write route, including Hugging Face push; see [Organization Ownership and Enforcement](#organization-ownership-and-enforcement-phase-2a-phase-2b)
+- ✅ Run-tracking data (`omr_runs`/`omr_params`/`omr_metrics`/`omr_tags`/`omr_version_tags`) organization-isolated too; see [Tracking-Data Organization Isolation](#tracking-data-organization-isolation-phase-2c)
 
 ---
 
@@ -470,12 +471,23 @@ the gate on all mutating routes above, including these three.
 When `DB_HOST` is set, the service bootstraps five tables on startup:
 
 ```
-omr_runs          — run lifecycle (run_id, status, started_at, finished_at)
+omr_runs          — run lifecycle (run_id, status, started_at, finished_at,
+                     organization_id, ownership_status)  [Phase 2C]
 omr_params        — key/value params per run
 omr_metrics       — step-indexed metric values per run
 omr_tags          — key/value tags per run
 omr_version_tags  — key/value tags per model version
 ```
+
+`organization_id`/`ownership_status` on `omr_runs` (Phase 2C) are added
+via an idempotent `ALTER TABLE ... ADD COLUMN` migration run on every
+startup (`db.py`'s `_ALTER_DDL`, guarded against MySQL error 1060 so
+re-running is always a safe no-op) — see
+[Tracking-Data Organization Isolation](#tracking-data-organization-isolation-phase-2c)
+below for the full design and legacy-row migration reasoning.
+`omr_params`/`omr_metrics`/`omr_tags`/`omr_version_tags` have no schema
+change; they inherit their organization boundary from `omr_runs`/
+`ownership.json` respectively, never a duplicated column.
 
 Environment variables:
 
@@ -531,10 +543,10 @@ model-bearing read/write route now independently enforces organization
 ownership (see
 [Organization Ownership](#organization-ownership-and-enforcement-phase-2a-phase-2b) below):
 holding `model.use` is necessary but no longer sufficient — the caller's
-verified `org_id` must also match the model's recorded owner. `omr_*`
-tracking-table scoping (`omr_runs`/`omr_params`/`omr_metrics`/
-`omr_tags`/`omr_version_tags`) is still real future work (Phase 2C, see
-Roadmap), not something this phase provides.
+verified `org_id` must also match the model's recorded owner (or, for
+`omr_*` run-tracking routes as of Phase 2C, the run's own recorded
+owner — see
+[Tracking-Data Organization Isolation](#tracking-data-organization-isolation-phase-2c)).
 
 ### Organization Ownership and Enforcement (Phase 2A, Phase 2B)
 
@@ -616,15 +628,82 @@ through) calls before touching filesystem state:
   their metadata now, not only inferable by correlating with a separate
   `model_access_*` event.
 
-**Not yet implemented** (tracked as Phase 2C/2D): `organization_id` on
-the `omr_*` tracking tables (`omr_runs`/`omr_params`/`omr_metrics`/
-`omr_tags`/`omr_version_tags`) — Phase 2C; resource-scoped `model.use`
-(authorization is still ownership-check-plus-flat-permission, not a
-redesigned permission model); a safe, audited path for an administrator
-to resolve a `legacy_unowned`/`unowned` model into real ownership — no
-such mechanism exists yet in this codebase, and Phase 2B deliberately
-does not invent one; a `platform`/public model namespace; model
-deletion.
+**Not yet implemented** (tracked as Phase 2D): resource-scoped
+`model.use` (authorization is still ownership-check-plus-flat-permission,
+not a redesigned permission model); a safe, audited path for an
+administrator to resolve a `legacy_unowned`/`unowned` model (or run --
+see Phase 2C below) into real ownership — no such mechanism exists yet in
+this codebase, and neither Phase 2B nor 2C invents one; a
+`platform`/public model namespace; model deletion.
+
+### Tracking-Data Organization Isolation (Phase 2C)
+
+Extends organization-scoped enforcement from the filesystem model
+registry (Phase 2A/2B, above) to the optional MySQL tracking layer
+(`omr_runs`/`omr_params`/`omr_metrics`/`omr_tags`/`omr_version_tags`),
+without a second, possibly-diverging source of truth for the same
+question.
+
+- **Two independent ownership authorities, deliberately not merged.**
+  `ownership.json` (Phase 2A) remains the sole authority for *model*
+  ownership. `omr_runs.organization_id` (new) is the sole authority for
+  *run* ownership — **not** derived from `ownership.json`, because a
+  run's `task`/`model_name` has no required correspondence to any
+  registered model at all: logging metrics/params *during* an
+  experiment, then registering the resulting model *afterward*, is the
+  whole point of this tracking layer, so `ownership.json` frequently
+  won't exist yet (or ever) for a given run. Neither authority can
+  override the other.
+- **Where it lives**: `organization_id`/`ownership_status` columns
+  directly on `omr_runs`, populated write-once (first `log-metric`/
+  `log-param`/`log-batch` call for a given `run_id`) from the caller's
+  verified `UserContext.org_id` — the exact same "record it once, never
+  reassign" pattern Phase 2A established for models, just at the row
+  level instead of a separate file. `omr_params`/`omr_metrics`/
+  `omr_tags` get no column of their own; they inherit their boundary via
+  the existing `run_id` foreign key. `omr_version_tags` gets no column
+  either — it's keyed directly by `(task, model_name, version)`, a real
+  model's version, so it's checked against `ownership.json` instead
+  (`tracking.set_version_tag()`/`get_version_tags()` now accept the same
+  `enforce_ownership`/`requesting_org_id` kwargs api.py's `ModelRegistry`
+  methods already do).
+- **Enforced routes**: `POST /v1/runs/log-metric|log-param|log-batch`,
+  `GET /v1/runs/get|list`. `GET /v1/metrics`'s own run-history lookup is
+  deliberately **not** run-ownership-gated — its `run_id` isn't
+  caller-supplied, it's read out of the model's own `model_meta.json`,
+  reachable only because `resolve_model()` already enforced *model*
+  ownership on `(task, model_name)`; gating it a second time on
+  `omr_runs.organization_id` too would incorrectly lock a model's
+  legitimate owner out of their own run history whenever that run
+  predates this migration (see below) or was logged before the model
+  existed.
+- **Legacy rows**: every `omr_runs` row that existed before this
+  migration gets `organization_id=NULL, ownership_status='legacy_unowned'`
+  automatically (MySQL applies a column's `DEFAULT` to every existing row
+  on `ALTER TABLE ... ADD COLUMN`) — denied for every caller, including
+  one with no org context, identical to Phase 2A/2B's `legacy_unowned`
+  model policy. **Deliberately not** backfilled by matching `(task,
+  model_name)` against `ownership.json`: pre-Phase-2A this service
+  enforced no uniqueness on those strings at all, so two different
+  orgs' legacy runs could coincidentally share the same `task`/
+  `model_name` — a string-match backfill risked attributing one org's
+  historical run data to a different org. Never guessed from the
+  `actor` column either.
+- **Anti-enumeration**: every denial (cross-org, legacy, or genuinely
+  missing) raises the exact same "Run not found" `ModelNotFound`
+  already used pre-Phase-2C for a missing `run_id` — same status code,
+  same message shape.
+- **`GET /v1/runs/list`** filters at the SQL layer (`WHERE ... AND
+  (organization_id/ownership_status ...)`), not fetch-all-then-hide.
+- **Concurrency**: run creation is `INSERT IGNORE` on `run_id`'s
+  `PRIMARY KEY` — atomic at the MySQL engine level, the same reasoning
+  `ownership.json`'s `os.link`-based write-once relies on, just via a
+  different primitive.
+- **Audit**: `log_metric`/`log_param`/`log_batch` now emit audit events
+  (none existed pre-Phase-2C) carrying `organization_id` — `log_param`'s
+  event deliberately never includes the logged `value` (caller-supplied
+  `Any`, unlike a metric's plain float) to avoid a param value that
+  happens to be a secret ending up in the audit trail.
 
 ### Observability side effects of every write
 
@@ -698,18 +777,31 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   either; needs its own product/audit decision). `model.use` remains
   unchanged (flat, not resource-scoped) — org enforcement sits alongside
   it, not inside a redesigned permission model.
+- **HIPAA hardening Phase 2C** — extends organization isolation to the
+  optional MySQL tracking layer; see
+  [Tracking-Data Organization Isolation](#tracking-data-organization-isolation-phase-2c).
+  `omr_runs` gets its own independent `organization_id`/
+  `ownership_status` columns (never derived from `ownership.json` — a
+  run's task/model_name has no required correspondence to a registered
+  model); `omr_params`/`omr_metrics`/`omr_tags` inherit via the `run_id`
+  FK; `omr_version_tags` is checked against `ownership.json` instead,
+  since it IS a real model's version. Legacy rows (pre-migration)
+  become `legacy_unowned` automatically via the column's `ALTER TABLE`
+  default, denied for everyone, never guessed from `actor` or
+  backfilled by string-matching `task`/`model_name` against
+  `ownership.json` (a real, considered, and rejected option — see the
+  section above for why).
 
 ### Near Term
 
 - S3 / Azure Blob storage backends
 - Step-history sparklines in UI pulled from DB (currently single-point)
 - Model signature validation (input/output schema enforcement)
-- **HIPAA hardening Phase 2C — tracking-table scoping.** Extend
-  organization awareness to `omr_runs`/`omr_version_tags` (and by FK,
-  `omr_params`/`omr_metrics`/`omr_tags`) now that Phase 2B's enforcement
-  model is settled — deliberately not modified in Phase 2A/2B to avoid
-  introducing a second, possibly-diverging ownership source of truth
-  ahead of that decision.
+- **HIPAA hardening Phase 2D** — resource-scoped `model.use`; a safe,
+  audited administrator path to resolve a `legacy_unowned`/`unowned`
+  model *or run* into real ownership (no such mechanism exists yet, and
+  none of Phase 2B/2C invents one); `platform`/public model namespace;
+  model deletion.
 
 ### Mid Term
 

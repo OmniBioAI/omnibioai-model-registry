@@ -2101,10 +2101,49 @@ class TestDBAndTracking:
 
     def test_init_tables_executes_all_ddl(self, mock_conn):
         conn, cursor = mock_conn
-        from omnibioai_model_registry.db import _DDL, init_tables
+        from omnibioai_model_registry.db import _ALTER_DDL, _DDL, init_tables
 
         init_tables(conn)
-        assert cursor.execute.call_count == len(_DDL)
+        # Phase 2C: init_tables() now also runs the additive-only
+        # omr_runs column migration after the CREATE TABLE loop.
+        assert cursor.execute.call_count == len(_DDL) + len(_ALTER_DDL)
+
+    # ── db.py — Phase 2C additive-only omr_runs migration ───────────────────
+
+    def test_alter_ddl_idempotent_swallows_duplicate_column(self, mock_conn):
+        """A duplicate-column error (MySQL 1060) on either ALTER
+        statement -- the expected outcome on every startup after the
+        first, or immediately on a freshly created table since _DDL
+        already includes both columns -- must be silently swallowed, not
+        raised."""
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.db import _run_alter_ddl_idempotent
+
+        dup_col_error = Exception()
+        dup_col_error.args = (1060, "Duplicate column name 'organization_id'")
+        cursor.execute.side_effect = [dup_col_error, dup_col_error]
+        # Should not raise.
+        _run_alter_ddl_idempotent(conn)
+
+    def test_alter_ddl_idempotent_reraises_other_errors(self, mock_conn):
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.db import _run_alter_ddl_idempotent
+
+        other_error = Exception()
+        other_error.args = (1146, "Table 'omr_runs' doesn't exist")
+        cursor.execute.side_effect = other_error
+        with pytest.raises(Exception) as excinfo:
+            _run_alter_ddl_idempotent(conn)
+        assert excinfo.value.args[0] == 1146
+
+    def test_alter_ddl_applies_cleanly_on_first_run(self, mock_conn):
+        """No error at all (e.g. a genuinely pre-2C table): both ALTER
+        statements execute without being swallowed."""
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.db import _ALTER_DDL, _run_alter_ddl_idempotent
+
+        _run_alter_ddl_idempotent(conn)
+        assert cursor.execute.call_count == len(_ALTER_DDL)
 
     # ── tracking.py — create / finish ──────────────────────────────────────
 
@@ -2460,6 +2499,441 @@ class TestDBAndTracking:
 
         assert get_version_tags(conn, "t", "m", "v1") == {}
 
+# ============================================================
+# Phase 2C — tracking-layer organization-scoped isolation
+# ============================================================
+#
+# Pure/mocked-cursor unit coverage of tracking.py's new run-ownership
+# decision logic (mirrors TestCheckModelOwnership's structure for
+# ownership.py) and the version-tag ownership.json integration. HTTP-
+# level route coverage is in TestPhase2CHTTPRunTracking further below.
+
+
+class TestTrackingPhase2COwnership:
+    """Unit-level coverage of _evaluate_run_ownership()/
+    check_run_ownership() and the enforce_ownership gate threaded
+    through every tracking.py read/write function -- independent of the
+    HTTP layer."""
+
+    @pytest.fixture
+    def mock_conn(self):
+        from unittest.mock import MagicMock
+
+        cursor = MagicMock()
+        cursor.rowcount = 1
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cursor
+        conn.cursor.return_value.__exit__.return_value = False
+        return conn, cursor
+
+    # ── _evaluate_run_ownership (pure decision, mirrors ownership.py) ──────
+
+    def test_owned_matching_org_allowed(self):
+        from omnibioai_model_registry.tracking import _evaluate_run_ownership
+
+        result = _evaluate_run_ownership("org-A", "owned", requesting_org_id="org-A")
+        assert result.allowed is True
+        assert result.reason == "owned_by_caller"
+
+    def test_owned_different_org_denied(self):
+        from omnibioai_model_registry.tracking import _evaluate_run_ownership
+
+        result = _evaluate_run_ownership("org-A", "owned", requesting_org_id="org-B")
+        assert result.allowed is False
+        assert result.reason == "owned_by_other_org"
+
+    def test_unowned_open_mode_caller_allowed(self):
+        from omnibioai_model_registry.tracking import _evaluate_run_ownership
+
+        result = _evaluate_run_ownership(None, "unowned", requesting_org_id=None)
+        assert result.allowed is True
+        assert result.reason == "open_mode_match"
+
+    def test_unowned_real_org_caller_denied(self):
+        """A real org_id reaching into a None-org run is NOT 'everyone's'."""
+        from omnibioai_model_registry.tracking import _evaluate_run_ownership
+
+        result = _evaluate_run_ownership(None, "unowned", requesting_org_id="org-A")
+        assert result.allowed is False
+        assert result.reason == "owned_by_other_org"
+
+    def test_legacy_unowned_denied_for_every_caller(self):
+        from omnibioai_model_registry.tracking import _evaluate_run_ownership
+
+        for requesting_org_id in ("org-A", None):
+            result = _evaluate_run_ownership("org-A", "legacy_unowned", requesting_org_id=requesting_org_id)
+            assert result.allowed is False
+            assert result.reason == "legacy_unowned"
+
+    # ── check_run_ownership (DB-touching wrapper) ───────────────────────────
+
+    def test_check_run_ownership_not_found(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = None
+        from omnibioai_model_registry.tracking import check_run_ownership
+
+        result = check_run_ownership(conn, "nonexistent", requesting_org_id="org-A")
+        assert result.allowed is False
+        assert result.exists is False
+        assert result.reason == "run_not_found"
+
+    def test_check_run_ownership_owned_by_caller(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.tracking import check_run_ownership
+
+        result = check_run_ownership(conn, "r1", requesting_org_id="org-A")
+        assert result.allowed is True
+        assert result.exists is True
+
+    # ── _ensure_run (write-path pre-check) ──────────────────────────────────
+
+    def test_ensure_run_creates_new_run_attributed_to_caller(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = None  # not found -> creatable
+        from omnibioai_model_registry.tracking import _ensure_run
+
+        _ensure_run(
+            conn, "r1", "t", "m", "alice",
+            requesting_org_id="org-A", enforce_ownership=True,
+        )
+        insert_calls = [c for c in cursor.execute.call_args_list if "INSERT IGNORE" in str(c[0][0])]
+        assert len(insert_calls) == 1
+        params = insert_calls[0][0][1]
+        assert params[-2:] == ("org-A", "owned")
+
+    def test_ensure_run_new_run_no_org_is_unowned(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = None
+        from omnibioai_model_registry.tracking import _ensure_run
+
+        _ensure_run(conn, "r1", "t", "m", enforce_ownership=True, requesting_org_id=None)
+        insert_calls = [c for c in cursor.execute.call_args_list if "INSERT IGNORE" in str(c[0][0])]
+        params = insert_calls[0][0][1]
+        assert params[-2:] == (None, "unowned")
+
+    def test_ensure_run_existing_run_other_org_denied_no_insert(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import _ensure_run
+
+        with pytest.raises(ModelNotFound):
+            _ensure_run(
+                conn, "r1", "t", "m",
+                requesting_org_id="org-B", enforce_ownership=True,
+            )
+        # Security requirement: cross-org denial causes no mutation --
+        # the INSERT IGNORE must never have been attempted.
+        insert_calls = [c for c in cursor.execute.call_args_list if "INSERT IGNORE" in str(c[0][0])]
+        assert insert_calls == []
+
+    def test_ensure_run_existing_run_same_org_allowed(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.tracking import _ensure_run
+
+        _ensure_run(
+            conn, "r1", "t", "m",
+            requesting_org_id="org-A", enforce_ownership=True,
+        )
+        insert_calls = [c for c in cursor.execute.call_args_list if "INSERT IGNORE" in str(c[0][0])]
+        assert len(insert_calls) == 1
+
+    def test_ensure_run_legacy_unowned_denied(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": None, "ownership_status": "legacy_unowned"}
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import _ensure_run
+
+        with pytest.raises(ModelNotFound):
+            _ensure_run(conn, "r1", "t", "m", requesting_org_id="org-A", enforce_ownership=True)
+        with pytest.raises(ModelNotFound):
+            _ensure_run(conn, "r1", "t", "m", requesting_org_id=None, enforce_ownership=True)
+
+    def test_ensure_run_enforce_ownership_false_skips_check_entirely(self, mock_conn):
+        """Backward-compat regression guard: CLI/direct Python API callers
+        (enforce_ownership defaults to False) never issue the ownership
+        SELECT at all -- existing behavior fully unchanged."""
+        conn, cursor = mock_conn
+        from omnibioai_model_registry.tracking import _ensure_run
+
+        _ensure_run(conn, "r1", "t", "m", "alice")
+        select_calls = [c for c in cursor.execute.call_args_list if "SELECT organization_id" in str(c[0][0])]
+        assert select_calls == []
+        cursor.fetchone.assert_not_called()
+
+    # ── log_metric / log_param / set_tag thread enforcement through ────────
+
+    def test_log_metric_cross_org_denied_no_metric_insert(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import log_metric
+
+        with pytest.raises(ModelNotFound):
+            log_metric(
+                conn, "r1", "acc", 0.9, task="t", model_name="m",
+                requesting_org_id="org-B", enforce_ownership=True,
+            )
+        metric_inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_metrics" in str(c[0][0])]
+        assert metric_inserts == []
+
+    def test_log_param_cross_org_denied_no_param_insert(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import log_param
+
+        with pytest.raises(ModelNotFound):
+            log_param(
+                conn, "r1", "lr", 0.01, task="t", model_name="m",
+                requesting_org_id="org-B", enforce_ownership=True,
+            )
+        param_inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_params" in str(c[0][0])]
+        assert param_inserts == []
+
+    def test_set_tag_cross_org_denied_no_tag_insert(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import set_tag
+
+        with pytest.raises(ModelNotFound):
+            set_tag(
+                conn, "r1", "team", "attacker", task="t", model_name="m",
+                requesting_org_id="org-B", enforce_ownership=True,
+            )
+        tag_inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_tags" in str(c[0][0])]
+        assert tag_inserts == []
+
+    def test_log_metric_same_org_allowed(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.tracking import log_metric
+
+        log_metric(
+            conn, "r1", "acc", 0.9, task="t", model_name="m",
+            requesting_org_id="org-A", enforce_ownership=True,
+        )
+        metric_inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_metrics" in str(c[0][0])]
+        assert len(metric_inserts) == 1
+
+    # ── get_run enforcement (reuses the row it already fetched) ────────────
+
+    def _run_row(self, **overrides):
+        from datetime import datetime, timezone
+
+        row = {
+            "run_id": "r1", "task": "t", "model_name": "m", "status": "running",
+            "started_at": datetime.now(timezone.utc).replace(tzinfo=None), "finished_at": None,
+            "actor": None, "organization_id": "org-A", "ownership_status": "owned",
+        }
+        row.update(overrides)
+        return row
+
+    def test_get_run_same_org_allowed(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = self._run_row()
+        cursor.fetchall.return_value = []
+        from omnibioai_model_registry.tracking import get_run
+
+        result = get_run(conn, "r1", requesting_org_id="org-A", enforce_ownership=True)
+        assert result["run_id"] == "r1"
+
+    def test_get_run_other_org_denied_same_shape_as_not_found(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = self._run_row()
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import get_run
+
+        with pytest.raises(ModelNotFound, match="Run not found: r1"):
+            get_run(conn, "r1", requesting_org_id="org-B", enforce_ownership=True)
+
+    def test_get_run_legacy_unowned_denied(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = self._run_row(organization_id=None, ownership_status="legacy_unowned")
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import get_run
+
+        with pytest.raises(ModelNotFound):
+            get_run(conn, "r1", requesting_org_id="org-A", enforce_ownership=True)
+
+    def test_get_run_enforce_ownership_false_ignores_mismatch(self, mock_conn):
+        """Backward-compat regression guard: a library/CLI caller that
+        never passes enforce_ownership gets the pre-Phase-2C behavior
+        exactly -- org mismatch present in the row is simply not
+        consulted."""
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = self._run_row(organization_id="org-A")
+        cursor.fetchall.return_value = []
+        from omnibioai_model_registry.tracking import get_run
+
+        result = get_run(conn, "r1", requesting_org_id="org-B")  # enforce_ownership defaults False
+        assert result["run_id"] == "r1"
+
+    # ── list_runs query-layer filtering ──────────────────────────────────────
+
+    def test_list_runs_enforce_ownership_adds_org_filter(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchall.return_value = []
+        from omnibioai_model_registry.tracking import list_runs
+
+        list_runs(conn, "t", "m", requesting_org_id="org-A", enforce_ownership=True)
+        sql, params = cursor.execute.call_args[0]
+        assert "organization_id" in sql
+        assert "ownership_status" in sql
+        assert "org-A" in params
+
+    def test_list_runs_enforce_ownership_false_is_unfiltered_original_query(self, mock_conn):
+        """Regression guard: the exact pre-Phase-2C query/behavior for
+        library/CLI callers that don't opt in."""
+        conn, cursor = mock_conn
+        cursor.fetchall.return_value = []
+        from omnibioai_model_registry.tracking import list_runs
+
+        list_runs(conn, "t", "m")
+        sql, params = cursor.execute.call_args[0]
+        assert "organization_id" not in sql
+        assert params == ("t", "m")
+
+    # ── get_metric_history enforcement ──────────────────────────────────────
+
+    def test_get_metric_history_cross_org_denied_no_metrics_query(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import get_metric_history
+
+        with pytest.raises(ModelNotFound):
+            get_metric_history(conn, "r1", "acc", requesting_org_id="org-B", enforce_ownership=True)
+        metric_selects = [c for c in cursor.execute.call_args_list if "FROM omr_metrics" in str(c[0][0])]
+        assert metric_selects == []
+
+    def test_get_metric_history_same_org_allowed(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        cursor.fetchall.return_value = []
+        from omnibioai_model_registry.tracking import get_metric_history
+
+        result = get_metric_history(conn, "r1", "acc", requesting_org_id="org-A", enforce_ownership=True)
+        assert result == []
+
+    # ── finish_run / create_run passthrough ─────────────────────────────────
+
+    def test_finish_run_cross_org_denied_no_update(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import finish_run
+
+        with pytest.raises(ModelNotFound):
+            finish_run(conn, "r1", requesting_org_id="org-B", enforce_ownership=True)
+        update_calls = [c for c in cursor.execute.call_args_list if "UPDATE omr_runs" in str(c[0][0])]
+        assert update_calls == []
+
+    def test_create_run_threads_ownership_through(self, mock_conn):
+        conn, cursor = mock_conn
+        cursor.fetchone.return_value = None  # brand new
+        cursor.fetchall.return_value = []
+        from omnibioai_model_registry.tracking import create_run
+
+        # After _ensure_run's INSERT IGNORE, get_run's own SELECT * must
+        # return something -- simulate the freshly created row.
+        cursor.fetchone.side_effect = [None, self._run_row(organization_id="org-A")]
+        result = create_run(conn, "t", "m", "r1", requesting_org_id="org-A", enforce_ownership=True)
+        assert result["run_id"] == "r1"
+
+
+class TestVersionTagOwnership:
+    """set_version_tag()/get_version_tags() -- Phase 2C: no independent
+    organization_id column, boundary derived from the SAME
+    ownership.json Phase 2A/2B already established (real filesystem via
+    tmp_path/env_root, mocked DB cursor)."""
+
+    @pytest.fixture
+    def mock_conn(self):
+        from unittest.mock import MagicMock
+
+        cursor = MagicMock()
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cursor
+        conn.cursor.return_value.__exit__.return_value = False
+        return conn, cursor
+
+    def _own(self, env_root, task, model_name, org_id, *, legacy=False):
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        ensure_model_ownership(
+            LocalFS(), env_root, task, model_name,
+            organization_id=None if legacy else org_id,
+            actor="alice", model_pre_existing=legacy,
+        )
+
+    def test_set_version_tag_same_org_allowed(self, env_root, mock_conn):
+        conn, cursor = mock_conn
+        self._own(env_root, "t", "m", "org-A")
+        from omnibioai_model_registry.tracking import set_version_tag
+
+        set_version_tag(
+            conn, "t", "m", "v1", "team", "bioml",
+            registry_root=env_root, requesting_org_id="org-A", enforce_ownership=True,
+        )
+        inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_version_tags" in str(c[0][0])]
+        assert len(inserts) == 1
+
+    def test_set_version_tag_other_org_denied_no_insert(self, env_root, mock_conn):
+        conn, cursor = mock_conn
+        self._own(env_root, "t", "m", "org-A")
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import set_version_tag
+
+        with pytest.raises(ModelNotFound):
+            set_version_tag(
+                conn, "t", "m", "v1", "team", "attacker",
+                registry_root=env_root, requesting_org_id="org-B", enforce_ownership=True,
+            )
+        inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_version_tags" in str(c[0][0])]
+        assert inserts == []
+
+    def test_set_version_tag_legacy_unowned_denied(self, env_root, mock_conn):
+        conn, cursor = mock_conn
+        self._own(env_root, "t", "old_model", None, legacy=True)
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import set_version_tag
+
+        with pytest.raises(ModelNotFound):
+            set_version_tag(
+                conn, "t", "old_model", "v1", "team", "x",
+                registry_root=env_root, requesting_org_id="org-A", enforce_ownership=True,
+            )
+
+    def test_get_version_tags_other_org_denied(self, env_root, mock_conn):
+        conn, cursor = mock_conn
+        self._own(env_root, "t", "m", "org-A")
+        from omnibioai_model_registry.errors import ModelNotFound
+        from omnibioai_model_registry.tracking import get_version_tags
+
+        with pytest.raises(ModelNotFound):
+            get_version_tags(
+                conn, "t", "m", "v1",
+                registry_root=env_root, requesting_org_id="org-B", enforce_ownership=True,
+            )
+        selects = [c for c in cursor.execute.call_args_list if "FROM omr_version_tags" in str(c[0][0])]
+        assert selects == []
+
+    def test_set_version_tag_enforce_ownership_false_unchanged_behavior(self, env_root, mock_conn):
+        """Backward-compat regression guard: the CLI's `omr tag` command
+        (cli/main.py) calls set_version_tag() with no IAM identity at
+        all -- must remain completely unaffected."""
+        conn, cursor = mock_conn
+        self._own(env_root, "t", "m", "org-A")
+        from omnibioai_model_registry.tracking import set_version_tag
+
+        set_version_tag(conn, "t", "m", "v1", "team", "bioml")
+        inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_version_tags" in str(c[0][0])]
+        assert len(inserts) == 1
 
 # ============================================================
 # plugin_client.py — TestPluginClient
@@ -5650,3 +6124,409 @@ class TestPhase2BConcurrency:
         # once) -- concurrency didn't drop or corrupt any version.
         for i in range(n):
             assert (env_root / "tasks" / "t" / "models" / "m" / "versions" / f"v{i}").exists()
+
+
+class TestPhase2CHTTPRunTracking:
+    """HTTP-level Phase 2C coverage. Unlike the pre-existing
+    'cover the handler body' tests in TestServiceAllRoutes (which mock
+    tracking.py's functions away entirely), these mock only the DB
+    connection/cursor -- the real tracking.py ownership-decision logic
+    runs, so cross-org denial is genuinely exercised through the HTTP
+    layer end to end, not merely asserted at the unit level."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def _as_org(self, monkeypatch, org_id, *, permissions=("model.use",)):
+        from iam_client.models import UserContext
+        return self._mock_iam_client(monkeypatch, UserContext(
+            user_id=f"user-{org_id}", email=f"user@{org_id}.example",
+            roles=[], permissions=list(permissions), valid=True, org_id=org_id,
+        ))
+
+    @pytest.fixture
+    def auth_client(self, tmp_path, monkeypatch):
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+    def _fake_cursor(self):
+        from unittest.mock import MagicMock
+
+        cursor = MagicMock()
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value = cursor
+        conn.cursor.return_value.__exit__.return_value = False
+        return conn, cursor
+
+    def _owned_row(self, org_id="org-A", status="owned"):
+        from datetime import datetime, timezone
+
+        return {
+            "run_id": "r1", "task": "t", "model_name": "m", "status": "running",
+            "started_at": datetime.now(timezone.utc).replace(tzinfo=None), "finished_at": None,
+            "actor": None, "organization_id": org_id, "ownership_status": status,
+        }
+
+    # ── log-metric: create + cross-org denial ───────────────────────────────
+
+    def test_log_metric_org_a_creates_new_run(self, auth_client, monkeypatch):
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = None  # genuinely new run_id
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.post(
+                "/v1/runs/log-metric",
+                json={"task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.9, "step": 0},
+                headers={"Authorization": "Bearer org-A"},
+            )
+        assert r.status_code == 200
+        inserts = [c for c in cursor.execute.call_args_list if "INSERT IGNORE" in str(c[0][0])]
+        assert inserts[0][0][1][-2:] == ("org-A", "owned")
+
+    def test_log_metric_org_b_denied_on_org_a_run(self, auth_client, monkeypatch):
+        """Security requirements #1/#6: org B cannot append metrics to
+        org A's run."""
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        self._as_org(monkeypatch, "org-B")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.post(
+                "/v1/runs/log-metric",
+                json={"task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.1, "step": 0},
+                headers={"Authorization": "Bearer org-B"},
+            )
+        assert r.status_code == 400
+        metric_inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_metrics" in str(c[0][0])]
+        assert metric_inserts == []
+
+    def test_log_param_org_b_denied_on_org_a_run(self, auth_client, monkeypatch):
+        """Security requirement #2: org B cannot append params to org A's
+        run."""
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        self._as_org(monkeypatch, "org-B")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.post(
+                "/v1/runs/log-param",
+                json={"task": "t", "model_name": "m", "run_id": "r1", "key": "lr", "value": 0.01},
+                headers={"Authorization": "Bearer org-B"},
+            )
+        assert r.status_code == 400
+        param_inserts = [c for c in cursor.execute.call_args_list if "INSERT INTO omr_params" in str(c[0][0])]
+        assert param_inserts == []
+
+    def test_log_batch_org_b_denied_on_org_a_run_nothing_written(self, auth_client, monkeypatch):
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        self._as_org(monkeypatch, "org-B")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.post(
+                "/v1/runs/log-batch",
+                json={
+                    "task": "t", "model_name": "m", "run_id": "r1",
+                    "metrics": [{"key": "acc", "value": 0.1, "step": 0}],
+                    "params": {"lr": 0.01}, "tags": {"team": "attacker"},
+                },
+                headers={"Authorization": "Bearer org-B"},
+            )
+        assert r.status_code == 400
+        mutating = [
+            c for c in cursor.execute.call_args_list
+            if any(t in str(c[0][0]) for t in ("INSERT INTO omr_metrics", "INSERT INTO omr_params", "INSERT INTO omr_tags"))
+        ]
+        assert mutating == []
+
+    def test_log_metric_same_org_continues_to_work(self, auth_client, monkeypatch):
+        """Security requirement #4: org A can keep reading/writing its own
+        run."""
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.post(
+                "/v1/runs/log-metric",
+                json={"task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.95, "step": 1},
+                headers={"Authorization": "Bearer org-A"},
+            )
+        assert r.status_code == 200
+
+    # ── runs/get: cross-org denial is an anti-enumeration oracle ───────────
+
+    def test_runs_get_org_b_denied_same_shape_as_missing_run(self, auth_client, monkeypatch):
+        """Security requirement #3: a cross-org run_id must not become an
+        enumeration oracle -- same status/response shape as a genuinely
+        missing run_id."""
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+
+        conn1, cursor1 = self._fake_cursor()
+        cursor1.fetchone.return_value = self._owned_row(org_id="org-A")
+        self._as_org(monkeypatch, "org-B")
+        with patch.object(_svc, "_get_db_conn", return_value=conn1):
+            r_other_org = client.get(
+                "/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"},
+                headers={"Authorization": "Bearer org-B"},
+            )
+
+        conn2, cursor2 = self._fake_cursor()
+        cursor2.fetchone.return_value = None
+        with patch.object(_svc, "_get_db_conn", return_value=conn2):
+            r_missing = client.get(
+                "/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"},
+                headers={"Authorization": "Bearer org-B"},
+            )
+
+        assert r_other_org.status_code == r_missing.status_code == 400
+        assert r_other_org.json() == r_missing.json()
+        # No params/tags/metrics query ever issued once ownership denies.
+        extra = [
+            c for c in cursor1.execute.call_args_list
+            if any(t in str(c[0][0]) for t in ("FROM omr_params", "FROM omr_tags", "FROM omr_metrics"))
+        ]
+        assert extra == []
+
+    def test_runs_get_legacy_unowned_denied_for_real_org(self, auth_client, monkeypatch):
+        """Security requirement #10 (legacy/unowned policy)."""
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = self._owned_row(org_id=None, status="legacy_unowned")
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.get(
+                "/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"},
+                headers={"Authorization": "Bearer org-A"},
+            )
+        assert r.status_code == 400
+
+    def test_runs_get_same_org_allowed(self, auth_client, monkeypatch):
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = self._owned_row(org_id="org-A")
+        cursor.fetchall.return_value = []
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.get(
+                "/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"},
+                headers={"Authorization": "Bearer org-A"},
+            )
+        assert r.status_code == 200
+        assert r.json()["run_id"] == "r1"
+
+    # ── runs/list: query-layer org filtering ────────────────────────────────
+
+    def test_runs_list_applies_org_filter_at_query_layer(self, auth_client, monkeypatch):
+        """Security requirement: cross-org task/model lookup is blocked --
+        the SQL itself is scoped to the caller's org, not filtered after
+        fetching everyone's runs."""
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchall.return_value = []
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.get(
+                "/v1/runs/list", params={"task": "t", "model": "m"},
+                headers={"Authorization": "Bearer org-A"},
+            )
+        assert r.status_code == 200
+        sql, params = cursor.execute.call_args[0]
+        assert "organization_id" in sql
+        assert "org-A" in params
+
+    # ── header/query/body spoofing cannot bypass ─────────────────────────────
+
+    def test_spoofed_x_organization_id_header_cannot_bypass_log_metric(self, auth_client, monkeypatch):
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
+        self._as_org(monkeypatch, "org-B")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.post(
+                "/v1/runs/log-metric",
+                json={"task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.1, "step": 0},
+                headers={"Authorization": "Bearer org-B", "X-Organization-ID": "org-A", "X-Team-ID": "team-A"},
+            )
+        assert r.status_code == 400
+
+    def test_query_param_organization_id_cannot_bypass_runs_get(self, auth_client, monkeypatch):
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = self._owned_row(org_id="org-A")
+        self._as_org(monkeypatch, "org-B")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.get(
+                "/v1/runs/get",
+                params={"task": "t", "model": "m", "run_id": "r1", "organization_id": "org-A"},
+                headers={"Authorization": "Bearer org-B"},
+            )
+        assert r.status_code == 400
+
+    def test_body_organization_id_cannot_bypass_log_metric(self, auth_client, monkeypatch):
+        """A spoofed body organization_id must not even influence which
+        org a brand-new run gets attributed to."""
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = None
+        self._as_org(monkeypatch, "org-B")
+        with patch.object(_svc, "_get_db_conn", return_value=conn):
+            r = client.post(
+                "/v1/runs/log-metric",
+                json={
+                    "task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.1, "step": 0,
+                    "organization_id": "org-A",
+                },
+                headers={"Authorization": "Bearer org-B"},
+            )
+        assert r.status_code == 200
+        inserts = [c for c in cursor.execute.call_args_list if "INSERT IGNORE" in str(c[0][0])]
+        assert inserts[0][0][1][-2:] == ("org-B", "owned")  # real JWT org, not the spoofed body field
+
+    # ── audit propagation ─────────────────────────────────────────────────
+
+    def test_log_metric_audit_carries_organization_id(self, auth_client, monkeypatch):
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = None
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_audit") as mock_audit:
+            with patch.object(_svc, "_get_db_conn", return_value=conn):
+                r = client.post(
+                    "/v1/runs/log-metric",
+                    json={"task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.9, "step": 0},
+                    headers={"Authorization": "Bearer org-A"},
+                )
+        assert r.status_code == 200
+        mock_audit.log_event.assert_called_once()
+        _, kwargs = mock_audit.log_event.call_args
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+
+    def test_log_param_audit_never_includes_value(self, auth_client, monkeypatch):
+        """Params are caller-supplied Any and could contain something
+        sensitive -- only the key name is ever audited."""
+        from unittest.mock import patch
+        client, _ = auth_client
+        import omnibioai_model_registry.service.app.main as _svc
+        conn, cursor = self._fake_cursor()
+        cursor.fetchone.return_value = None
+        self._as_org(monkeypatch, "org-A")
+        with patch.object(_svc, "_audit") as mock_audit:
+            with patch.object(_svc, "_get_db_conn", return_value=conn):
+                r = client.post(
+                    "/v1/runs/log-param",
+                    json={"task": "t", "model_name": "m", "run_id": "r1", "key": "api_key", "value": "sk-super-secret"},
+                    headers={"Authorization": "Bearer org-A"},
+                )
+        assert r.status_code == 200
+        _, kwargs = mock_audit.log_event.call_args
+        assert "sk-super-secret" not in json.dumps(kwargs["metadata"])
+        assert kwargs["metadata"]["organization_id"] == "org-A"
+        assert kwargs["metadata"]["key"] == "api_key"
+
+    # ── Phase 1 auth still required on the write routes ─────────────────────
+
+    def test_log_metric_without_authorization_returns_401(self, auth_client):
+        client, _ = auth_client
+        r = client.post("/v1/runs/log-metric", json={
+            "task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.1, "step": 0,
+        })
+        assert r.status_code == 401
+
+    def test_log_param_without_authorization_returns_401(self, auth_client):
+        client, _ = auth_client
+        r = client.post("/v1/runs/log-param", json={
+            "task": "t", "model_name": "m", "run_id": "r1", "key": "lr", "value": 0.1,
+        })
+        assert r.status_code == 401
+
+    def test_log_batch_without_authorization_returns_401(self, auth_client):
+        client, _ = auth_client
+        r = client.post("/v1/runs/log-batch", json={"task": "t", "model_name": "m", "run_id": "r1"})
+        assert r.status_code == 401
+
+    # ── filesystem-only mode (DB_HOST unset) remains functional ─────────────
+
+    def test_runs_log_metric_returns_503_without_db_configured(self, auth_client, monkeypatch):
+        """Security requirement: filesystem-only deployments remain
+        completely functional -- a DB-backed route degrades to 503
+        (pre-existing behavior), it does not error or bypass auth."""
+        monkeypatch.delenv("DB_HOST", raising=False)
+        client, _ = auth_client
+        self._as_org(monkeypatch, "org-A")
+        r = client.post(
+            "/v1/runs/log-metric",
+            json={"task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.1, "step": 0},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 503
+
+    def test_filesystem_only_mode_register_and_resolve_unaffected(self, tmp_path, monkeypatch):
+        """The core filesystem model registry (Phase 2A/2B) is completely
+        untouched by Phase 2C -- open mode, no DB at all."""
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.delenv("AUTH_ENABLED", raising=False)
+        monkeypatch.delenv("DB_HOST", raising=False)
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        client = TestClient(_svc.app, raise_server_exceptions=False)
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        r = client.post("/v1/register", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": str(src), "metadata": {},
+        })
+        assert r.status_code == 200
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"})
+        assert r.status_code == 200

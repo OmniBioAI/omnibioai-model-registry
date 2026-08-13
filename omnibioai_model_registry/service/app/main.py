@@ -532,12 +532,25 @@ _VALID_STAGES = frozenset({"none", "staging", "production", "archived"})
 
 
 @app.post(f"{DEFAULT_PREFIX}/runs/log-metric")
-def api_log_metric(req: LogMetricRequest, actor: str = Depends(require_auth)):
+def api_log_metric(req: LogMetricRequest, user: UserContext = Depends(require_write_auth_with_context)):
     conn = _get_db_conn()
     try:
         _tracking.log_metric(
             conn, req.run_id, req.key, req.value, req.step,
             task=req.task, model_name=req.model_name,
+            # Phase 2C: a run_id already owned by a different org is
+            # denied (ModelNotFound -> 400) before any INSERT; a
+            # genuinely new run_id is attributed to this org. See
+            # tracking.py's module docstring for why this is its own
+            # independent ownership record, not derived from
+            # ownership.json.
+            requesting_org_id=user.org_id, enforce_ownership=True,
+        )
+        _audit.log_event(
+            "log_metric", _actor_identifier(user),
+            f"{req.task}/{req.model_name}#{req.run_id}",
+            task=req.task, model_name=req.model_name,
+            metadata={"organization_id": user.org_id, "run_id": req.run_id, "key": req.key, "value": req.value},
         )
         return {"ok": True}
     except Exception as e:
@@ -547,12 +560,22 @@ def api_log_metric(req: LogMetricRequest, actor: str = Depends(require_auth)):
 
 
 @app.post(f"{DEFAULT_PREFIX}/runs/log-param")
-def api_log_param(req: LogParamRequest, actor: str = Depends(require_auth)):
+def api_log_param(req: LogParamRequest, user: UserContext = Depends(require_write_auth_with_context)):
     conn = _get_db_conn()
     try:
         _tracking.log_param(
             conn, req.run_id, req.key, req.value,
             task=req.task, model_name=req.model_name,
+            requesting_org_id=user.org_id, enforce_ownership=True,
+        )
+        # Deliberately no `value` in audit metadata -- param values are
+        # caller-supplied Any (unlike log-metric's plain float) and could
+        # contain something sensitive; only the key name is recorded.
+        _audit.log_event(
+            "log_param", _actor_identifier(user),
+            f"{req.task}/{req.model_name}#{req.run_id}",
+            task=req.task, model_name=req.model_name,
+            metadata={"organization_id": user.org_id, "run_id": req.run_id, "key": req.key},
         )
         return {"ok": True}
     except Exception as e:
@@ -562,18 +585,36 @@ def api_log_param(req: LogParamRequest, actor: str = Depends(require_auth)):
 
 
 @app.post(f"{DEFAULT_PREFIX}/runs/log-batch")
-def api_log_batch(req: LogBatchRequest, actor: str = Depends(require_auth)):
+def api_log_batch(req: LogBatchRequest, user: UserContext = Depends(require_write_auth_with_context)):
     conn = _get_db_conn()
     try:
         for m in req.metrics:
             _tracking.log_metric(
                 conn, req.run_id, m["key"], float(m["value"]), int(m.get("step", 0)),
                 task=req.task, model_name=req.model_name,
+                requesting_org_id=user.org_id, enforce_ownership=True,
             )
         if req.params:
-            _tracking.log_params(conn, req.run_id, req.params, task=req.task, model_name=req.model_name)
+            _tracking.log_params(
+                conn, req.run_id, req.params, task=req.task, model_name=req.model_name,
+                requesting_org_id=user.org_id, enforce_ownership=True,
+            )
         if req.tags:
-            _tracking.set_tags(conn, req.run_id, req.tags, task=req.task, model_name=req.model_name)
+            _tracking.set_tags(
+                conn, req.run_id, req.tags, task=req.task, model_name=req.model_name,
+                requesting_org_id=user.org_id, enforce_ownership=True,
+            )
+        _audit.log_event(
+            "log_batch", _actor_identifier(user),
+            f"{req.task}/{req.model_name}#{req.run_id}",
+            task=req.task, model_name=req.model_name,
+            metadata={
+                "organization_id": user.org_id, "run_id": req.run_id,
+                "metrics_count": len(req.metrics),
+                "param_keys": list(req.params.keys()),
+                "tag_keys": list(req.tags.keys()),
+            },
+        )
         return {"ok": True}
     except Exception as e:
         _handle_registry_error(e)
@@ -582,13 +623,17 @@ def api_log_batch(req: LogBatchRequest, actor: str = Depends(require_auth)):
 
 
 @app.get(f"{DEFAULT_PREFIX}/runs/get", response_model=RunGetResponse)
-def api_run_get(task: str, model: str, run_id: str, actor: str = Depends(require_auth)):
+def api_run_get(task: str, model: str, run_id: str, user: UserContext = Depends(require_auth_with_context)):
     conn = _get_db_conn()
     try:
-        data = _tracking.get_run(conn, run_id)
+        data = _tracking.get_run(
+            conn, run_id, requesting_org_id=user.org_id, enforce_ownership=True,
+        )
         history: Dict[str, List[Any]] = {}
         for key in data.get("metrics_summary", {}).keys():
-            history[key] = _tracking.get_metric_history(conn, run_id, key)
+            history[key] = _tracking.get_metric_history(
+                conn, run_id, key, requesting_org_id=user.org_id, enforce_ownership=True,
+            )
         data["metric_history"] = history
         return RunGetResponse(ok=True, **data)
     except Exception as e:
@@ -598,14 +643,24 @@ def api_run_get(task: str, model: str, run_id: str, actor: str = Depends(require
 
 
 @app.get(f"{DEFAULT_PREFIX}/runs/list")
-def api_runs_list(task: str, model: str, actor: str = Depends(require_auth)):
+def api_runs_list(task: str, model: str, user: UserContext = Depends(require_auth_with_context)):
     conn = _get_db_conn()
     try:
-        basic = _tracking.list_runs(conn, task, model)
+        # Phase 2C: org-filtered at the query layer (tracking.list_runs)
+        # -- another org's run is never fetched, not fetched-then-hidden.
+        basic = _tracking.list_runs(
+            conn, task, model, requesting_org_id=user.org_id, enforce_ownership=True,
+        )
         result = []
         for r in basic:
             try:
-                full = _tracking.get_run(conn, r["run_id"])
+                # Redundant with the list_runs filter above in the
+                # common case, kept for defense-in-depth consistency
+                # (don't rely solely on the caller having filtered
+                # correctly upstream).
+                full = _tracking.get_run(
+                    conn, r["run_id"], requesting_org_id=user.org_id, enforce_ownership=True,
+                )
                 result.append(full)
             except Exception:
                 result.append(r)
@@ -649,6 +704,17 @@ def api_metrics(task: str, ref: str, user: UserContext = Depends(require_auth_wi
     run_id: Optional[str] = (meta.get("lineage") or {}).get("run_id")
     run_history: Dict[str, list] = {}
 
+    # Phase 2C: deliberately NOT run-ownership-gated here, unlike
+    # /v1/runs/get|list. `run_id` is not caller-supplied on this route --
+    # it's read out of `meta`, this model's OWN model_meta.json, only
+    # reachable because resolve_model() above already enforced ownership
+    # on (task, model_name). Gating this second, transitively-safe lookup
+    # on omr_runs.organization_id too would incorrectly lock the model's
+    # legitimate owner out of their own run history whenever that run
+    # predates the Phase 2C migration (organization_id=NULL,
+    # ownership_status='legacy_unowned' -- see db.py's _ALTER_DDL
+    # comment) or was logged before this model existed at all (the
+    # ordinary log-during-experiment-then-register-after workflow).
     if run_id and _db is not None:
         try:
             conn = _db.get_connection()
@@ -731,7 +797,15 @@ def api_set_tag(req: SetTagRequest, user: UserContext = Depends(require_write_au
         try:
             conn = _db.get_connection()
             try:
-                _tracking.set_version_tag(conn, req.task, req.model_name, req.version, req.key, req.value)
+                # Phase 2C: defense-in-depth -- _require_model_ownership()
+                # above already gates this whole route, but
+                # set_version_tag() re-derives from the same
+                # ownership.json rather than trusting only the route.
+                _tracking.set_version_tag(
+                    conn, req.task, req.model_name, req.version, req.key, req.value,
+                    registry_root=Path(registry.root), requesting_org_id=user.org_id,
+                    enforce_ownership=True,
+                )
             finally:
                 conn.close()
         except Exception:
