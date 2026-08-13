@@ -22,7 +22,6 @@ from omnibioai_model_registry.errors import ModelRegistryError, RegistryNotConfi
 from omnibioai_model_registry.config import load_config
 from omnibioai_model_registry.auth import (
     _actor_identifier,
-    require_auth,
     require_auth_with_context,
     require_write_auth_with_context,
 )
