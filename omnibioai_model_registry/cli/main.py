@@ -17,15 +17,22 @@ from omnibioai_model_registry.errors import InvalidStageTransition, ModelRegistr
 
 
 def cmd_list(args):
+    from omnibioai_model_registry.package import layout as L
+
     registry = ModelRegistry.from_env()
     root = registry.root
 
-    task_root = root / "tasks" / args.task / "models"
-    if not task_root.exists():
+    # Uses layout.py's task_root() (validated, see path_safety.py)
+    # rather than a raw join, consistent with every other path this
+    # service constructs -- not a meaningfully different trust boundary
+    # for a local CLI operator, but keeps a single safe primitive
+    # everywhere rather than a hand-rolled exception here.
+    models_dir = L.task_root(root, args.task) / "models"
+    if not models_dir.exists():
         print(f"No models found for task '{args.task}'")
         return
 
-    for model_dir in sorted(task_root.iterdir()):
+    for model_dir in sorted(models_dir.iterdir()):
         if model_dir.is_dir():
             print(model_dir.name)
 

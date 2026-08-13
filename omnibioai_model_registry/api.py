@@ -13,6 +13,7 @@ from .ownership import check_model_ownership, ensure_model_ownership
 from .package import layout as L
 from .package.manifest import verify_sha256_manifest, write_sha256_manifest
 from .package.validate import validate_package_files
+from .path_safety import assert_contained
 from .refs import parse_model_ref
 from .storage.localfs import LocalFS
 
@@ -65,6 +66,62 @@ class ModelRegistry:
         if not check.allowed:
             raise ModelNotFound(f"Model not found: task={task}, model_name={model_name}")
 
+    def _validate_artifacts_dir(self, artifacts_dir: Path) -> None:
+        """Security PR (filesystem path hardening): `artifacts_dir` is a
+        server-local directory path, not an identifier subject to
+        safe_component()'s allowlist -- it legitimately needs to be
+        anywhere a training job wrote its output on this server's
+        filesystem, so a fixed character allowlist doesn't apply here
+        the way it does to task/model_name/version/alias.
+
+        Two checks, deliberately different in nature:
+
+        1. ALWAYS enforced, no configuration involved: `artifacts_dir`
+           may never resolve inside this registry's own root. Without
+           this, any authenticated model.use holder could point
+           artifacts_dir at an *already-registered* version directory
+           -- including one belonging to a different organization -- and
+           have copy_tree() ingest those files into a brand-new
+           registration they own, then read them back via their own,
+           legitimately-authorized /v1/artifacts or /v1/resolve. That
+           would be a complete, silent bypass of every Phase 2A-2D
+           ownership check via a path no ownership check ever
+           inspects -- never a legitimate use case under any deployment,
+           so this is a structural safety rule, not a policy choice.
+
+        2. OPTIONAL, operator-configured: if
+           OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS is set,
+           artifacts_dir must resolve under one of the listed roots.
+           Unset (the default) is intentionally unrestricted --
+           preserves every existing deployment's behavior unchanged.
+           This service has no established convention for where
+           training-output directories live on a given server, so a
+           mandatory default allowlist would be inventing a policy this
+           codebase has no basis to pick; operators who want this
+           narrowed can opt in.
+        """
+        try:
+            artifacts_dir.relative_to(self.root)
+        except ValueError:
+            pass
+        else:
+            raise ValidationError(
+                "artifacts_dir must not be inside the model registry root"
+            )
+
+        allowed_roots = self.cfg.artifacts_allowed_roots
+        if allowed_roots:
+            for allowed in allowed_roots:
+                try:
+                    artifacts_dir.relative_to(Path(allowed).expanduser().resolve())
+                    return
+                except ValueError:
+                    continue
+            raise ValidationError(
+                "artifacts_dir is not under an allowed root "
+                "(OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS)"
+            )
+
     def register_model(
         self,
         task: str,
@@ -102,6 +159,7 @@ class ModelRegistry:
         artifacts_dir = Path(artifacts_dir).resolve()
         if not artifacts_dir.exists():
             raise ValidationError(f"artifacts_dir does not exist: {artifacts_dir}")
+        self._validate_artifacts_dir(artifacts_dir)
 
         # Snapshot BEFORE _ensure_model_dirs() creates the model's
         # directories -- this is the only reliable signal for whether
@@ -139,6 +197,12 @@ class ModelRegistry:
         self._ensure_model_dirs(task, model_name)
 
         dst = L.version_dir(self.root, task, model_name, version)
+        # Defense-in-depth: dst is already lexically incapable of
+        # escaping self.root (task/model_name/version were validated by
+        # safe_component() inside version_dir() above), but this
+        # re-verifies against the real, symlink-resolved filesystem
+        # location before any write -- see path_safety.py.
+        assert_contained(dst, self.root, field_name="version")
         if self.backend.exists(dst):
             raise VersionAlreadyExists(
                 f"Model version already exists: {task}/{model_name}/{version}"
@@ -244,6 +308,11 @@ class ModelRegistry:
             version = ref.selector
 
         vdir = L.version_dir(self.root, task, ref.model_name, version)
+        # Defense-in-depth (see register_model's identical comment) --
+        # `version` here may have come from an alias file's own content
+        # rather than directly from the caller, but version_dir() already
+        # validated it as a path component either way.
+        assert_contained(vdir, self.root, field_name="version")
         if not vdir.exists():
             raise ModelNotFound(
                 f"Model not found: task={task}, ref={model_ref} (resolved version={version})"
@@ -295,8 +364,11 @@ class ModelRegistry:
             "reason": reason,
         }
 
+        alias_file = L.alias_path(self.root, task, model_name, alias)
+        # Defense-in-depth (see register_model's identical comment).
+        assert_contained(alias_file, self.root, field_name="alias")
         self.backend.atomic_write_text(
-            L.alias_path(self.root, task, model_name, alias),
+            alias_file,
             json.dumps(payload, indent=2) + "\n",
         )
 

@@ -6783,3 +6783,727 @@ class TestPhase2DFinalConsistencyAudit:
             ("models", client.get("/v1/models", headers=headers)),
         ]:
             assert resp.status_code == 200, f"{name} unexpectedly denied for the owning org: {resp.text}"
+
+
+# ============================================================
+# Filesystem path traversal & storage boundary hardening
+# ============================================================
+#
+# Standalone security PR following the Phase 2A-2D tenant-isolation
+# series. Establishes: no user-controlled task/model_name/version/
+# alias/run_id/metric_key may cause any filesystem operation to resolve
+# outside OMNIBIOAI_MODEL_REGISTRY_ROOT. See path_safety.py's module
+# docstring for the full design.
+
+
+class TestPathSafetyModule:
+    """Pure unit coverage of path_safety.py -- independent of layout.py,
+    api.py, or the HTTP layer."""
+
+    # ── safe_component: valid identifiers ───────────────────────────────────
+
+    @pytest.mark.parametrize("value", [
+        "t", "m", "v1", "human_pbmc", "2026-02-13_001", "staging",
+        "production", "none", "archived", "a" * 128,
+        "model-name_with.dots-and-hyphens123",
+    ])
+    def test_safe_component_accepts_legitimate_identifiers(self, value):
+        from omnibioai_model_registry.path_safety import safe_component
+        assert safe_component(value, "field") == value
+
+    # ── safe_component: rejected variants -- do not assume '..' alone is enough ──
+
+    @pytest.mark.parametrize("value,label", [
+        ("..", "dotdot"),
+        (".", "dot"),
+        ("../", "dotdot_slash"),
+        ("../../", "dotdot_dotdot_slash"),
+        ("../../../etc/passwd", "nested_traversal"),
+        ("foo/../bar", "embedded_traversal"),
+        ("/etc/passwd", "absolute_posix"),
+        ("/", "bare_root"),
+        ("//etc/passwd", "repeated_leading_slash"),
+        ("foo//bar", "repeated_separator"),
+        ("foo/bar", "embedded_slash"),
+        ("..\\..\\windows", "backslash_traversal"),
+        ("foo\\bar", "backslash_separator"),
+        ("", "empty"),
+        ("   ", "whitespace_only"),
+        ("foo bar", "embedded_space"),
+        ("foo\tbar", "embedded_tab"),
+        ("foo\nbar", "embedded_newline"),
+        ("foo\x00bar", "embedded_nul"),
+        (".hidden", "leading_dot"),
+        ("trailing.", "trailing_dot"),
+        ("%2e%2e%2f", "url_encoded_literal_not_decoded"),
+        ("a" * 200, "too_long"),
+    ])
+    def test_safe_component_rejects_dangerous_variants(self, value, label):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.path_safety import safe_component
+
+        with pytest.raises(PathTraversalError):
+            safe_component(value, "field")
+
+    def test_safe_component_error_never_contains_the_value(self):
+        """The error message names only the field, never the (possibly
+        attacker-crafted) value itself -- avoids reflecting arbitrary
+        input back in any response."""
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.path_safety import safe_component
+
+        secret_looking_value = "../../../etc/shadow"
+        with pytest.raises(PathTraversalError) as excinfo:
+            safe_component(secret_looking_value, "task")
+        assert secret_looking_value not in str(excinfo.value)
+        assert "task" in str(excinfo.value)
+
+    def test_safe_component_rejects_non_string(self):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.path_safety import safe_component
+
+        with pytest.raises(PathTraversalError):
+            safe_component(None, "field")  # type: ignore[arg-type]
+
+    # ── assert_contained ────────────────────────────────────────────────────
+
+    def test_assert_contained_allows_nested_existing_path(self, tmp_path):
+        from omnibioai_model_registry.path_safety import assert_contained
+
+        root = tmp_path / "root"
+        nested = root / "tasks" / "t" / "models" / "m"
+        nested.mkdir(parents=True)
+        assert assert_contained(nested, root) == nested
+
+    def test_assert_contained_allows_nested_nonexistent_path(self, tmp_path):
+        """Path.resolve(strict=False) must work for a path that doesn't
+        exist yet -- the common case (creating a brand-new version)."""
+        from omnibioai_model_registry.path_safety import assert_contained
+
+        root = tmp_path / "root"
+        root.mkdir()
+        not_yet_created = root / "tasks" / "t" / "models" / "m" / "versions" / "v1"
+        assert assert_contained(not_yet_created, root) == not_yet_created
+
+    def test_assert_contained_rejects_escape(self, tmp_path):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.path_safety import assert_contained
+
+        root = tmp_path / "root"
+        root.mkdir()
+        outside = tmp_path / "elsewhere"
+        with pytest.raises(PathTraversalError):
+            assert_contained(outside, root)
+
+    def test_assert_contained_follows_legitimate_symlinked_root(self, tmp_path):
+        """Symlink-AWARE, not symlink-hostile: a symlinked registry root
+        is followed, and paths genuinely nested under its real target
+        are still accepted."""
+        from omnibioai_model_registry.path_safety import assert_contained
+
+        real_root = tmp_path / "real_root"
+        real_root.mkdir()
+        symlinked_root = tmp_path / "root_symlink"
+        symlinked_root.symlink_to(real_root, target_is_directory=True)
+
+        nested = symlinked_root / "tasks" / "t"
+        assert assert_contained(nested, symlinked_root) == nested
+
+    def test_assert_contained_rejects_symlink_escape(self, tmp_path):
+        """A symlink *inside* the tree pointing outside the root must
+        still be caught -- Path.resolve() follows it to its real,
+        out-of-bounds destination."""
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.path_safety import assert_contained
+
+        root = tmp_path / "root"
+        root.mkdir()
+        outside_target = tmp_path / "secret"
+        outside_target.mkdir()
+        escape_link = root / "escape"
+        escape_link.symlink_to(outside_target, target_is_directory=True)
+
+        with pytest.raises(PathTraversalError):
+            assert_contained(escape_link, root)
+
+
+class TestLayoutPathSafetyIntegration:
+    """package/layout.py's builder functions -- the single choke point
+    every filesystem path in this codebase is constructed through --
+    reject bad components for every identifier kind."""
+
+    def test_task_root_rejects_traversal(self):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.package import layout as L
+
+        with pytest.raises(PathTraversalError):
+            L.task_root(Path("/registry"), "../../etc")
+
+    def test_model_root_rejects_traversal_in_model_name(self):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.package import layout as L
+
+        with pytest.raises(PathTraversalError):
+            L.model_root(Path("/registry"), "t", "../../etc")
+
+    def test_version_dir_rejects_traversal_in_version(self):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.package import layout as L
+
+        with pytest.raises(PathTraversalError):
+            L.version_dir(Path("/registry"), "t", "m", "../../../etc")
+
+    def test_alias_path_rejects_traversal_in_alias(self):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.package import layout as L
+
+        with pytest.raises(PathTraversalError):
+            L.alias_path(Path("/registry"), "t", "m", "../../etc/passwd")
+
+    def test_run_dir_rejects_traversal_in_run_id(self):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.package import layout as L
+
+        with pytest.raises(PathTraversalError):
+            L.run_dir(Path("/registry"), "t", "m", "../../../etc")
+
+    def test_run_metric_log_path_rejects_traversal_in_metric_key(self):
+        from omnibioai_model_registry.errors import PathTraversalError
+        from omnibioai_model_registry.package import layout as L
+
+        with pytest.raises(PathTraversalError):
+            L.run_metric_log_path(Path("/registry"), "t", "m", "r1", "../../etc/passwd")
+
+    def test_legitimate_nested_names_still_work(self):
+        """Regression: realistic multi-part identifiers with hyphens/
+        underscores/digits keep working end to end through every
+        builder."""
+        from omnibioai_model_registry.package import layout as L
+
+        root = Path("/registry")
+        vdir = L.version_dir(root, "celltype_sc", "human-pbmc_v2", "2026-06-14_001")
+        assert vdir == root / "tasks/celltype_sc/models/human-pbmc_v2/versions/2026-06-14_001"
+
+
+class TestRegisterModelPathSafety:
+    """api.py-level: register_model() with malicious identifiers and
+    artifacts_dir handling."""
+
+    def test_traversal_in_model_name_rejected_no_directory_created(self, env_root, tmp_path):
+        from omnibioai_model_registry import register_model
+        from omnibioai_model_registry.errors import PathTraversalError
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        with pytest.raises(PathTraversalError):
+            register_model(
+                task="t", model_name="../../../tmp/evil", version="v1",
+                artifacts_dir=str(src), metadata={}, set_alias=None,
+            )
+        # Security requirement: denial causes no filesystem mutation --
+        # nothing was created outside (or even inside) the registry root.
+        assert not (Path("/tmp/evil")).exists()
+        assert not (env_root / "tasks").exists()
+
+    def test_traversal_in_task_rejected(self, env_root, tmp_path):
+        from omnibioai_model_registry import register_model
+        from omnibioai_model_registry.errors import PathTraversalError
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        with pytest.raises(PathTraversalError):
+            register_model(
+                task="../../etc", model_name="m", version="v1",
+                artifacts_dir=str(src), metadata={}, set_alias=None,
+            )
+
+    def test_traversal_in_version_rejected(self, env_root, tmp_path):
+        from omnibioai_model_registry import register_model
+        from omnibioai_model_registry.errors import PathTraversalError
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        with pytest.raises(PathTraversalError):
+            register_model(
+                task="t", model_name="m", version="../../../etc/evil",
+                artifacts_dir=str(src), metadata={}, set_alias=None,
+            )
+
+    def test_valid_registration_still_works(self, env_root, tmp_path):
+        """Regression: ordinary registration is completely unaffected."""
+        from omnibioai_model_registry import register_model
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        out = register_model(
+            task="t", model_name="human_pbmc", version="2026-06-14_001",
+            artifacts_dir=str(src), metadata={}, set_alias="latest",
+        )
+        assert out["ok"] is True
+
+    # ── artifacts_dir: cross-org / cross-model exfiltration via ingestion ──
+
+    def test_artifacts_dir_inside_registry_root_rejected(self, env_root, tmp_path):
+        """Security requirement: artifacts_dir may never point at an
+        already-registered version directory inside the registry root
+        -- the exact vector that would otherwise let a caller ingest
+        (and then read back via their own legitimately-owned model) any
+        other org's already-stored artifacts."""
+        from omnibioai_model_registry import register_model
+        from omnibioai_model_registry.errors import ValidationError
+        from omnibioai_model_registry.package import layout as L
+
+        # Org A's real, already-registered model.
+        src = tmp_path / "src_a"
+        _make_minimal_package(src)
+        register_model(
+            task="t", model_name="org_a_model", version="v1",
+            artifacts_dir=str(src), metadata={}, set_alias=None,
+            organization_id="org-A",
+        )
+        org_a_version_dir = L.version_dir(env_root, "t", "org_a_model", "v1")
+        assert org_a_version_dir.exists()
+
+        # Attacker (any org) tries to register a NEW model with
+        # artifacts_dir pointed straight at org A's existing version dir.
+        with pytest.raises(ValidationError):
+            register_model(
+                task="t", model_name="attacker_model", version="v1",
+                artifacts_dir=str(org_a_version_dir), metadata={}, set_alias=None,
+                organization_id="org-B",
+            )
+        # No new model directory was created at all.
+        assert not L.model_root(env_root, "t", "attacker_model").exists()
+
+    def test_artifacts_dir_outside_registry_root_still_allowed_by_default(self, env_root, tmp_path):
+        """Regression: the ordinary, supported workflow -- artifacts_dir
+        pointing at some unrelated server-local training-output
+        directory -- remains fully unrestricted by default (no
+        OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS configured)."""
+        from omnibioai_model_registry import register_model
+
+        src = tmp_path / "totally_unrelated_training_output"
+        _make_minimal_package(src)
+        out = register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=str(src), metadata={}, set_alias=None,
+        )
+        assert out["ok"] is True
+
+    def test_artifacts_allowed_roots_rejects_outside_when_configured(self, env_root, tmp_path, monkeypatch):
+        from omnibioai_model_registry import register_model
+        from omnibioai_model_registry.errors import ValidationError
+
+        allowed = tmp_path / "allowed_training_outputs"
+        allowed.mkdir()
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS", str(allowed))
+
+        outside = tmp_path / "not_allowed"
+        _make_minimal_package(outside)
+        with pytest.raises(ValidationError):
+            register_model(
+                task="t", model_name="m", version="v1",
+                artifacts_dir=str(outside), metadata={}, set_alias=None,
+            )
+
+    def test_artifacts_allowed_roots_accepts_inside_when_configured(self, env_root, tmp_path, monkeypatch):
+        from omnibioai_model_registry import register_model
+
+        allowed = tmp_path / "allowed_training_outputs"
+        src = allowed / "exp123" / "output"
+        _make_minimal_package(src)
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS", str(allowed))
+
+        out = register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=str(src), metadata={}, set_alias=None,
+        )
+        assert out["ok"] is True
+
+
+class TestResolvePromotePathSafety:
+    """api.py-level: resolve_model()/promote_model() with malicious refs/aliases."""
+
+    def test_resolve_rejects_traversal_in_model_ref(self, env_root):
+        """refs.py's parse_model_ref() catches path_safety's
+        PathTraversalError and re-raises as the pre-existing
+        InvalidModelRef shape (both ModelRegistryError, both -> HTTP
+        400) -- rejected either way, see refs.py's own comment for why."""
+        from omnibioai_model_registry import resolve_model
+        from omnibioai_model_registry.errors import ModelRegistryError
+
+        with pytest.raises(ModelRegistryError):
+            resolve_model(task="t", model_ref="../../../etc@passwd")
+
+    def test_resolve_rejects_traversal_in_selector(self, env_root, tmp_path):
+        from omnibioai_model_registry import register_model, resolve_model
+        from omnibioai_model_registry.errors import ModelRegistryError
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=str(src), metadata={}, set_alias=None,
+        )
+        with pytest.raises(ModelRegistryError):
+            resolve_model(task="t", model_ref="m@../../../etc")
+
+    def test_promote_rejects_traversal_in_alias(self, env_root, tmp_path):
+        from omnibioai_model_registry import promote_model, register_model
+        from omnibioai_model_registry.errors import PathTraversalError
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=str(src), metadata={}, set_alias=None,
+        )
+        with pytest.raises(PathTraversalError):
+            promote_model(task="t", model_name="m", alias="../../../etc/evil", version="v1")
+
+    def test_resolve_round_trip_still_works(self, env_root, tmp_path):
+        """Regression."""
+        from omnibioai_model_registry import register_model, resolve_model
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=str(src), metadata={}, set_alias="latest",
+        )
+        path = resolve_model(task="t", model_ref="m@latest", verify=False)
+        assert path.endswith("v1")
+
+
+class TestSymlinkContainment:
+    """A registry_root that is itself a symlink to real storage -- a
+    plausible legitimate deployment layout (e.g. network-mounted
+    storage) -- keeps working; a pre-existing malicious symlink inside
+    the tree pointing outside the root is caught by resolve_model()'s
+    defense-in-depth containment check."""
+
+    def test_symlinked_registry_root_round_trip(self, tmp_path, monkeypatch):
+        real_root = tmp_path / "real_storage"
+        real_root.mkdir()
+        symlinked_root = tmp_path / "registry_via_symlink"
+        symlinked_root.symlink_to(real_root, target_is_directory=True)
+
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(symlinked_root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        from omnibioai_model_registry import register_model, resolve_model
+
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        out = register_model(
+            task="t", model_name="m", version="v1",
+            artifacts_dir=str(src), metadata={}, set_alias="latest",
+        )
+        assert out["ok"] is True
+        path = resolve_model(task="t", model_ref="m@latest", verify=False)
+        assert Path(path).exists()
+
+    def test_malicious_preexisting_version_symlink_escape_rejected(self, env_root, tmp_path):
+        """Simulates a version directory that was replaced by a symlink
+        pointing outside the registry root (e.g. by an operator/attacker
+        with independent filesystem access) -- resolve_model() must not
+        follow it back out."""
+        from omnibioai_model_registry import resolve_model
+        from omnibioai_model_registry.errors import ModelRegistryError
+        from omnibioai_model_registry.package import layout as L
+
+        outside_secret = tmp_path / "outside_secret"
+        outside_secret.mkdir()
+        (outside_secret / "leaked.txt").write_text("should never be readable via the API")
+
+        vdir = L.version_dir(env_root, "t", "m", "v1")
+        vdir.parent.mkdir(parents=True)
+        vdir.symlink_to(outside_secret, target_is_directory=True)
+
+        with pytest.raises(ModelRegistryError):
+            resolve_model(task="t", model_ref="m@v1", verify=False)
+
+
+class TestPathSecurityHTTP:
+    """HTTP-level: every malicious-identifier route rejects safely (400,
+    generic message, no path/stack-trace/secret disclosure), composed
+    correctly with Phase 2A-2D authorization, and legitimate traffic is
+    completely unaffected."""
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def _as_org(self, monkeypatch, org_id, *, permissions=("model.use",)):
+        from iam_client.models import UserContext
+        return self._mock_iam_client(monkeypatch, UserContext(
+            user_id=f"user-{org_id}", email=f"user@{org_id}.example",
+            roles=[], permissions=list(permissions), valid=True, org_id=org_id,
+        ))
+
+    @pytest.fixture
+    def auth_client(self, tmp_path, monkeypatch):
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+    def _register(self, client, tmp_path, monkeypatch, org_id, **overrides):
+        self._as_org(monkeypatch, org_id)
+        src = tmp_path / f"src_{org_id}"
+        _make_minimal_package(src)
+        payload = {
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": str(src), "metadata": {}, "set_alias": "latest",
+        }
+        payload.update(overrides)
+        r = client.post("/v1/register", json=payload, headers={"Authorization": f"Bearer {org_id}"})
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    # ── malicious identifiers, one per route ────────────────────────────────
+
+    def test_register_traversal_model_name_returns_400_no_disclosure(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._as_org(monkeypatch, "org-A")
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        r = client.post("/v1/register", json={
+            "task": "t", "model_name": "../../../tmp/evil", "version": "v1",
+            "artifacts_dir": str(src), "metadata": {},
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400
+        body = r.text
+        assert str(root) not in body
+        assert "/etc" not in body and "Traceback" not in body
+
+    def test_resolve_traversal_ref_returns_400(self, auth_client, monkeypatch):
+        client, _ = auth_client
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "../../../etc@passwd"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400
+
+    def test_show_traversal_ref_returns_400(self, auth_client, monkeypatch):
+        client, _ = auth_client
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/show", params={"task": "t", "ref": "m@../../../etc"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400
+
+    def test_artifacts_traversal_ref_returns_400(self, auth_client, monkeypatch):
+        client, _ = auth_client
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/artifacts", params={"task": "../../etc", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400
+
+    def test_promote_traversal_alias_returns_400(self, auth_client, tmp_path, monkeypatch):
+        client, _ = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "alias": "../../../etc/evil", "version": "v1",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400
+
+    def test_tags_traversal_version_returns_error_no_mutation(self, auth_client, tmp_path, monkeypatch):
+        client, root = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        self._as_org(monkeypatch, "org-A")
+        r = client.put("/v1/tags", json={
+            "task": "t", "model_name": "m", "version": "../../../etc/evil",
+            "key": "k", "value": "v",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code in (400, 500)
+        assert not (root / "etc").exists()
+
+    def test_versions_patch_traversal_version_returns_error(self, auth_client, tmp_path, monkeypatch):
+        client, _ = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/versions/patch", json={
+            "task": "t", "model_name": "m", "version": "../../../etc/evil", "description": "x",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code in (400, 404, 500)
+
+    def test_stage_traversal_version_returns_error(self, auth_client, tmp_path, monkeypatch):
+        client, _ = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/stage", json={
+            "task": "t", "model_name": "m", "version": "../../../etc/evil", "stage": "staging",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code in (400, 404, 500)
+
+    def test_aliases_traversal_model_returns_400_via_global_handler(self, auth_client, monkeypatch):
+        """api_aliases constructs a path directly via package.layout with
+        no local try/except -- this specifically exercises the global
+        PathTraversalError exception handler, not _handle_registry_error."""
+        client, _ = auth_client
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/aliases", params={"task": "t", "model": "../../../etc"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400
+
+    def test_compare_traversal_model_returns_400_via_global_handler(self, auth_client, monkeypatch):
+        client, _ = auth_client
+        self._as_org(monkeypatch, "org-A")
+        r = client.get(
+            "/v1/compare",
+            params={"task": "t", "model": "../../../etc", "versions": ["v1", "v2"]},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 400
+
+    def test_hf_push_traversal_returns_error_no_hf_call(self, auth_client, tmp_path, monkeypatch):
+        import omnibioai_model_registry.hf_routes as hf_mod
+        from unittest.mock import MagicMock
+
+        client, _ = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        mock_run_push = MagicMock()
+        monkeypatch.setattr(hf_mod, "_run_push", mock_run_push)
+        monkeypatch.setattr(hf_mod, "_registry", __import__(
+            "omnibioai_model_registry.service.app.main", fromlist=["registry"]
+        ).registry)
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/hf/push", json={
+            "task": "t", "model_name": "../../../etc", "version": "v1",
+            "repo_id": "some/repo", "token": "hf_faketoken",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code in (400, 404)
+        mock_run_push.assert_not_called()
+
+    def test_verify_traversal_ref_returns_400(self, auth_client, monkeypatch):
+        client, _ = auth_client
+        self._as_org(monkeypatch, "org-A")
+        r = client.post("/v1/verify", json={"task": "t", "ref": "../../../etc@passwd"},
+                         headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400
+
+    # ── register: cross-org artifacts_dir exfiltration blocked over HTTP ───
+
+    def test_register_artifacts_dir_pointed_at_other_org_version_rejected(self, auth_client, tmp_path, monkeypatch):
+        """End-to-end HTTP-level version of the cross-org ingestion
+        vector: org B cannot register a new model with artifacts_dir
+        pointed at org A's already-stored version directory."""
+        from omnibioai_model_registry.package import layout as L
+
+        client, root = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        org_a_vdir = L.version_dir(root, "t", "m", "v1")
+        assert org_a_vdir.exists()
+
+        self._as_org(monkeypatch, "org-B")
+        r = client.post("/v1/register", json={
+            "task": "t2", "model_name": "attacker_model", "version": "v1",
+            "artifacts_dir": str(org_a_vdir), "metadata": {},
+        }, headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 400
+        assert not L.model_root(root, "t2", "attacker_model").exists()
+
+    # ── api_metrics: poisoned model_meta.json cannot redirect the filesystem fallback ──
+
+    def test_metrics_poisoned_metadata_task_and_model_name_ignored(self, auth_client, tmp_path, monkeypatch):
+        """register_model() only *defaults* task/model_name into
+        model_meta.json (setdefault) -- a caller who pre-populates those
+        keys in `metadata` has them persisted verbatim. The /v1/metrics
+        filesystem fallback must use this route's own validated task/ref
+        (via vdir), never those attacker-influenced fields."""
+        client, root = auth_client
+        self._as_org(monkeypatch, "org-A")
+        src = tmp_path / "src"
+        _make_minimal_package(src)
+        r = client.post("/v1/register", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": str(src),
+            "metadata": {
+                "task": "../../../tmp/poisoned_task",
+                "model_name": "../../../tmp/poisoned_model",
+                "run_id": "../../../tmp/poisoned_run",
+            },
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+
+        r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        # No crash, no disclosure of anything from outside the registry
+        # root -- the poisoned run_id/task/model_name simply yield no
+        # run history (the fallback's own pre-existing best-effort
+        # behavior), not an error and not a path escape.
+        assert r.json()["run_history"] == {}
+
+    # ── authorization composition: path safety never substitutes for it ────
+
+    def test_spoofed_org_header_still_ignored_alongside_valid_path(self, auth_client, tmp_path, monkeypatch):
+        client, _ = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        self._as_org(monkeypatch, "org-B")
+        r = client.get(
+            "/v1/resolve", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-B", "X-Organization-ID": "org-A"},
+        )
+        assert r.status_code == 400  # still denied on ownership grounds
+
+    def test_cross_org_denial_unaffected_by_path_safety_layer(self, auth_client, tmp_path, monkeypatch):
+        """A well-formed (not traversal) but wrong-org request is still
+        denied for ownership reasons -- confirms the new path-safety
+        layer runs *in addition to*, not instead of, Phase 2B/2C/2D
+        ownership enforcement."""
+        client, _ = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A")
+        self._as_org(monkeypatch, "org-B")
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 400
+
+    def test_every_protected_route_still_requires_authentication(self, auth_client):
+        """Regression: path-safety hardening doesn't weaken Phase 1
+        authentication on any route."""
+        client, _ = auth_client
+        for method, path, params in [
+            ("get", "/v1/resolve", {"task": "t", "ref": "m@v1"}),
+            ("get", "/v1/artifacts", {"task": "t", "ref": "m@v1"}),
+            ("get", "/v1/aliases", {"task": "t", "model": "m"}),
+            ("get", "/v1/compare", {"task": "t", "model": "m", "versions": ["v1", "v2"]}),
+        ]:
+            r = getattr(client, method)(path, params=params)
+            assert r.status_code == 401, f"{path} did not require auth"
+
+    # ── full regression across the ordinary happy path ──────────────────────
+
+    def test_full_lifecycle_with_legitimate_identifiers_unaffected(self, auth_client, tmp_path, monkeypatch):
+        client, _ = auth_client
+        self._register(client, tmp_path, monkeypatch, "org-A", model_name="human_pbmc", set_alias="latest")
+        self._as_org(monkeypatch, "org-A")
+        headers = {"Authorization": "Bearer org-A"}
+
+        for name, resp in [
+            ("resolve", client.get("/v1/resolve", params={"task": "t", "ref": "human_pbmc@latest"}, headers=headers)),
+            ("show", client.get("/v1/show", params={"task": "t", "ref": "human_pbmc@latest"}, headers=headers)),
+            ("artifacts", client.get("/v1/artifacts", params={"task": "t", "ref": "human_pbmc@latest"}, headers=headers)),
+            ("aliases", client.get("/v1/aliases", params={"task": "t", "model": "human_pbmc"}, headers=headers)),
+            ("promote", client.post("/v1/promote", json={
+                "task": "t", "model_name": "human_pbmc", "alias": "staging", "version": "v1"
+            }, headers=headers)),
+            ("tags", client.put("/v1/tags", json={
+                "task": "t", "model_name": "human_pbmc", "version": "v1", "key": "team", "value": "bioml"
+            }, headers=headers)),
+        ]:
+            assert resp.status_code == 200, f"{name} unexpectedly failed after path hardening: {resp.text}"
+
