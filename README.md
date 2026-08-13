@@ -696,18 +696,14 @@ external dependency — see below).
   *permission*, never by role. `model.resolve_ownership` keeps that
   policy intact — same mechanism as `model.use` (a name in the verified
   JWT's `permissions` claim), just a second, narrower one.
-- **Not yet registered in omnibioai-auth.** This permission is checked
-  by this service, but as of this change it does not yet exist in
-  omnibioai-auth's permission catalog (`app/core/permission_names.py`)
-  and cannot yet be granted to any role. Registering it there (and
-  deciding who gets it) is a **required, separate follow-up in that
-  repo** — out of scope here, the same way this repo has never
-  unilaterally edited omnibioai-auth for `model.use` either. Until that
-  follow-up ships, this endpoint is reachable but unusable in any
-  deployment with `AUTH_ENABLED=true` (nobody can hold a permission that
-  doesn't exist yet) — safe by construction, not a functional gap in
-  *this* repo's own contract. Note: `model.ownership.resolve` (a name
-  discussed early on) does not satisfy omnibioai-auth's own
+- **Registered in omnibioai-auth.** This permission is checked by this
+  service and now also exists in omnibioai-auth's permission catalog
+  (`app/core/permission_names.py`), granted to that repo's `org_admin`
+  role — shipped as a separate follow-up in that repo (omnibioai-auth
+  PR #57), the same way this repo has never unilaterally edited
+  omnibioai-auth for `model.use` either. The endpoint is usable in any
+  deployment with `AUTH_ENABLED=true`. Note: `model.ownership.resolve`
+  (a name discussed early on) does not satisfy omnibioai-auth's own
   permission-name format (`resource.action`, a single dot) —
   `model.resolve_ownership` does, and is the name actually used
   everywhere in this codebase.
@@ -1074,21 +1070,17 @@ The **ModelHub** provides the AI artifact governance layer shared by all.
   Self-scoped only — no client-supplied target organization anywhere in
   the HTTP path. Write-once, idempotent for the resolver's own org,
   race-safe via a dedicated marker file (not a second ownership source
-  of truth), audited on both success and failure. **Not yet usable in
-  any `AUTH_ENABLED=true` deployment**: the permission is checked here
-  but not yet registered in omnibioai-auth's permission catalog or
-  granted to any role — that's a required, separate follow-up in that
-  repo, out of scope here (see the Phase 2E section for why).
+  of truth), audited on both success and failure. **Usable in
+  `AUTH_ENABLED=true` deployments**: the permission is registered in
+  omnibioai-auth's permission catalog and granted to that repo's
+  `org_admin` role (omnibioai-auth PR #57) — see the Phase 2E section
+  for the full history.
 
 ### Near Term
 
 - S3 / Azure Blob storage backends
 - Step-history sparklines in UI pulled from DB (currently single-point)
 - Model signature validation (input/output schema enforcement)
-- **Register `model.resolve_ownership` in omnibioai-auth** (separate
-  repo) and grant it to an appropriate role — the only remaining step
-  before Phase 2E's resolution endpoint is usable in a deployment with
-  auth enabled.
 - Resource-scoped `model.use`; `platform`/public model namespace; model
   deletion remain separately unscoped.
 
