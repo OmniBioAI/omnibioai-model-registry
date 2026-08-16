@@ -23,9 +23,11 @@ from omnibioai_model_registry import (
 from omnibioai_model_registry.errors import ModelRegistryError, PathTraversalError, RegistryNotConfigured
 from omnibioai_model_registry.config import load_config
 from omnibioai_model_registry.auth import (
+    MODEL_USE_PERMISSION,
     _actor_identifier,
     require_auth_with_context,
     require_ownership_resolve_auth_with_context,
+    require_read_auth_with_context,
     require_write_auth_with_context,
 )
 from omnibioai_model_registry.ownership import check_model_ownership, read_ownership, resolve_legacy_ownership
@@ -199,7 +201,10 @@ class ResolveResponse(BaseModel):
 class ShowResponse(BaseModel):
     ok: bool
     meta: Dict[str, Any]
-    package_dir: str
+    # Read/use split audit: Optional, not str, as of this change --
+    # api_show() below redacts this to None for a caller who holds only
+    # model.read, never model.use. See that handler's own comment.
+    package_dir: Optional[str] = None
 
 
 # ── Phase-2 request / response models ────────────────────────────────────────
@@ -555,7 +560,17 @@ def api_verify(req: VerifyRequest, user: UserContext = Depends(require_auth_with
 
 
 @app.get(f"{DEFAULT_PREFIX}/show", response_model=ShowResponse)
-def api_show(task: str, ref: str, verify: bool = False, user: UserContext = Depends(require_auth_with_context)):
+def api_show(task: str, ref: str, verify: bool = False, user: UserContext = Depends(require_read_auth_with_context)):
+    # Read/use split audit: unlike /v1/models/aliases/compare/metrics/
+    # runs-*, this route's response includes package_dir -- the real
+    # server filesystem path resolve_model() below resolved to, the same
+    # class of information /v1/resolve exists specifically to hand back.
+    # Moved to require_read_auth_with_context (model.use OR model.read)
+    # anyway, rather than left on model.use-only, so a model.read-only
+    # caller still gets this route's metadata -- but package_dir itself
+    # is redacted to None for them below. A model.use holder (every
+    # existing caller) is completely unaffected: still gets the real path,
+    # exactly as before this change.
     try:
         vdir = ModelRegistry.from_env().resolve_model(
             task=task, model_ref=ref, verify=verify,
@@ -566,7 +581,8 @@ def api_show(task: str, ref: str, verify: bool = False, user: UserContext = Depe
             raise HTTPException(status_code=404, detail="model_meta.json not found")
 
         meta = json.loads(meta_path.read_text())
-        return ShowResponse(ok=True, meta=meta, package_dir=str(vdir))
+        can_use = MODEL_USE_PERMISSION in (user.permissions or [])
+        return ShowResponse(ok=True, meta=meta, package_dir=str(vdir) if can_use else None)
     except Exception as e:
         _handle_registry_error(e)
 
@@ -580,7 +596,14 @@ def list_models(
     task: Optional[str] = Query(None, description="filter by task"),
     model_name: Optional[str] = Query(None, description="filter by model name"),
     metric_gte: Optional[str] = Query(None, description="metric filter, format key:threshold"),
-    user: UserContext = Depends(require_auth_with_context),
+    # Read/use authorization split audit: genuinely read-only catalog
+    # listing -- accepts model.use OR model.read (require_read_auth_
+    # with_context), unlike /v1/resolve/verify which still require
+    # model.use specifically. Returns model_meta.json content only, never
+    # a filesystem path (see register_model()'s own docstring for why
+    # package_dir never ends up in that file) -- no redaction needed here,
+    # unlike /v1/show.
+    user: UserContext = Depends(require_read_auth_with_context),
 ):
     """
     UI endpoint for dashboard:
@@ -747,7 +770,9 @@ def api_log_batch(req: LogBatchRequest, user: UserContext = Depends(require_writ
 
 
 @app.get(f"{DEFAULT_PREFIX}/runs/get", response_model=RunGetResponse)
-def api_run_get(task: str, model: str, run_id: str, user: UserContext = Depends(require_auth_with_context)):
+def api_run_get(task: str, model: str, run_id: str, user: UserContext = Depends(require_read_auth_with_context)):
+    # Read/use split audit: experiment-tracking run detail, model.use OR
+    # model.read -- returns metrics/params history only, no artifact path.
     conn = _get_db_conn()
     try:
         data = _tracking.get_run(
@@ -767,7 +792,8 @@ def api_run_get(task: str, model: str, run_id: str, user: UserContext = Depends(
 
 
 @app.get(f"{DEFAULT_PREFIX}/runs/list")
-def api_runs_list(task: str, model: str, user: UserContext = Depends(require_auth_with_context)):
+def api_runs_list(task: str, model: str, user: UserContext = Depends(require_read_auth_with_context)):
+    # Read/use split audit: same reasoning as api_run_get above.
     conn = _get_db_conn()
     try:
         # Phase 2C: org-filtered at the query layer (tracking.list_runs)
@@ -800,7 +826,9 @@ def api_runs_list(task: str, model: str, user: UserContext = Depends(require_aut
 # ==========================================================
 
 @app.get(f"{DEFAULT_PREFIX}/metrics", response_model=MetricsResponse)
-def api_metrics(task: str, ref: str, user: UserContext = Depends(require_auth_with_context)):
+def api_metrics(task: str, ref: str, user: UserContext = Depends(require_read_auth_with_context)):
+    # Read/use split audit: version metrics + run history -- numbers only,
+    # no artifact path. model.use OR model.read.
     try:
         vdir = Path(registry.resolve_model(
             task=task, model_ref=ref, verify=False,
@@ -900,7 +928,9 @@ def api_metrics(task: str, ref: str, user: UserContext = Depends(require_auth_wi
 
 
 @app.get(f"{DEFAULT_PREFIX}/aliases", response_model=AliasesResponse)
-def api_aliases(task: str, model: str, user: UserContext = Depends(require_auth_with_context)):
+def api_aliases(task: str, model: str, user: UserContext = Depends(require_read_auth_with_context)):
+    # Read/use split audit: alias/version mapping, no artifact path.
+    # model.use OR model.read.
     from omnibioai_model_registry.package.layout import aliases_root as _aliases_root
 
     # Phase 2B: alias resolution is model metadata retrieval -- reads the
@@ -1095,7 +1125,9 @@ def api_compare(
     task: str,
     model: str,
     versions: List[str] = Query(default=[]),
-    user: UserContext = Depends(require_auth_with_context),
+    # Read/use split audit: metrics/stage/tags diff across versions, no
+    # artifact path. model.use OR model.read.
+    user: UserContext = Depends(require_read_auth_with_context),
 ):
     if len(versions) < 2:
         raise HTTPException(
@@ -1136,7 +1168,12 @@ def api_compare(
 
 
 @app.get(f"{DEFAULT_PREFIX}/artifacts", response_model=ArtifactsResponse)
-def api_artifacts(task: str, ref: str, user: UserContext = Depends(require_auth_with_context)):
+def api_artifacts(task: str, ref: str, user: UserContext = Depends(require_read_auth_with_context)):
+    # Read/use split audit: inspected directly -- ArtifactsResponse/
+    # ArtifactEntry carry only filename/sha256/size_bytes, never a path or
+    # file content, and there is no download route anywhere in this
+    # service. Unlike /v1/show, nothing here needs redaction.
+    # model.use OR model.read.
     try:
         vdir = Path(registry.resolve_model(
             task=task, model_ref=ref, verify=False,

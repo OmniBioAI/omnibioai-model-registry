@@ -16,11 +16,18 @@ IAM logic" instruction.
 Every authenticated call is authorized against an IAM permission --
 never by role name, username, or a hardcoded admin check (the old
 require_write_auth was a bare copy of require_auth with no permission
-check at all; this replaces both with real enforcement). Almost every
-route checks the existing `model.use` permission; Phase 2E adds exactly
-one narrowly-scoped exception, MODEL_RESOLVE_OWNERSHIP_PERMISSION
-("model.resolve_ownership", see verify_and_authorize()'s
-`required_permission` parameter and require_ownership_resolve_auth_
+check at all; this replaces both with real enforcement). Every write
+route, plus resolve/verify (the two routes that actually hand back or
+validate a usable model reference), checks `model.use`; a read/use
+authorization split audit found this same permission was also gating
+every genuinely read-only catalog route (list/detail/history), with no
+way to grant one without the other -- those routes now check
+`model.use` OR the new, narrower `model.read` instead (see
+MODEL_READ_PERMISSION, verify_and_authorize()'s tuple-form
+`required_permission`, and require_read_auth_with_context() below); no
+existing model.use holder lost anything. Phase 2E adds one further
+narrowly-scoped exception, MODEL_RESOLVE_OWNERSHIP_PERMISSION
+("model.resolve_ownership", see require_ownership_resolve_auth_
 with_context() below) -- a deliberately SEPARATE permission for
 resolving legacy_unowned model ownership, so that holding model.use
 alone is never sufficient for that one administrative action. Still no
@@ -81,6 +88,20 @@ MODEL_USE_PERMISSION = "model.use"
 # role via omnibioai-auth PR #57 -- usable in AUTH_ENABLED=true
 # deployments. See README's Phase 2E section for the full history.
 MODEL_RESOLVE_OWNERSHIP_PERMISSION = "model.resolve_ownership"
+# Model Registry read/use authorization split audit: deliberately
+# NARROWER than MODEL_USE_PERMISSION, not a replacement for it -- an
+# authorization audit found model.use gating both genuinely read-only
+# catalog routes (list/detail/history) and the actual use-enabling ones
+# (resolve/verify) with no way to grant one without the other. This
+# permission covers only the former. Every existing model.use holder is
+# completely unaffected: require_read_auth_with_context() below accepts
+# EITHER model.use or model.read, so nothing that worked before this
+# change stops working. resolve/verify stay on require_auth_with_context
+# (model.use only) -- see that function's own docstring for which routes
+# moved and why. Registered in omnibioai-auth's permission catalog
+# (app/core/permission_names.py) and granted to that repo's scientist and
+# org_admin roles -- usable in AUTH_ENABLED=true deployments.
+MODEL_READ_PERMISSION = "model.read"
 
 
 class AuthError(Exception):
@@ -109,7 +130,7 @@ def extract_token(authorization_header: str | None) -> str:
 
 
 async def verify_and_authorize(
-    token: str, action: str, *, required_permission: str = MODEL_USE_PERMISSION
+    token: str, action: str, *, required_permission: str | tuple[str, ...] = MODEL_USE_PERMISSION
 ) -> UserContext:
     """Verifies `token` via the centralized IAM client (signature +
     revocation -- see module docstring) and enforces `required_permission`.
@@ -124,6 +145,16 @@ async def verify_and_authorize(
     passes MODEL_RESOLVE_OWNERSHIP_PERMISSION instead -- same
     verification path, same audit event shape, a different permission
     name in the missing-permission branch.
+
+    Model Registry read/use authorization split audit: `required_permission`
+    may also be a tuple of names, in which case holding ANY ONE of them
+    satisfies the check -- require_read_auth_with_context() below passes
+    (MODEL_USE_PERMISSION, MODEL_READ_PERMISSION) so an existing model.use
+    holder and a new model.read-only holder are both authorized by the
+    same single IAM round trip, without a second permission-check pass.
+    A single-string `required_permission` (every other call site) behaves
+    exactly as before -- normalized to a one-element tuple internally,
+    same short-circuit `any()` check, same audit event shape.
 
     A fresh AsyncIAMClient per call, not a module-level singleton -- its
     httpx.AsyncClient binds its connection pool to whichever asyncio event
@@ -150,16 +181,18 @@ async def verify_and_authorize(
         )
         raise AuthError("Invalid, expired, or revoked token", 401)
 
-    if required_permission not in (user.permissions or []):
+    accepted = (required_permission,) if isinstance(required_permission, str) else required_permission
+    user_permissions = user.permissions or []
+    if not any(p in user_permissions for p in accepted):
         audit.log_event(
             "model_access_denied", _actor_identifier(user), action,
             metadata={
                 "reason": "missing_permission",
                 "organization_id": user.org_id,
-                "required_permission": required_permission,
+                "required_permission": " or ".join(accepted),
             },
         )
-        raise AuthError(f"Missing required permission: {required_permission}", 403)
+        raise AuthError(f"Missing required permission: {' or '.join(accepted)}", 403)
 
     audit.log_event(
         "model_access_success", _actor_identifier(user), action,
@@ -217,14 +250,16 @@ async def require_write_auth(
 async def _resolve_user_context(
     authorization: str | None,
     *,
-    required_permission: str = MODEL_USE_PERMISSION,
+    required_permission: str | tuple[str, ...] = MODEL_USE_PERMISSION,
 ) -> UserContext:
-    """Shared by require_auth_with_context, require_write_auth_with_context,
-    and (Phase 2E) require_ownership_resolve_auth_with_context -- all need
-    the full verified UserContext (not just the actor string) so callers
-    can read org_id for ownership enforcement. Same enforcement as
-    require_auth/require_write_auth in every other respect, just against
-    whichever permission the caller asks for.
+    """Shared by require_auth_with_context, require_read_auth_with_context,
+    require_write_auth_with_context, and (Phase 2E)
+    require_ownership_resolve_auth_with_context -- all need the full
+    verified UserContext (not just the actor string) so callers can read
+    org_id for ownership enforcement. Same enforcement as require_auth/
+    require_write_auth in every other respect, just against whichever
+    permission (or, for the read/use split, either-of-a-pair of
+    permissions) the caller asks for.
 
     When auth_enabled=False, returns a synthetic "system" UserContext with
     org_id=None -- check_model_ownership() treats a None requesting_org_id
@@ -234,13 +269,17 @@ async def _resolve_user_context(
     exactly `required_permission` (not a fixed list) -- open mode remains
     "no enforcement at all" for whichever permission is being checked,
     the same unchanged philosophy every route in this service already has
-    in that mode, not a new asymmetric carve-out for Phase 2E's
-    permission specifically.
+    in that mode, not a new asymmetric carve-out for Phase 2E's (or this
+    audit's) permission specifically. Normalized to a list either way,
+    since `required_permission` may now be a tuple (require_read_auth_
+    with_context's (model.use, model.read) pair) as well as a single
+    string.
     """
     cfg = load_config()
     if not cfg.auth_enabled:
+        granted = [required_permission] if isinstance(required_permission, str) else list(required_permission)
         return UserContext(
-            user_id="system", email="system", roles=[], permissions=[required_permission],
+            user_id="system", email="system", roles=[], permissions=granted,
             valid=True, org_id=None,
         )
     try:
@@ -256,13 +295,46 @@ async def require_auth_with_context(
     authorization: Annotated[str | None, Header()] = None,
 ) -> UserContext:
     """Phase 2B: read-side counterpart to require_write_auth_with_context.
-    Every read route that must enforce organization-scoped ownership
-    (resolve/show/models/compare/artifacts/aliases/metrics/verify) depends
-    on this instead of require_auth, so it has org_id to check against
+    Model.use-only -- reserved for the two routes that actually resolve or
+    verify a usable model reference (GET /v1/resolve, POST /v1/verify)
+    after the read/use authorization split audit moved every genuinely
+    read-only route (models/aliases/compare/metrics/runs-get/runs-list/
+    artifacts/show) to require_read_auth_with_context below -- including
+    /v1/show and /v1/artifacts, which now accept model.read too (see
+    require_read_auth_with_context's own docstring, and api_show()'s
+    handler for the package_dir redaction that keeps the model.use-only
+    part of /v1/show's response gated correctly even though the route
+    itself is no longer on this function). Has org_id to check against
     check_model_ownership() -- not just the actor string. Enforcement
     itself (model.use permission, token verification) is identical to
     require_auth."""
     return await _resolve_user_context(authorization)
+
+
+async def require_read_auth_with_context(
+    authorization: Annotated[str | None, Header()] = None,
+) -> UserContext:
+    """Model Registry read/use authorization split audit: accepts EITHER
+    model.use or model.read (see verify_and_authorize()'s tuple-form
+    `required_permission` support) -- every existing model.use holder
+    keeps working unchanged, and a caller holding only the new, narrower
+    model.read is now also authorized for genuinely read-only catalog
+    routes. Used by GET /v1/models, /v1/aliases, /v1/compare, /v1/metrics,
+    /v1/runs/get, /v1/runs/list, /v1/artifacts, and /v1/show -- never by
+    resolve/verify (still require_auth_with_context, model.use only) or
+    any write route (still require_write_auth_with_context). /v1/show is
+    the one route among these whose *response* still distinguishes the
+    two permissions after this dependency lets both in: its handler
+    separately checks MODEL_USE_PERMISSION and redacts package_dir to
+    None for a model.read-only caller, so holding only model.read here
+    grants metadata visibility, never the artifact path model.use itself
+    protects. Same UserContext/org_id-bearing return shape as
+    require_auth_with_context, for the same check_model_ownership()
+    enforcement every one of these routes already does independently of
+    which permission gated entry."""
+    return await _resolve_user_context(
+        authorization, required_permission=(MODEL_USE_PERMISSION, MODEL_READ_PERMISSION)
+    )
 
 
 async def require_write_auth_with_context(

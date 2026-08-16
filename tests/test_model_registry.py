@@ -8163,6 +8163,363 @@ class TestPhase2EOwnershipResolveHTTP:
         assert r.status_code == 403
 
 
+class TestModelReadUseAuthorizationSplit:
+    """Read/use authorization split audit: GET /v1/models, /v1/aliases,
+    /v1/compare, /v1/metrics, /v1/runs/get, /v1/runs/list, and /v1/show
+    (metadata only, see below) now accept model.use OR the new, narrower
+    model.read (require_read_auth_with_context) -- resolve/verify and
+    every write route are unaffected, still model.use-only. See auth.py's
+    module docstring and require_read_auth_with_context()'s own docstring
+    for the full design.
+
+    Role-to-permission grants (scientist/org_admin get model.read,
+    platform_admin deliberately does not) are omnibioai-auth's own
+    concern, covered by that repo's test suite (org_service.py's
+    SCIENTIST_PERMISSIONS/ORG_ADMIN_PERMISSIONS, and permission_names.py's
+    registry tests) -- this service only ever sees the resulting JWT
+    `permissions` claim, never a role name, so these tests exercise
+    "a caller whose JWT carries model.read" directly, the same boundary
+    every other permission test in this file already tests at.
+    """
+
+    def _mock_iam_client(self, monkeypatch, user_context):
+        from unittest.mock import AsyncMock, MagicMock
+        import omnibioai_model_registry.auth as auth_mod
+
+        mock_client = MagicMock()
+        mock_client.get_user = AsyncMock(return_value=user_context)
+        mock_client.http.aclose = AsyncMock()
+        monkeypatch.setattr(auth_mod, "AsyncIAMClient", MagicMock(return_value=mock_client))
+        return mock_client
+
+    def _as(self, monkeypatch, org_id, *, permissions=("model.use",), user_id="1"):
+        from iam_client.models import UserContext
+        return self._mock_iam_client(monkeypatch, UserContext(
+            user_id=user_id, email=f"user@{org_id}.example" if org_id else "user@open.example",
+            roles=[], permissions=list(permissions), valid=True, org_id=org_id,
+        ))
+
+    @pytest.fixture
+    def auth_client(self, tmp_path, monkeypatch):
+        root = tmp_path / "registry"
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
+        monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
+        monkeypatch.setenv("AUTH_ENABLED", "true")
+        monkeypatch.setenv("JWT_SECRET", "testsecret")
+
+        import omnibioai_model_registry.service.app.main as _svc
+        from fastapi.testclient import TestClient
+
+        new_reg = _svc.ModelRegistry.from_env()
+        monkeypatch.setattr(_svc, "registry", new_reg)
+        return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
+
+    def _make_owned_model(self, root, org_id, task="t", model_name="m", version="v1"):
+        from omnibioai_model_registry.ownership import ensure_model_ownership
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        vdir = root / "tasks" / task / "models" / model_name / "versions" / version
+        vdir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (vdir / f).write_text("{}" if f.endswith(".json") else "x")
+        # Real task/model_name/version content, not the generic "{}" stub
+        # REQUIRED_FILES above just wrote -- list_models()/show()/compare()
+        # etc. all read these fields back out of model_meta.json, same
+        # fixture shape test_get_compare_returns_metrics_for_both_versions
+        # (above, in TestPhase2CHTTPRunTracking) already establishes.
+        (vdir / "model_meta.json").write_text(json.dumps({
+            "task": task, "model_name": model_name, "version": version, "stage": "none",
+        }))
+        ensure_model_ownership(
+            LocalFS(), root, task, model_name,
+            organization_id=org_id, actor="registrant", model_pre_existing=False,
+        )
+
+    # ── A. model.read can list the catalog ───────────────────────────────
+
+    def test_model_read_only_can_list_models(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.get("/v1/models", headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 200
+        assert len(r.json()) == 1
+        assert r.json()[0]["model_name"] == "m"
+
+    # ── B. model.read cannot resolve (the actual use-enabling route) ────
+
+    def test_model_read_only_cannot_resolve(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.get(
+            "/v1/resolve", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 403
+        # /v1/resolve is unmoved -- still require_auth_with_context,
+        # single-permission model.use, same error shape as always.
+        assert r.json()["detail"] == "Missing required permission: model.use"
+
+    # ── C. model.read cannot verify (a pre-use integrity gate) ──────────
+
+    def test_model_read_only_cannot_verify(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.post(
+            "/v1/verify", json={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 403
+
+    # ── D. model.read cannot mutate ──────────────────────────────────────
+
+    def test_model_read_only_cannot_register(self, auth_client, monkeypatch, tmp_path):
+        client, root = auth_client
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        src = tmp_path / "src"
+        src.mkdir()
+        for f in REQUIRED_FILES:
+            (src / f).write_text("{}" if f.endswith(".json") else "x")
+        r = client.post("/v1/register", json={
+            "task": "t", "model_name": "m", "version": "v1",
+            "artifacts_dir": str(src), "metadata": {},
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 403
+
+    def test_model_read_only_cannot_promote(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.post("/v1/promote", json={
+            "task": "t", "model_name": "m", "alias": "prod", "version": "v1",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 403
+
+    def test_model_read_only_cannot_set_tag(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.put("/v1/tags", json={
+            "task": "t", "model_name": "m", "version": "v1", "key": "k", "value": "v",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 403
+
+    def test_model_read_only_cannot_set_stage(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.post("/v1/stage", json={
+            "task": "t", "model_name": "m", "version": "v1", "stage": "production",
+        }, headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 403
+
+    # ── E. existing model.use callers are completely unaffected ─────────
+
+    def test_model_use_only_still_reaches_every_moved_read_route(self, auth_client, monkeypatch):
+        """Backward compatibility: a model.use-only caller (every existing
+        holder) must still get 200 from every route this audit moved to
+        accept model.read too -- model.use was never narrowed."""
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.use",))
+        headers = {"Authorization": "Bearer org-A"}
+        assert client.get("/v1/models", headers=headers).status_code == 200
+        assert client.get("/v1/aliases", params={"task": "t", "model": "m"}, headers=headers).status_code == 200
+        assert client.get(
+            "/v1/compare", params={"task": "t", "model": "m", "versions": ["v1", "v1"]}, headers=headers,
+        ).status_code == 200
+        assert client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"}, headers=headers).status_code == 200
+        assert client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"}, headers=headers).status_code == 200
+        assert client.get("/v1/show", params={"task": "t", "ref": "m@v1"}, headers=headers).status_code == 200
+        # And model.use still reaches resolve/verify -- the two routes
+        # that deliberately did NOT move.
+        assert client.get(
+            "/v1/resolve", params={"task": "t", "ref": "m@v1"}, headers=headers,
+        ).status_code == 200
+        assert client.post("/v1/verify", json={"task": "t", "ref": "m@v1"}, headers=headers).status_code == 200
+
+    # ── F/G. a model.read grant (scientist or org_admin, from the IAM
+    # side) reaches every approved catalog endpoint -- role assignment
+    # itself is omnibioai-auth's own test suite's concern (see this
+    # class's own docstring); this is the model-registry side of that
+    # contract, exercised the same way every other permission test here
+    # is: by the resulting JWT `permissions` claim. ──────────────────────
+
+    def test_model_read_reaches_every_approved_catalog_endpoint(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        headers = {"Authorization": "Bearer org-A"}
+        assert client.get("/v1/models", headers=headers).status_code == 200
+        assert client.get("/v1/aliases", params={"task": "t", "model": "m"}, headers=headers).status_code == 200
+        assert client.get(
+            "/v1/compare", params={"task": "t", "model": "m", "versions": ["v1", "v1"]}, headers=headers,
+        ).status_code == 200
+        assert client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"}, headers=headers).status_code == 200
+        assert client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"}, headers=headers).status_code == 200
+        assert client.get("/v1/show", params={"task": "t", "ref": "m@v1"}, headers=headers).status_code == 200
+
+    # ── H. platform_admin ─────────────────────────────────────────────
+    #
+    # This service has no concept of "platform_admin" -- it only ever
+    # checks permission strings against the JWT `permissions` claim, never
+    # a role name (see auth.py's own module docstring). Whether
+    # platform_admin's JWT carries model.read is decided entirely by
+    # omnibioai-auth's role-to-permission grant (deliberately NOT
+    # granted, for the same "administer everything via its own
+    # manage_all_orgs-gated routes, not via org-scoped resource
+    # permissions" reasoning platform_admin already never held model.use,
+    # workflow.read, dataset.read, or runs.read for -- see this audit's
+    # own report). That decision is tested at the auth-repo level, not
+    # here: this service would enforce it identically to any other
+    # missing-permission case either way, which test_no_permissions_*
+    # -style tests elsewhere in this file already cover.
+
+    # ── I. cross-org isolation is unaffected by which permission gated
+    # entry -- check_model_ownership() is downstream of, and independent
+    # from, the model.use/model.read check. ─────────────────────────────
+
+    def test_model_read_cannot_see_another_orgs_models_in_list(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A", task="t", model_name="m-a")
+        self._make_owned_model(root, "org-B", task="t", model_name="m-b")
+        self._as(monkeypatch, "org-B", permissions=("model.read",))
+        r = client.get("/v1/models", headers={"Authorization": "Bearer org-B"})
+        assert r.status_code == 200
+        names = {row["model_name"] for row in r.json()}
+        assert names == {"m-b"}
+        assert "m-a" not in names
+
+    def test_model_read_cannot_show_another_orgs_model(self, auth_client, monkeypatch):
+        """Anti-enumerating: /v1/show resolves via resolve_model()
+        (api.py), whose ModelNotFound -- raised identically for "doesn't
+        exist" and "not yours" (api.py's _enforce_ownership_or_not_found)
+        -- _handle_registry_error maps to 400, not 404 (unlike /v1/aliases
+        and /v1/compare's own _require_model_ownership() helper, which
+        raises HTTPException(404) directly; a pre-existing inconsistency
+        between routes, unrelated to and unchanged by this audit). Either
+        way, a cross-org model.read caller gets the exact same response a
+        genuinely nonexistent model would -- never a 403 that would
+        confirm the model exists but belongs to someone else."""
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-B", permissions=("model.read",))
+        r = client.get(
+            "/v1/show", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-B"},
+        )
+        assert r.status_code == 400
+        assert r.json()["detail"] == "Model not found: task=t, model_name=m"
+        nonexistent = client.get(
+            "/v1/show", params={"task": "t", "ref": "does-not-exist@v1"},
+            headers={"Authorization": "Bearer org-B"},
+        )
+        # Same status and same message shape (task=..., model_name=...) --
+        # the two are structurally indistinguishable, which is the actual
+        # anti-enumeration property; the model_name value itself differs
+        # only because this test asked about two different names.
+        assert nonexistent.status_code == r.status_code == 400
+        assert nonexistent.json()["detail"] == "Model not found: task=t, model_name=does-not-exist"
+
+    def test_model_read_cannot_see_another_orgs_aliases_or_compare(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-B", permissions=("model.read",))
+        headers = {"Authorization": "Bearer org-B"}
+        r = client.get("/v1/aliases", params={"task": "t", "model": "m"}, headers=headers)
+        assert r.status_code == 404
+        r = client.get(
+            "/v1/compare", params={"task": "t", "model": "m", "versions": ["v1", "v1"]}, headers=headers,
+        )
+        assert r.status_code == 404
+
+    def test_model_read_same_org_can_see_own_models_org_id_handling_unchanged(self, auth_client, monkeypatch):
+        """The requesting_org_id plumbing itself (check_model_ownership's
+        `requesting_org_id=user.org_id`) is identical regardless of which
+        permission was checked to reach the route -- same-org access for a
+        model.read-only caller behaves exactly like same-org access for a
+        model.use-only caller (see test_model_use_only_still_reaches_
+        every_moved_read_route above)."""
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.get(
+            "/v1/show", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 200
+        assert r.json()["meta"]["model_name"] == "m"
+
+    # ── J. /v1/show: package_dir redaction decision ──────────────────────
+
+    def test_show_redacts_package_dir_for_model_read_only(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.get(
+            "/v1/show", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["package_dir"] is None
+        # Metadata itself is still real, useful data -- only the
+        # filesystem path is redacted.
+        assert body["meta"]["model_name"] == "m"
+        assert body["meta"]["task"] == "t"
+
+    def test_show_includes_package_dir_for_model_use(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.use",))
+        r = client.get(
+            "/v1/show", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["package_dir"] is not None
+        assert "m" in body["package_dir"]
+
+    def test_show_includes_package_dir_when_caller_holds_both(self, auth_client, monkeypatch):
+        """A caller who holds both (e.g. a scientist, who gets model.use
+        AND model.read) is treated as a model.use holder for redaction
+        purposes -- holding the narrower permission in addition to the
+        broader one never subtracts capability."""
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.use", "model.read"))
+        r = client.get(
+            "/v1/show", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 200
+        assert r.json()["package_dir"] is not None
+
+    # ── K. /v1/artifacts: no redaction needed (filename/hash/size only,
+    # confirmed by direct inspection -- no path, no content, no download
+    # capability anywhere in this service) ───────────────────────────────
+
+    def test_artifacts_returns_full_listing_for_model_read_only(self, auth_client, monkeypatch):
+        client, root = auth_client
+        self._make_owned_model(root, "org-A")
+        self._as(monkeypatch, "org-A", permissions=("model.read",))
+        r = client.get(
+            "/v1/artifacts", params={"task": "t", "ref": "m@v1"},
+            headers={"Authorization": "Bearer org-A"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["files"], "expected at least one artifact entry"
+        names = {f["name"] for f in body["files"]}
+        assert names == set(REQUIRED_FILES)
+        # No path/content field anywhere in the response shape.
+        for f in body["files"]:
+            assert set(f.keys()) <= {"name", "sha256", "size_bytes"}
+
+
 class TestOwnershipResolutionCLI:
     """omr resolve-ownership -- operator/administrator use, same
     out-of-band trust boundary as `omr register --org-id`."""
