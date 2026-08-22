@@ -60,6 +60,7 @@ export default function ExperimentsView({ selectedTask, onOpenModel }: Props) {
       );
       setRuns(results.flat());
     } catch (e) {
+      console.error('[model-registry-ui] failed to load experiments:', e);
       setError(String(e));
     } finally {
       setLoading(false);

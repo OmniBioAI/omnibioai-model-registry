@@ -46,7 +46,9 @@ export default function ModelDrawer({
     try {
       const res = await fetch(`${BASE_URL}${path}`, {
         method: body !== undefined ? "POST" : "GET",
-        headers: body !== undefined ? { "Content-Type": "application/json" } : {},
+        headers: body !== undefined
+          ? { "Content-Type": "application/json", ...authHeader() }
+          : { ...authHeader() },
         body: body !== undefined ? JSON.stringify(body) : undefined,
       });
       const data = await res.json();

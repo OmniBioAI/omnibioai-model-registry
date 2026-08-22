@@ -88,7 +88,7 @@ from pathlib import Path
 from typing import Optional
 
 from .audit.audit_log import now_utc_iso
-from .errors import ModelNotFound, OwnershipResolutionNotEligible, ValidationError
+from .errors import ModelNotFound, OwnershipResolutionNotEligible, PathTraversalError, ValidationError
 from .package import layout as L
 from .storage.localfs import LocalFS
 
@@ -291,12 +291,24 @@ def backfill_legacy_ownership(
     re-run: already-migrated or already-owned models are left untouched
     (ownership.json is write-once).
 
-    Returns {"scanned": N, "migrated": N, "already_had_ownership": N}.
+    A single stray directory under `tasks/` whose name fails
+    path_safety.safe_component() (e.g. leftover debug/test scaffolding
+    that was never a real model_meta.json-backed model -- observed live:
+    a `__jwt_probe__/__probe__` directory pair with no model_meta.json
+    at all, from some prior ad-hoc probe) must never abort the migration
+    for every OTHER real model in the registry; it is skipped and
+    counted, not raised. This mirrors list_models()'s own per-entry
+    `except Exception: continue` in service/app/main.py, which already
+    tolerates exactly this kind of malformed entry for reads -- the bulk
+    migration should be no less resilient.
+
+    Returns {"scanned": N, "migrated": N, "already_had_ownership": N,
+    "skipped_invalid": N}.
     """
     backend = backend or LocalFS()
     root = Path(registry_root)
     tasks_root = root / "tasks"
-    summary = {"scanned": 0, "migrated": 0, "already_had_ownership": 0}
+    summary = {"scanned": 0, "migrated": 0, "already_had_ownership": 0, "skipped_invalid": 0}
     if not tasks_root.exists():
         return summary
 
@@ -308,19 +320,23 @@ def backfill_legacy_ownership(
             summary["scanned"] += 1
             task = task_dir.name
             model_name = model_dir.name
-            if read_ownership(root, task, model_name) is not None:
-                summary["already_had_ownership"] += 1
+            try:
+                if read_ownership(root, task, model_name) is not None:
+                    summary["already_had_ownership"] += 1
+                    continue
+                ensure_model_ownership(
+                    backend,
+                    root,
+                    task,
+                    model_name,
+                    organization_id=None,
+                    actor=None,
+                    model_pre_existing=True,
+                )
+                summary["migrated"] += 1
+            except PathTraversalError:
+                summary["skipped_invalid"] += 1
                 continue
-            ensure_model_ownership(
-                backend,
-                root,
-                task,
-                model_name,
-                organization_id=None,
-                actor=None,
-                model_pre_existing=True,
-            )
-            summary["migrated"] += 1
     return summary
 
 

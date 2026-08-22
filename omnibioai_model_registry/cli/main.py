@@ -111,6 +111,8 @@ def cmd_migrate_ownership(args):
         print(f"Scanned:               {summary['scanned']}")
         print(f"Migrated to legacy:    {summary['migrated']}")
         print(f"Already had ownership: {summary['already_had_ownership']}")
+        if summary.get("skipped_invalid"):
+            print(f"Skipped (invalid name):{summary['skipped_invalid']}")
         if summary["migrated"]:
             print(
                 "\nMigrated models are recorded as status=legacy_unowned "
