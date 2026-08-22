@@ -2,8 +2,17 @@ import { authHeader } from "./auth";
 
 const BASE_URL = "/modelregistry/v1";
 
+// Every route below (except hf_routes.py's /settings, which this file never
+// calls) is gated on the backend by Depends(require_read_auth_with_context)
+// or Depends(require_write_auth_with_context) (service/app/main.py), which
+// read the caller's Authorization header directly -- same JWT/org-context
+// mechanism as the rest of the OmniBioAI API surface. Most of the GET calls
+// here were missing the header entirely (only setStage attached it), so
+// every one of them 401'd. See RegisterModelModal.tsx / ModelDrawer.tsx's
+// promote() / VersionRow.tsx for the already-correct reference usage.
+
 export async function fetchModels() {
-  const res = await fetch(`${BASE_URL}/models`);
+  const res = await fetch(`${BASE_URL}/models`, { headers: { ...authHeader() } });
 
   if (!res.ok) {
     throw new Error(`Failed to fetch models: ${res.status}`);
@@ -29,7 +38,8 @@ export type AliasesResponse = {
 
 export async function fetchAliases(task: string, model: string): Promise<AliasesResponse> {
   const res = await fetch(
-    `${BASE_URL}/aliases?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}`
+    `${BASE_URL}/aliases?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}`,
+    { headers: { ...authHeader() } }
   );
   if (!res.ok) throw new Error(`Failed to fetch aliases: ${res.status}`);
   return res.json() as Promise<AliasesResponse>;
@@ -47,7 +57,8 @@ export type MetricsResponse = {
 
 export async function fetchMetrics(task: string, ref: string): Promise<MetricsResponse> {
   const res = await fetch(
-    `${BASE_URL}/metrics?task=${encodeURIComponent(task)}&ref=${encodeURIComponent(ref)}`
+    `${BASE_URL}/metrics?task=${encodeURIComponent(task)}&ref=${encodeURIComponent(ref)}`,
+    { headers: { ...authHeader() } }
   );
   if (!res.ok) throw new Error(`Failed to fetch metrics: ${res.status}`);
   return res.json() as Promise<MetricsResponse>;
@@ -74,7 +85,9 @@ export async function compareVersions(
 ): Promise<CompareResponse> {
   const params = new URLSearchParams({ task, model });
   for (const v of versions) params.append("versions", v);
-  const res = await fetch(`${BASE_URL}/compare?${params.toString()}`);
+  const res = await fetch(`${BASE_URL}/compare?${params.toString()}`, {
+    headers: { ...authHeader() },
+  });
   if (!res.ok) throw new Error(`Failed to compare versions: ${res.status}`);
   return res.json() as Promise<CompareResponse>;
 }
@@ -90,7 +103,7 @@ export async function setTag(
 ): Promise<{ ok: boolean }> {
   const res = await fetch(`${BASE_URL}/tags`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify({ task, model_name, version, key, value }),
   });
   if (!res.ok) throw new Error(`Failed to set tag: ${res.status}`);
@@ -135,7 +148,8 @@ export type RunDetail = RunSummary & {
 
 export async function fetchRuns(task: string, model: string): Promise<RunSummary[]> {
   const res = await fetch(
-    `${BASE_URL}/runs/list?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}`
+    `${BASE_URL}/runs/list?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}`,
+    { headers: { ...authHeader() } }
   );
   if (!res.ok) throw new Error(`Failed to fetch runs: ${res.status}`);
   return res.json() as Promise<RunSummary[]>;
@@ -147,7 +161,8 @@ export async function fetchRunDetail(
   run_id: string
 ): Promise<RunDetail> {
   const res = await fetch(
-    `${BASE_URL}/runs/get?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}&run_id=${encodeURIComponent(run_id)}`
+    `${BASE_URL}/runs/get?task=${encodeURIComponent(task)}&model=${encodeURIComponent(model)}&run_id=${encodeURIComponent(run_id)}`,
+    { headers: { ...authHeader() } }
   );
   if (!res.ok) throw new Error(`Failed to fetch run detail: ${res.status}`);
   return res.json() as Promise<RunDetail>;
@@ -165,7 +180,8 @@ export type ArtifactsResponse = {
 
 export async function fetchArtifacts(task: string, ref: string): Promise<ArtifactsResponse> {
   const res = await fetch(
-    `${BASE_URL}/artifacts?task=${encodeURIComponent(task)}&ref=${encodeURIComponent(ref)}`
+    `${BASE_URL}/artifacts?task=${encodeURIComponent(task)}&ref=${encodeURIComponent(ref)}`,
+    { headers: { ...authHeader() } }
   );
   if (!res.ok) throw new Error(`Failed to fetch artifacts: ${res.status}`);
   return res.json() as Promise<ArtifactsResponse>;

@@ -5032,7 +5032,7 @@ class TestOwnershipModule:
                 (legacy_dir / f).write_text("{}" if f.endswith(".json") else "x")
 
         summary = backfill_legacy_ownership(env_root)
-        assert summary == {"scanned": 3, "migrated": 2, "already_had_ownership": 1}
+        assert summary == {"scanned": 3, "migrated": 2, "already_had_ownership": 1, "skipped_invalid": 0}
 
         assert read_ownership(env_root, "t", "owned_model").status == "owned"
         assert read_ownership(env_root, "t", "legacy_one").status == "legacy_unowned"
@@ -5045,7 +5045,7 @@ class TestOwnershipModule:
 
         (env_root / "tasks" / "empty_task").mkdir(parents=True)
         summary = backfill_legacy_ownership(env_root)
-        assert summary == {"scanned": 0, "migrated": 0, "already_had_ownership": 0}
+        assert summary == {"scanned": 0, "migrated": 0, "already_had_ownership": 0, "skipped_invalid": 0}
 
     def test_backfill_is_idempotent_on_rerun(self, env_root):
         from omnibioai_model_registry.ownership import backfill_legacy_ownership
@@ -5057,8 +5057,8 @@ class TestOwnershipModule:
 
         first = backfill_legacy_ownership(env_root)
         second = backfill_legacy_ownership(env_root)
-        assert first == {"scanned": 1, "migrated": 1, "already_had_ownership": 0}
-        assert second == {"scanned": 1, "migrated": 0, "already_had_ownership": 1}
+        assert first == {"scanned": 1, "migrated": 1, "already_had_ownership": 0, "skipped_invalid": 0}
+        assert second == {"scanned": 1, "migrated": 0, "already_had_ownership": 1, "skipped_invalid": 0}
 
     def test_backfill_on_empty_registry_is_a_safe_noop(self, tmp_path, monkeypatch):
         """MIGRATION TESTING: empty registry (no tasks/ dir at all yet)."""
@@ -5066,7 +5066,7 @@ class TestOwnershipModule:
 
         empty_root = tmp_path / "brand_new_registry"
         summary = backfill_legacy_ownership(empty_root)
-        assert summary == {"scanned": 0, "migrated": 0, "already_had_ownership": 0}
+        assert summary == {"scanned": 0, "migrated": 0, "already_had_ownership": 0, "skipped_invalid": 0}
         # Must not have created the tasks/ dir as a side effect.
         assert not empty_root.exists() or not (empty_root / "tasks").exists()
 
@@ -5092,6 +5092,38 @@ class TestOwnershipModule:
         model_root_dir = env_root / "tasks" / "t" / "models" / "legacy"
         assert (model_root_dir / "ownership.json").exists()
         assert (model_root_dir / "versions" / "v1" / "model.pt").exists()
+
+    def test_backfill_skips_invalid_directory_name_without_aborting(self, env_root):
+        """A stray directory under tasks/ whose name fails
+        path_safety.safe_component() (observed live: leftover debug
+        scaffolding like `__jwt_probe__/__probe__`, never a real
+        model_meta.json-backed model) must be skipped and counted, not
+        allowed to abort the migration for every OTHER real model in the
+        registry."""
+        from omnibioai_model_registry.ownership import (
+            backfill_legacy_ownership,
+            read_ownership,
+        )
+
+        # A genuinely valid legacy model, alongside the malformed entry.
+        legacy_dir = env_root / "tasks" / "t" / "models" / "legacy" / "versions" / "v1"
+        legacy_dir.mkdir(parents=True)
+        for f in REQUIRED_FILES:
+            (legacy_dir / f).write_text("{}" if f.endswith(".json") else "x")
+
+        # Invalid task name: leading underscore fails _SAFE_IDENTIFIER_RE
+        # (must start with an alphanumeric character).
+        probe_dir = env_root / "tasks" / "__jwt_probe__" / "models" / "__probe__"
+        probe_dir.mkdir(parents=True)
+
+        summary = backfill_legacy_ownership(env_root)
+        assert summary == {
+            "scanned": 2,
+            "migrated": 1,
+            "already_had_ownership": 0,
+            "skipped_invalid": 1,
+        }
+        assert read_ownership(env_root, "t", "legacy").status == "legacy_unowned"
 
 
 class TestRegisterModelOwnership:
@@ -5436,7 +5468,7 @@ class TestMigrateOwnershipCLI:
         args.func(args)
         out = capsys.readouterr().out
         summary = json.loads(out)
-        assert summary == {"scanned": 1, "migrated": 1, "already_had_ownership": 0}
+        assert summary == {"scanned": 1, "migrated": 1, "already_had_ownership": 0, "skipped_invalid": 0}
 
     def test_migrate_ownership_cli_human_readable(self, env_root, capsys):
         from omnibioai_model_registry.cli.main import build_parser

@@ -94,7 +94,7 @@ export default function HFPushButton({
       const jobId = data.job_id as string;
       pollRef.current = window.setInterval(async () => {
         try {
-          const sRes = await fetch(`${BASE_URL}/push/status/${jobId}`);
+          const sRes = await fetch(`${BASE_URL}/push/status/${jobId}`, { headers: { ...authHeader() } });
           const sData = await sRes.json();
           if (sData.status === "success") {
             setStatus("success");

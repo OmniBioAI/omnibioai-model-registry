@@ -56,7 +56,10 @@ export default function App() {
     setLoading(true);
     setAliasMap({});
     try {
-      const data = await fetchModels();
+      const data = await fetchModels().catch((err: unknown) => {
+        console.error('[model-registry-ui] failed to load models:', err);
+        throw err;
+      });
       const normalized: Model[] = Array.isArray(data) ? data : (data.models ?? []);
       setModels(normalized);
 
