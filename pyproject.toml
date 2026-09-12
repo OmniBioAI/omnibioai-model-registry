@@ -94,12 +94,7 @@ select = ["E", "F", "I"]
 ignore = ["E501"]
 
 [tool.coverage.run]
-omit = [
-    "omnibioai_model_registry/package/manifest.py",
-    "omnibioai_model_registry/package/validate.py",
-    "omnibioai_model_registry/storage/localfs.py",
-    "omnibioai_model_registry/storage/base.py",
-]
+branch = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
