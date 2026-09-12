@@ -1,6 +1,6 @@
 # OmniBioAI ModelHub
 
-> README last reviewed: **2026-08-23**
+> README last reviewed: **2026-09-12**
 
 **OmniBioAI ModelHub** is a production-oriented experiment tracking and model lifecycle management system for AI/ML models within the OmniBioAI ecosystem — purpose-built for biomedical AI plugins.
 
@@ -30,7 +30,7 @@ The registry is implemented as a **standalone Python library** (package name: `o
 - ✅ MySQL-backed metric + param storage
 - ✅ Immutable and verifiable model storage
 - ✅ Audit-ready promotion workflow
-- ✅ 24 `/v1` REST endpoints (tracking + registry + governance + Hugging Face push), plus `/health`
+- ✅ 23 `/v1` REST endpoints (tracking + registry + governance + Hugging Face push), plus `/health`
 - ✅ 13 CLI commands
 - ✅ IAM-gated reads and writes (`model.use` permission, `omnibioai-iam-client`, enforced independently at the registry)
 - ✅ Usage metering + cross-service audit emission
@@ -186,6 +186,7 @@ omnibioai-model-registry/
 │   ├── usage_emit.py        # Usage-metering wrapper around omnibioai-usage-client
 │   ├── ownership.py         # Phase 2A — write-once model ownership.json,
 │   │                         # legacy backfill (see Organization Ownership)
+│   ├── path_safety.py       # Allowlist path validation — see Filesystem Path Safety
 │   ├── storage/
 │   ├── package/
 │   ├── audit/                # Local audit trail — audit/promotions.jsonl
@@ -193,7 +194,10 @@ omnibioai-model-registry/
 │   └── service/
 ├── frontend/
 │   └── omnibioai-model-registry-ui/   # ModelHub UI (React + TypeScript)
+├── scripts/                  # One-off/operator migration scripts (ownership backfill)
+├── docs/                     # Standalone engineering write-ups (incident follow-ups, etc.)
 ├── tests/
+├── Dockerfile                # Multi-stage build: React UI + FastAPI + nginx — see Docker
 ├── pyproject.toml
 └── README.md
 ```
@@ -275,7 +279,7 @@ pip install dist/*.whl
 
 ## CLI Usage (`omr`)
 
-11 commands covering the full model lifecycle.
+13 commands covering the full model lifecycle.
 
 ### Register a model package
 
@@ -523,6 +527,48 @@ When `DB_HOST` is absent, the service runs in filesystem-only mode. Tracking end
 
 ---
 
+## Docker
+
+The root `Dockerfile` is a two-stage build that packages the FastAPI
+service **and** the ModelHub UI behind a single nginx front. Every `COPY`
+in it is rooted at `omnibioai-model-registry/...`, so **the build context
+must be this repo's parent directory** (the monorepo checkout layout this
+repo lives in — see the sibling-repo layout note), not this repo itself:
+
+1. **`ui-builder`** (`node:20-bookworm-slim`) — `npm ci && npm run build`
+   inside `omnibioai-model-registry/frontend/omnibioai-model-registry-ui/`.
+2. **`backend`** (`python:3.12-slim-bookworm`) — installs this package
+   with `pip install .` (pulling the private, pinned
+   `omnibioai-iam-client` git dependency via a BuildKit `--mount=type=secret`
+   GitHub token, never an `ARG`, so the token never lands in build logs or
+   an image layer), copies the built UI's static assets into
+   `/usr/share/nginx/html`, and writes an nginx config that serves the UI
+   at `/` and reverse-proxies `/v1/`, `/health`, and `/docs` to the
+   uvicorn process on `127.0.0.1:8095`.
+
+The container exposes both `8095` (the API directly) and `5176` (nginx,
+UI + proxied API) and starts both processes (`nginx` then `uvicorn`) from
+a single `CMD`.
+
+```bash
+# from the parent of this repo — the build context, not this directory
+cd ..
+docker build \
+  --secret id=github_token,env=GITHUB_TOKEN \
+  -f omnibioai-model-registry/Dockerfile \
+  -t omnibioai-model-registry .
+
+docker run --rm -p 5176:5176 -p 8095:8095 \
+  -e OMNIBIOAI_MODEL_REGISTRY_ROOT=/data/model_registry \
+  -v ~/local_registry/model_registry:/data/model_registry \
+  omnibioai-model-registry
+```
+
+UI: `http://localhost:5176/` — API (proxied): `http://localhost:5176/v1/...`
+— API (direct): `http://localhost:8095/v1/...`.
+
+---
+
 ## Authentication
 
 Off by default; **every non-informational endpoint** — both mutations
@@ -535,6 +581,7 @@ routes, `runs/log-*`) and reads (`resolve`, `verify`, `show`, `models`,
 export AUTH_ENABLED=true
 export JWT_SECRET=...      # HS256 fallback secret, matches omnibioai-auth's SECRET_KEY
 export IAM_URL=http://auth-service:8001
+export IAM_REDIS_URL=redis://localhost:6379/0   # optional; falls back to REDIS_URL, then this default
 ```
 
 `AUTH_ENABLED=false` (the default) runs the service in open mode — no
@@ -542,7 +589,9 @@ token required, every call attributed to a synthetic `system` actor. When
 enabled, `require_auth`/`require_write_auth` (`auth.py`) verify the
 presented JWT via `omnibioai-iam-client`'s `AsyncIAMClient.get_user()`
 (RS256/JWKS-or-HS256 signature check + revocation check against
-`omnibioai-auth`, no local JWT decoding of its own) and require the
+`omnibioai-auth`, no local JWT decoding of its own — `IAM_REDIS_URL`
+backs that client's own JWKS/revocation cache, not anything this
+service reads directly) and require the
 `model.use` permission — the same IAM pattern `omnibioai-lims` and
 `omnibioai-api-gateway` use. **The registry performs this verification
 itself, independently of the API Gateway** — it never trusts
