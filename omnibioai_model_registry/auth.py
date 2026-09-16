@@ -166,7 +166,18 @@ async def verify_and_authorize(
     """
     cfg = load_config()
     audit = AuditClient(cfg.audit_url)
-    client = AsyncIAMClient(base_url=cfg.iam_url, redis_url=cfg.iam_redis_url)
+    # HIPAA PHI P1-5: cache_secret HMAC-signs every Redis identity-cache
+    # entry this client reads/writes. Without it (the pre-fix state),
+    # anyone with Redis write access -- confirmed reachable on the shared
+    # unauthenticated Redis instance -- can forge an `iam:<token>` entry
+    # with attacker-chosen user_id/org_id/permissions and have it trusted
+    # with zero signature check, the same bypass omnibioai-tes's PR #22
+    # already fixed for itself. Reuses cfg.jwt_secret -- no new secret or
+    # env var, same value every other IAM-integrated service already
+    # shares.
+    client = AsyncIAMClient(
+        base_url=cfg.iam_url, redis_url=cfg.iam_redis_url, cache_secret=cfg.jwt_secret
+    )
     try:
         user = await client.get_user(token, cfg.jwt_secret)
     except Exception:
