@@ -126,16 +126,38 @@ def read_ownership(
 ) -> Optional[OwnershipRecord]:
     """The persisted ownership record for a model, or None if one has
     never been established (should not happen for any model that has
-    been registered against, or migrated, since this PR)."""
+    been registered against, or migrated, since this PR) OR if the file
+    exists but is unreadable as a valid record (corrupt JSON, not a JSON
+    object, or missing a required field -- e.g. disk corruption, a
+    truncated write outside this module's own atomic/write-once paths,
+    or manual tampering).
+
+    Deliberately returns None -- rather than letting json.JSONDecodeError/
+    TypeError propagate -- for that second case too: check_model_ownership()
+    treats None identically to "never established" (REASON_MODEL_NOT_FOUND,
+    always denied for every caller). This is the fail-closed behavior HIPAA-
+    V2-001 requires for malformed ownership records: an unreadable record
+    must never be silently treated as unowned/open-mode-accessible, and must
+    never surface a raw parse error (a 500 with internal detail) instead of
+    the same anti-enumerating "not found" shape every other denial in this
+    module already uses. See check_model_ownership()'s docstring."""
     path = L.ownership_path(Path(registry_root), task, model_name)
     if not path.exists():
         return None
-    data = json.loads(path.read_text())
-    # Forward-compatible: unknown extra keys from a future schema_version
-    # are dropped rather than raising, known-missing keys fall back to
-    # dataclass defaults (discovered_at/note).
-    known = {f for f in OwnershipRecord.__dataclass_fields__}
-    return OwnershipRecord(**{k: v for k, v in data.items() if k in known})
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict):
+            raise ValueError("ownership record is not a JSON object")
+        # Forward-compatible: unknown extra keys from a future schema_version
+        # are dropped rather than raising, known-missing keys fall back to
+        # dataclass defaults (discovered_at/note). A required field with no
+        # default (task/model_name/organization_id/status/registered_by/
+        # registered_at) that's simply absent from `data` raises TypeError
+        # here, caught below same as any other malformed-record case.
+        known = {f for f in OwnershipRecord.__dataclass_fields__}
+        return OwnershipRecord(**{k: v for k, v in data.items() if k in known})
+    except (json.JSONDecodeError, TypeError, ValueError, UnicodeDecodeError):
+        return None
 
 
 def ensure_model_ownership(
@@ -226,6 +248,16 @@ REASON_OPEN_MODE_MATCH = "open_mode_match"
 REASON_MODEL_NOT_FOUND = "model_not_found"
 REASON_LEGACY_UNOWNED = "legacy_unowned"
 REASON_OWNED_BY_OTHER_ORG = "owned_by_other_org"
+# Defense-in-depth: a record whose `status` field parsed as valid JSON
+# (so read_ownership() didn't already fail closed to None) but holds a
+# value outside the three known statuses -- not reachable via any
+# HTTP-facing write path today (ensure_model_ownership/
+# resolve_legacy_ownership only ever write one of the three), but a
+# malformed/legacy/corrupted ownership.json must never be treated as
+# implicitly "owned or unowned" by falling through the match logic
+# below. Always denied, same anti-enumerating shape as every other
+# reason here.
+REASON_UNKNOWN_STATUS = "unknown_status"
 
 
 @dataclass(frozen=True)
@@ -262,6 +294,13 @@ def check_model_ownership(
 
     if record.status == STATUS_LEGACY_UNOWNED:
         return OwnershipCheckResult(False, REASON_LEGACY_UNOWNED, record)
+
+    if record.status not in (STATUS_OWNED, STATUS_UNOWNED):
+        # Explicit allow-list, not an implicit elif-fallthrough: a status
+        # value that is none of the three known constants is always
+        # denied, never treated as if it were "owned"/"unowned" just
+        # because it wasn't "legacy_unowned". See REASON_UNKNOWN_STATUS.
+        return OwnershipCheckResult(False, REASON_UNKNOWN_STATUS, record)
 
     # status is STATUS_OWNED or STATUS_UNOWNED here.
     if requesting_org_id is not None and requesting_org_id == record.organization_id:
@@ -435,7 +474,13 @@ def resolve_legacy_ownership(
         raise OwnershipResolutionNotEligible(
             f"Model already owned by another organization: task={task}, model_name={model_name}"
         )
-    if existing.status == STATUS_UNOWNED:
+    if existing.status != STATUS_LEGACY_UNOWNED:
+        # Covers STATUS_UNOWNED (a real, already-established open-mode
+        # state -- not eligible, see the docstring above) AND, defense-
+        # in-depth, any status value that is neither of the three known
+        # constants: explicit allow-list, not an implicit fallthrough
+        # that would otherwise treat an unrecognized/malformed status as
+        # eligible for resolution.
         raise OwnershipResolutionNotEligible(
             f"Model is not a legacy record eligible for resolution: task={task}, model_name={model_name}"
         )

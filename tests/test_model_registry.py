@@ -5586,6 +5586,110 @@ class TestCheckModelOwnership:
         assert result.reason == "model_not_found"
         assert result.ownership is None
 
+    def test_malformed_json_ownership_record_fails_closed(self, env_root):
+        """HIPAA-V2-001 Legacy Resources requirement: a corrupt/unreadable
+        ownership.json must never be treated as unowned/open-mode -- it
+        must fail closed for every caller, with the SAME anti-enumerating
+        'not found' shape a genuinely missing record already uses, not a
+        raised parse exception."""
+        from omnibioai_model_registry.ownership import check_model_ownership, read_ownership
+        from omnibioai_model_registry.package.layout import ownership_path
+
+        path = ownership_path(env_root, "t", "corrupt_model")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{not valid json,,,")
+
+        assert read_ownership(env_root, "t", "corrupt_model") is None
+
+        for requesting_org_id in ("org-A", None):
+            result = check_model_ownership(
+                env_root, "t", "corrupt_model", requesting_org_id=requesting_org_id
+            )
+            assert result.allowed is False
+            assert result.reason == "model_not_found"
+
+    def test_ownership_record_that_is_not_a_json_object_fails_closed(self, env_root):
+        """A syntactically valid JSON value (e.g. a bare list/string) that
+        isn't an object -- so has no `.items()` -- must also fail closed,
+        not raise AttributeError."""
+        from omnibioai_model_registry.ownership import check_model_ownership, read_ownership
+        from omnibioai_model_registry.package.layout import ownership_path
+
+        path = ownership_path(env_root, "t", "list_model")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("[1, 2, 3]")
+
+        assert read_ownership(env_root, "t", "list_model") is None
+        result = check_model_ownership(env_root, "t", "list_model", requesting_org_id="org-A")
+        assert result.allowed is False
+        assert result.reason == "model_not_found"
+
+    def test_ownership_record_missing_required_field_fails_closed(self, env_root):
+        """Valid JSON object, but missing a required (no-default)
+        OwnershipRecord field -- must fail closed, not raise TypeError."""
+        from omnibioai_model_registry.ownership import check_model_ownership, read_ownership
+        from omnibioai_model_registry.package.layout import ownership_path
+
+        path = ownership_path(env_root, "t", "partial_model")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"schema_version": 1, "task": "t"}))
+
+        assert read_ownership(env_root, "t", "partial_model") is None
+        result = check_model_ownership(env_root, "t", "partial_model", requesting_org_id="org-A")
+        assert result.allowed is False
+        assert result.reason == "model_not_found"
+
+    def test_unknown_status_value_denied_not_implicitly_owned(self, env_root):
+        """Defense-in-depth: an ownership.json that parses fine and has
+        every required field, but whose `status` is neither owned/
+        unowned/legacy_unowned (a future/rolled-back schema, or direct
+        tampering), must be explicitly denied -- never fall through the
+        owned/unowned match logic just because it isn't literally
+        'legacy_unowned'."""
+        from omnibioai_model_registry.ownership import (
+            OwnershipRecord, check_model_ownership,
+        )
+        from omnibioai_model_registry.package.layout import ownership_path
+
+        path = ownership_path(env_root, "t", "weird_status_model")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        record = OwnershipRecord(
+            schema_version=1, task="t", model_name="weird_status_model",
+            organization_id="org-A", status="some_future_status",
+            registered_by="alice", registered_at="2026-01-01T00:00:00Z",
+        )
+        path.write_text(record.to_json())
+
+        for requesting_org_id in ("org-A", None):
+            result = check_model_ownership(
+                env_root, "t", "weird_status_model", requesting_org_id=requesting_org_id
+            )
+            assert result.allowed is False
+            assert result.reason == "unknown_status"
+
+    def test_resolve_legacy_ownership_denies_unknown_status(self, env_root):
+        """Same defense-in-depth for the resolution path: an unrecognized
+        status must never be treated as the eligible legacy_unowned case."""
+        from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
+        from omnibioai_model_registry.ownership import OwnershipRecord, resolve_legacy_ownership
+        from omnibioai_model_registry.package.layout import ownership_path
+        from omnibioai_model_registry.storage.localfs import LocalFS
+
+        path = ownership_path(env_root, "t", "weird_status_model")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        record = OwnershipRecord(
+            schema_version=1, task="t", model_name="weird_status_model",
+            organization_id=None, status="some_future_status",
+            registered_by=None, registered_at=None,
+        )
+        path.write_text(record.to_json())
+
+        with pytest.raises(OwnershipResolutionNotEligible):
+            resolve_legacy_ownership(
+                LocalFS(), env_root, "t", "weird_status_model",
+                organization_id="org-A", actor="alice@a.com",
+            )
+
 
 class TestPhase2BOrgEnforcement:
     """HTTP/TestClient-level: two organizations, one model owned by org-A
@@ -5980,6 +6084,23 @@ class TestPhase2BOrgEnforcement:
 
         r = client.get("/v1/resolve", params={"task": "t", "ref": "old_model@v1"})
         assert r.status_code == 400
+
+    def test_malformed_ownership_json_denied_not_500(self, org_a_model, monkeypatch):
+        """HIPAA-V2-001 Legacy Resources requirement, exercised at the HTTP
+        layer: a corrupted ownership.json for an existing, registered model
+        must deny org-A's OWN request the same anti-enumerating way as
+        any other denial (400 via ModelNotFound), never surface as an
+        unhandled 500 with internal parse-error detail."""
+        client, root = org_a_model
+        from omnibioai_model_registry.package.layout import ownership_path
+
+        ownership_path(root, "t", "m").write_text("{not valid json")
+
+        self._as_org(monkeypatch, "org-A")
+        r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"},
+                        headers={"Authorization": "Bearer org-A"})
+        assert r.status_code == 400
+        assert "not valid json" not in r.text
 
     # ── header/query/body spoofing cannot bypass ownership ──────────────────
 
