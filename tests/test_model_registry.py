@@ -3,6 +3,9 @@ tests/test_model_registry.py
 
 Comprehensive tests for omnibioai_model_registry — target 95%+ coverage.
 Covers: api, config, refs, errors, package/*, storage/*, audit/*, cli/main
+
+Developer:
+    Manish Kumar <manish@omnibioai.org>
 """
 
 from __future__ import annotations
@@ -30,6 +33,8 @@ from omnibioai_model_registry.package.layout import REQUIRED_FILES
 
 
 def _make_minimal_package(dir_path: Path, *, meta: dict | None = None) -> None:
+    """Writes a minimal valid model package (weights, gene list, label map, metrics,
+    feature schema, model_meta.json and an empty sha256sums.txt) into dir_path."""
     dir_path.mkdir(parents=True, exist_ok=True)
     (dir_path / "model.pt").write_bytes(b"fake model weights")
     (dir_path / "model_genes.txt").write_text("GeneA\nGeneB\n", encoding="utf-8")
@@ -70,6 +75,8 @@ def _write_unowned_ownership(root: Path, task: str, model_name: str) -> None:
 
 @pytest.fixture
 def env_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Registry root under tmp_path, selected through the OMNIBIOAI_MODEL_REGISTRY_ROOT,
+    _BACKEND=localfs and _STRICT_VERIFY=1 environment variables."""
     root = tmp_path / "registry_root"
     monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
     monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_BACKEND", "localfs")
@@ -79,11 +86,14 @@ def env_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.fixture
 def reg(env_root: Path) -> ModelRegistry:
+    """A ModelRegistry built from the env_root environment."""
     return ModelRegistry.from_env()
 
 
 @pytest.fixture
 def registered_reg(env_root: Path, tmp_path: Path) -> tuple[ModelRegistry, Path]:
+    """A ModelRegistry with model t/m at version v1 (alias latest) already registered
+    from a minimal package; returns the registry and its root."""
     src = tmp_path / "pkg_src"
     _make_minimal_package(src)
     r = ModelRegistry.from_env()
@@ -106,6 +116,9 @@ def registered_reg(env_root: Path, tmp_path: Path) -> tuple[ModelRegistry, Path]
 
 
 def test_register_creates_version_dir_and_metadata(env_root: Path, tmp_path: Path):
+    """register_model creates a version directory holding every REQUIRED_FILES entry,
+    and model_meta.json records the task, model name, version, created_at and the
+    supplied framework."""
     src = tmp_path / "pkg_src"
     _make_minimal_package(src, meta={"framework": "test"})
     reg = ModelRegistry.from_env()
@@ -131,6 +144,8 @@ def test_register_creates_version_dir_and_metadata(env_root: Path, tmp_path: Pat
 
 
 def test_register_is_immutable(env_root: Path, tmp_path: Path):
+    """Registering the same task, model and version a second time raises
+    VersionAlreadyExists."""
     src = tmp_path / "pkg_src"
     _make_minimal_package(src)
     reg = ModelRegistry.from_env()
@@ -154,6 +169,8 @@ def test_register_is_immutable(env_root: Path, tmp_path: Path):
 
 
 def test_resolve_by_version_and_alias(env_root: Path, tmp_path: Path):
+    """resolve_model returns the same path for m@v1 and m@latest, and the latest alias
+    file records version v1 and the registering actor."""
     src = tmp_path / "pkg_src"
     _make_minimal_package(src)
     reg = ModelRegistry.from_env()
@@ -178,6 +195,8 @@ def test_resolve_by_version_and_alias(env_root: Path, tmp_path: Path):
 
 
 def test_promote_writes_audit_log(env_root: Path, tmp_path: Path):
+    """promote_model appends an entry to the model's promotions.jsonl audit log
+    recording the alias, version and actor."""
     src = tmp_path / "pkg_src"
     _make_minimal_package(src)
     reg = ModelRegistry.from_env()
@@ -208,12 +227,15 @@ def test_promote_writes_audit_log(env_root: Path, tmp_path: Path):
 
 
 def test_resolve_missing_raises(env_root: Path):
+    """Resolving a model that was never registered raises ModelNotFound."""
     reg = ModelRegistry.from_env()
     with pytest.raises(ModelNotFound):
         reg.resolve_model(task="t", model_ref="m@latest", verify=False)
 
 
 def test_register_fails_if_artifacts_dir_missing(env_root: Path, tmp_path: Path):
+    """Registering from an artifacts directory that does not exist raises
+    ValidationError."""
     reg = ModelRegistry.from_env()
     with pytest.raises(ValidationError):
         reg.register_model(
@@ -307,8 +329,12 @@ def test_register_then_resolve_end_to_end_without_precomputed_manifest(
 
 
 class TestConfig:
+    """load_config() reads the registry root, backend and strict-verify setting from
+    environment variables, applies defaults, and fails when no root is configured."""
 
     def test_load_config_from_env(self, monkeypatch):
+        """OMNIBIOAI_MODEL_REGISTRY_ROOT, _BACKEND and _STRICT_VERIFY=1 are read into
+        the config's root, backend and a strict_verify of True."""
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_BACKEND", "localfs")
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "1")
@@ -320,6 +346,7 @@ class TestConfig:
         assert cfg.strict_verify is True
 
     def test_load_config_strict_verify_false(self, monkeypatch):
+        """OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY=0 gives strict_verify False."""
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
         from omnibioai_model_registry.config import load_config
@@ -328,6 +355,8 @@ class TestConfig:
         assert cfg.strict_verify is False
 
     def test_load_config_strict_verify_false_word(self, monkeypatch):
+        """OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY=false, written as a word, also gives
+        strict_verify False."""
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "false")
         from omnibioai_model_registry.config import load_config
@@ -336,6 +365,8 @@ class TestConfig:
         assert cfg.strict_verify is False
 
     def test_load_config_missing_root_raises(self, monkeypatch):
+        """With neither OMNIBIOAI_MODEL_REGISTRY_ROOT nor REGISTRY_ROOT set, load_config
+        raises RegistryNotConfigured."""
         monkeypatch.delenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", raising=False)
         monkeypatch.delenv("REGISTRY_ROOT", raising=False)
         from omnibioai_model_registry.config import load_config
@@ -353,6 +384,7 @@ class TestConfig:
         assert cfg.root == "/tmp/fallback"
 
     def test_load_config_default_backend(self, monkeypatch):
+        """With no backend variable set, the backend defaults to localfs."""
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.delenv("OMNIBIOAI_MODEL_REGISTRY_BACKEND", raising=False)
         from omnibioai_model_registry.config import load_config
@@ -367,8 +399,11 @@ class TestConfig:
 
 
 class TestRefs:
+    """parse_model_ref() splits 'model@selector' references and rejects malformed ones."""
 
     def test_parse_valid_ref(self):
+        """'human_pbmc@production' parses to model_name human_pbmc and selector
+        production."""
         from omnibioai_model_registry.refs import parse_model_ref
 
         ref = parse_model_ref("human_pbmc@production")
@@ -376,6 +411,8 @@ class TestRefs:
         assert ref.selector == "production"
 
     def test_parse_version_ref(self):
+        """A version-style selector in 'human_pbmc@2026-02-13_001' is parsed as the
+        selector."""
         from omnibioai_model_registry.refs import parse_model_ref
 
         ref = parse_model_ref("human_pbmc@2026-02-13_001")
@@ -390,6 +427,7 @@ class TestRefs:
             parse_model_ref("human_pbmc_no_at")
 
     def test_parse_empty_ref_raises(self):
+        """An empty reference raises InvalidModelRef."""
         from omnibioai_model_registry.refs import parse_model_ref
 
         with pytest.raises(InvalidModelRef):
@@ -416,8 +454,12 @@ class TestRefs:
 
 
 class TestErrors:
+    """The registry's exception types."""
 
     def test_all_error_types(self):
+        """Each registry error type (ModelNotFound, VersionAlreadyExists,
+        ValidationError, IntegrityError, InvalidModelRef and RegistryNotConfigured) is
+        an Exception whose message contains the text it was given."""
         from omnibioai_model_registry.errors import (
             IntegrityError,
             InvalidModelRef,
@@ -446,44 +488,52 @@ class TestErrors:
 
 
 class TestLayout:
+    """The package.layout path helpers and the REQUIRED_FILES list."""
 
     def test_required_files_list(self):
+        """REQUIRED_FILES includes model.pt and sha256sums.txt."""
         from omnibioai_model_registry.package.layout import REQUIRED_FILES
 
         assert "model.pt" in REQUIRED_FILES
         assert "sha256sums.txt" in REQUIRED_FILES
 
     def test_task_root(self, tmp_path):
+        """task_root ends with tasks/<task>."""
         from omnibioai_model_registry.package.layout import task_root
 
         p = task_root(tmp_path, "celltype_sc")
         assert str(p).endswith("tasks/celltype_sc")
 
     def test_model_root(self, tmp_path):
+        """model_root contains models/<model_name>."""
         from omnibioai_model_registry.package.layout import model_root
 
         p = model_root(tmp_path, "celltype_sc", "human_pbmc")
         assert "models/human_pbmc" in str(p)
 
     def test_version_dir(self, tmp_path):
+        """version_dir's final path component is the version."""
         from omnibioai_model_registry.package.layout import version_dir
 
         p = version_dir(tmp_path, "t", "m", "v1")
         assert p.name == "v1"
 
     def test_alias_path(self, tmp_path):
+        """alias_path's file name is <alias>.json."""
         from omnibioai_model_registry.package.layout import alias_path
 
         p = alias_path(tmp_path, "t", "m", "latest")
         assert p.name == "latest.json"
 
     def test_audit_root(self, tmp_path):
+        """audit_root's final path component is audit."""
         from omnibioai_model_registry.package.layout import audit_root
 
         p = audit_root(tmp_path, "t", "m")
         assert p.name == "audit"
 
     def test_promotions_log_path(self, tmp_path):
+        """promotions_log_path's file name is promotions.jsonl."""
         from omnibioai_model_registry.package.layout import promotions_log_path
 
         p = promotions_log_path(tmp_path, "t", "m")
@@ -498,12 +548,14 @@ class TestLayout:
         assert pp.manifest_path == tmp_path / "sha256sums.txt"
 
     def test_versions_root(self, tmp_path):
+        """versions_root's final path component is versions."""
         from omnibioai_model_registry.package.layout import versions_root
 
         p = versions_root(tmp_path, "t", "m")
         assert p.name == "versions"
 
     def test_aliases_root(self, tmp_path):
+        """aliases_root's final path component is aliases."""
         from omnibioai_model_registry.package.layout import aliases_root
 
         p = aliases_root(tmp_path, "t", "m")
@@ -516,8 +568,12 @@ class TestLayout:
 
 
 class TestValidate:
+    """validate_package_files() requires a package directory to contain every required
+    file."""
 
     def test_validate_passes_with_all_files(self, tmp_path):
+        """validate_package_files accepts a directory that contains every REQUIRED_FILES
+        entry."""
         from omnibioai_model_registry.package.validate import validate_package_files
 
         for f in REQUIRED_FILES:
@@ -541,8 +597,11 @@ class TestValidate:
 
 
 class TestManifest:
+    """The sha256 manifest helpers: hashing files and writing, reading and verifying
+    sha256sums.txt."""
 
     def test_sha256_file(self, tmp_path):
+        """sha256_file returns a 64-character digest that is the same on repeated calls."""
         from omnibioai_model_registry.package.manifest import sha256_file
 
         f = tmp_path / "test.bin"
@@ -552,6 +611,8 @@ class TestManifest:
         assert digest == sha256_file(f)
 
     def test_write_and_read_manifest(self, tmp_path):
+        """write_sha256_manifest hashes the listed files, and read_sha256_manifest
+        returns the same hashes."""
         from omnibioai_model_registry.package.manifest import (
             read_sha256_manifest,
             write_sha256_manifest,
@@ -636,6 +697,8 @@ class TestManifest:
         assert len(result) == 2
 
     def test_verify_manifest_passes(self, tmp_path):
+        """verify_sha256_manifest accepts a file whose content matches its manifest
+        hash."""
         from omnibioai_model_registry.package.manifest import (
             verify_sha256_manifest,
             write_sha256_manifest,
@@ -657,6 +720,8 @@ class TestManifest:
         assert "missing" in str(exc_info.value)
 
     def test_verify_manifest_hash_mismatch_raises(self, tmp_path):
+        """A file whose content differs from its manifest hash raises IntegrityError
+        with a message mentioning a mismatch."""
         from omnibioai_model_registry.package.manifest import verify_sha256_manifest
 
         (tmp_path / "model.pt").write_bytes(b"different content")
@@ -675,8 +740,11 @@ class TestManifest:
 
 
 class TestLocalFS:
+    """LocalFS's filesystem primitives: directory creation, existence checks, tree copy,
+    and atomic text writes with cleanup on failure."""
 
     def test_ensure_dirs(self, tmp_path):
+        """ensure_dirs creates a nested directory path that did not previously exist."""
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         fs = LocalFS()
@@ -685,6 +753,7 @@ class TestLocalFS:
         assert new_dir.exists()
 
     def test_exists_true_false(self, tmp_path):
+        """exists reports True for a path that exists and False for one that does not."""
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         fs = LocalFS()
@@ -692,6 +761,7 @@ class TestLocalFS:
         assert fs.exists(tmp_path / "nonexistent") is False
 
     def test_copy_tree(self, tmp_path):
+        """copy_tree copies a directory's file contents to the destination."""
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         fs = LocalFS()
@@ -703,6 +773,7 @@ class TestLocalFS:
         assert (dst / "file.txt").read_text() == "hello"
 
     def test_atomic_write_text(self, tmp_path):
+        """atomic_write_text writes the given text so the target file's content matches."""
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         fs = LocalFS()
@@ -720,6 +791,7 @@ class TestLocalFS:
         assert target.read_text() == "content"
 
     def test_atomic_write_overwrites(self, tmp_path):
+        """A second atomic_write_text call replaces the file's previous content."""
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         fs = LocalFS()
@@ -774,8 +846,12 @@ class TestLocalFS:
 
 
 class TestAuditLog:
+    """The promotion audit log: appending PromotionEvent records to a JSONL file and the
+    now_utc_iso timestamp helper."""
 
     def test_append_and_read_promotion_event(self, tmp_path):
+        """append_promotion_event writes one JSON line recording the event's alias and
+        actor."""
         from omnibioai_model_registry.audit.audit_log import (
             PromotionEvent,
             append_promotion_event,
@@ -800,6 +876,8 @@ class TestAuditLog:
         assert data["actor"] == "x"
 
     def test_append_multiple_events(self, tmp_path):
+        """Three successive append_promotion_event calls produce three JSON lines in the
+        log."""
         from omnibioai_model_registry.audit.audit_log import (
             PromotionEvent,
             append_promotion_event,
@@ -822,6 +900,8 @@ class TestAuditLog:
         assert len(lines) == 3
 
     def test_now_utc_iso_format(self):
+        """now_utc_iso returns a timestamp containing a 'T' separator and a UTC marker
+        (Z, +00:00 or UTC)."""
         from omnibioai_model_registry.audit.audit_log import now_utc_iso
 
         ts = now_utc_iso()
@@ -835,6 +915,10 @@ class TestAuditLog:
 
 
 class TestAPIAdditional:
+    """Additional
+    ModelRegistry.from_env()/register_model()/resolve_model()/promote_model() behavior
+    not covered by the module-level tests above, including the module-level convenience
+    functions."""
 
     def test_from_env_unsupported_backend_raises(self, monkeypatch, tmp_path):
         """Covers line 28: unsupported backend raises ValueError."""
@@ -844,6 +928,7 @@ class TestAPIAdditional:
             ModelRegistry.from_env()
 
     def test_root_property(self, env_root):
+        """ModelRegistry.root is an absolute path."""
         reg = ModelRegistry.from_env()
         assert reg.root.is_absolute()
 
@@ -861,6 +946,7 @@ class TestAPIAdditional:
             )
 
     def test_verify_model_ref(self, env_root, tmp_path):
+        """verify_model_ref succeeds for a model reference that was just registered."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -875,6 +961,8 @@ class TestAPIAdditional:
         reg.verify_model_ref(task="t", model_ref="m@v1")
 
     def test_resolve_model_no_verify(self, env_root, tmp_path):
+        """resolve_model with verify=False returns an existing version directory without
+        checksum verification."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -890,6 +978,8 @@ class TestAPIAdditional:
         assert vdir.exists()
 
     def test_register_with_actor_and_reason(self, env_root, tmp_path):
+        """register_model with an actor and reason and set_alias='latest' reports
+        alias_set as latest."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -906,6 +996,7 @@ class TestAPIAdditional:
         assert out["alias_set"] == "latest"
 
     def test_register_no_alias(self, env_root, tmp_path):
+        """register_model with set_alias=None reports alias_set as None."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -993,6 +1084,7 @@ class TestAPIAdditional:
         api_mod.verify_model_ref(task="t", model_ref="m@v1")
 
     def test_hashes_returned_in_register(self, env_root, tmp_path):
+        """register_model's result includes a non-empty hashes dict."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -1008,6 +1100,8 @@ class TestAPIAdditional:
         assert len(out["hashes"]) > 0
 
     def test_promote_multiple_aliases(self, env_root, tmp_path):
+        """Promoting the same version under two different aliases (staging and
+        production) writes both alias files with that version."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -1037,17 +1131,24 @@ class TestAPIAdditional:
 
 
 class TestCLIMain:
+    """The omr CLI (cli/main.py), invoked in-process through runpy: register, resolve,
+    promote, verify, list and show subcommands, their JSON/raw/pretty output modes, and
+    their exit codes on error."""
 
     def _get_cli_path(self):
+        """Returns cli/main.py's own file path, used to re-execute it with runpy."""
         import omnibioai_model_registry.cli.main as cli_mod
 
         return cli_mod.__file__
 
     def _run_cli(self, monkeypatch, argv):
+        """Sets sys.argv to argv and runs cli/main.py as __main__ via runpy."""
         monkeypatch.setattr("sys.argv", argv)
         runpy.run_path(self._get_cli_path(), run_name="__main__")
 
     def _register_via_api(self, env_root, tmp_path, model="m", version="v1"):
+        """Registers a minimal package for the given model/version directly through
+        ModelRegistry, for tests that need an existing model before exercising the CLI."""
         src = tmp_path / f"src_{model}_{version}"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -1062,6 +1163,7 @@ class TestCLIMain:
         return src
 
     def test_cli_register_plain(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr register with --set-alias latest prints a success message or the version."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         self._run_cli(
@@ -1085,6 +1187,8 @@ class TestCLIMain:
         assert "Registered" in out.out or "v1" in out.out
 
     def test_cli_register_json_output(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr register --json with an empty --set-alias prints a JSON object with ok
+        true."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         self._run_cli(
@@ -1112,6 +1216,8 @@ class TestCLIMain:
     def test_cli_register_with_metadata_inline(
         self, env_root, tmp_path, monkeypatch, capsys
     ):
+        """omr register --metadata-inline accepts an inline JSON metadata string and
+        registers the model."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         self._run_cli(
@@ -1137,6 +1243,8 @@ class TestCLIMain:
     def test_cli_register_with_metadata_json_file(
         self, env_root, tmp_path, monkeypatch, capsys
     ):
+        """omr register --metadata-json reads metadata from the given file and registers
+        the model."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         meta_file = tmp_path / "meta.json"
@@ -1164,6 +1272,8 @@ class TestCLIMain:
     def test_cli_register_metadata_json_missing_raises(
         self, env_root, tmp_path, monkeypatch
     ):
+        """omr register --metadata-json pointing at a nonexistent file exits with code 1
+        or 2."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         with pytest.raises(SystemExit) as exc_info:
@@ -1187,6 +1297,7 @@ class TestCLIMain:
         assert exc_info.value.code in (1, 2)
 
     def test_cli_resolve(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr resolve prints the resolved version or the registry root path."""
         self._register_via_api(env_root, tmp_path)
         self._run_cli(
             monkeypatch,
@@ -1203,6 +1314,7 @@ class TestCLIMain:
         assert "v1" in out.out or str(env_root) in out.out
 
     def test_cli_promote(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr promote prints the alias or a success message."""
         self._register_via_api(env_root, tmp_path)
         self._run_cli(
             monkeypatch,
@@ -1227,6 +1339,7 @@ class TestCLIMain:
         assert "production" in out.out or "Promoted" in out.out
 
     def test_cli_verify(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr verify prints a success indication or non-empty output."""
         self._register_via_api(env_root, tmp_path)
         self._run_cli(
             monkeypatch,
@@ -1243,17 +1356,21 @@ class TestCLIMain:
         assert "passed" in out.out or out.out.strip() != ""
 
     def test_cli_list(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr list --task t prints the registered model's name."""
         self._register_via_api(env_root, tmp_path)
         self._run_cli(monkeypatch, ["omr", "list", "--task", "t"])
         out = capsys.readouterr()
         assert "m" in out.out
 
     def test_cli_list_no_models(self, env_root, monkeypatch, capsys):
+        """omr list for a task with no models prints a 'No models' message."""
         self._run_cli(monkeypatch, ["omr", "list", "--task", "nonexistent_task"])
         out = capsys.readouterr()
         assert "No models" in out.out
 
     def test_cli_show_pretty(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr show without --json or --raw prints a pretty view containing Task or
+        Model."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -1278,6 +1395,8 @@ class TestCLIMain:
         assert "Task" in out.out or "Model" in out.out
 
     def test_cli_show_json(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr show --json prints a JSON object whose framework field matches the
+        registered metadata."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -1306,6 +1425,7 @@ class TestCLIMain:
         assert data["framework"] == "sklearn"
 
     def test_cli_show_raw(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr show --raw prints the raw metadata including the framework value."""
         src = tmp_path / "src"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -1333,11 +1453,13 @@ class TestCLIMain:
         assert "sklearn" in out.out
 
     def test_cli_no_args_exits(self, env_root, monkeypatch):
+        """Running the CLI with no arguments raises SystemExit."""
         monkeypatch.setattr("sys.argv", ["omr"])
         with pytest.raises(SystemExit):
             runpy.run_path(self._get_cli_path(), run_name="__main__")
 
     def test_cli_registry_error_exits_1(self, env_root, monkeypatch):
+        """Resolving a nonexistent model through the CLI exits with code 1."""
         with pytest.raises(SystemExit) as exc_info:
             self._run_cli(
                 monkeypatch,
@@ -1419,8 +1541,11 @@ class TestCLIMain:
 
 
 class TestLayoutRunPaths:
+    """The package.layout path helpers for run-scoped paths: runs_root, run_dir,
+    run_params_path, run_tags_path, run_metric_log_path and version_tags_path."""
 
     def test_runs_root(self, tmp_path):
+        """runs_root's parent is the model directory and its own name is runs."""
         from omnibioai_model_registry.package.layout import runs_root
 
         p = runs_root(tmp_path, "celltype_sc", "human_pbmc")
@@ -1429,6 +1554,7 @@ class TestLayoutRunPaths:
         assert str(p).endswith("models/human_pbmc/runs")
 
     def test_run_dir(self, tmp_path):
+        """run_dir's name is the run id and its parent is runs."""
         from omnibioai_model_registry.package.layout import run_dir
 
         p = run_dir(tmp_path, "t", "m", "run_abc123")
@@ -1436,6 +1562,7 @@ class TestLayoutRunPaths:
         assert p.parent.name == "runs"
 
     def test_run_params_path(self, tmp_path):
+        """run_params_path's file name is params.json under the run directory."""
         from omnibioai_model_registry.package.layout import run_params_path
 
         p = run_params_path(tmp_path, "t", "m", "r1")
@@ -1443,6 +1570,7 @@ class TestLayoutRunPaths:
         assert p.parent.name == "r1"
 
     def test_run_tags_path(self, tmp_path):
+        """run_tags_path's file name is tags.json under the run directory."""
         from omnibioai_model_registry.package.layout import run_tags_path
 
         p = run_tags_path(tmp_path, "t", "m", "r1")
@@ -1450,6 +1578,8 @@ class TestLayoutRunPaths:
         assert p.parent.name == "r1"
 
     def test_run_metric_log_path(self, tmp_path):
+        """run_metric_log_path's file name is <metric>.jsonl under a metrics directory
+        under the run directory."""
         from omnibioai_model_registry.package.layout import run_metric_log_path
 
         p = run_metric_log_path(tmp_path, "t", "m", "r1", "accuracy")
@@ -1458,6 +1588,7 @@ class TestLayoutRunPaths:
         assert p.parent.parent.name == "r1"
 
     def test_version_tags_path(self, tmp_path):
+        """version_tags_path's file name is tags.json under the version directory."""
         from omnibioai_model_registry.package.layout import version_tags_path
 
         p = version_tags_path(tmp_path, "t", "m", "v1")
@@ -1485,8 +1616,11 @@ class TestLayoutRunPaths:
 
 
 class TestRunLogger:
+    """RunLogger's param/metric/tag logging, its context-manager finish behavior, and
+    isolation between concurrent run instances."""
 
     def test_run_id_auto_generated(self, tmp_path):
+        """A RunLogger with no run_id given generates a non-empty string run id."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1494,12 +1628,14 @@ class TestRunLogger:
         assert len(r.run_id) > 0
 
     def test_run_id_explicit(self, tmp_path):
+        """A RunLogger created with an explicit run_id keeps that exact id."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", run_id="fixed_id", registry_root=tmp_path)
         assert r.run_id == "fixed_id"
 
     def test_run_id_stable_across_calls(self, tmp_path):
+        """Logging params, metrics and tags does not change the run's run_id."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1510,6 +1646,7 @@ class TestRunLogger:
         assert r.run_id == rid
 
     def test_log_param_writes_params_json(self, tmp_path):
+        """log_param writes the key/value into the run's params.json."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1523,6 +1660,7 @@ class TestRunLogger:
         assert data["lr"] == 0.001
 
     def test_log_params_merges_all_keys(self, tmp_path):
+        """log_params writes every key from the given dict into params.json."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1537,6 +1675,8 @@ class TestRunLogger:
         assert data["batch_size"] == 32
 
     def test_log_param_then_log_params_cumulates(self, tmp_path):
+        """A log_param call followed by log_params keeps both sets of keys in
+        params.json."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1551,6 +1691,8 @@ class TestRunLogger:
         assert data["epochs"] == 50
 
     def test_log_metric_creates_jsonl_file(self, tmp_path):
+        """log_metric appends one JSON line to <metric>.jsonl recording the key, value,
+        step and a ts_utc timestamp."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1571,6 +1713,8 @@ class TestRunLogger:
         assert "ts_utc" in entry
 
     def test_log_metric_multiple_steps_appends(self, tmp_path):
+        """Repeated log_metric calls for the same metric append one line per step, in
+        order."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1591,6 +1735,7 @@ class TestRunLogger:
         assert values == [1.0, 0.5, 0.2]
 
     def test_log_metrics_dict_creates_separate_files(self, tmp_path):
+        """log_metrics writes each metric in the dict to its own <metric>.jsonl file."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1605,6 +1750,7 @@ class TestRunLogger:
         assert json.loads((metrics_dir / "f1.jsonl").read_text().strip())["value"] == 0.85
 
     def test_set_tag_writes_tags_json(self, tmp_path):
+        """set_tag writes the key/value into the run's tags.json."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1618,6 +1764,7 @@ class TestRunLogger:
         assert data["team"] == "bioml"
 
     def test_set_tags_merges_all_keys(self, tmp_path):
+        """set_tags writes every key from the given dict into tags.json."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1632,6 +1779,7 @@ class TestRunLogger:
         assert data["version"] == "v3"
 
     def test_set_tag_then_set_tags_cumulates(self, tmp_path):
+        """A set_tag call followed by set_tags keeps both sets of keys in tags.json."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1646,6 +1794,7 @@ class TestRunLogger:
         assert data["env"] == "training"
 
     def test_finish_returns_run_id(self, tmp_path):
+        """finish() returns the run's own run_id."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1654,6 +1803,8 @@ class TestRunLogger:
         assert result == r.run_id
 
     def test_finish_flushes_params_and_tags(self, tmp_path):
+        """After finish(), the run's params.json and tags.json on disk reflect
+        everything logged."""
         from omnibioai_model_registry.run import RunLogger
 
         r = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1666,6 +1817,8 @@ class TestRunLogger:
         assert json.loads((base / "tags.json").read_text())["k"] == "v"
 
     def test_context_manager_calls_finish(self, tmp_path):
+        """Using RunLogger as a context manager flushes params.json on exit without an
+        explicit finish() call."""
         from omnibioai_model_registry.run import RunLogger
 
         with RunLogger(task="t", model_name="m", registry_root=tmp_path) as r:
@@ -1679,6 +1832,8 @@ class TestRunLogger:
         assert json.loads(params_file.read_text())["lr"] == 0.01
 
     def test_context_manager_with_metrics_and_tags(self, tmp_path):
+        """As a context manager, params, two metric steps and a tag are all persisted on
+        exit."""
         from omnibioai_model_registry.run import RunLogger
 
         with RunLogger(task="t", model_name="m", registry_root=tmp_path) as r:
@@ -1698,6 +1853,8 @@ class TestRunLogger:
         assert len(lines) == 2
 
     def test_two_instances_produce_separate_dirs(self, tmp_path):
+        """Two RunLogger instances for the same task/model get distinct run ids and
+        separate params.json files."""
         from omnibioai_model_registry.run import RunLogger
 
         r1 = RunLogger(task="t", model_name="m", registry_root=tmp_path)
@@ -1734,16 +1891,22 @@ class TestRunLogger:
 
 
 class TestCLINewCommands:
+    """The omr metrics/aliases/tag/stage/compare subcommands: text and JSON output, tag
+    and stage merging into model_meta.json, and rejection of an invalid stage."""
 
     def _get_cli_path(self):
+        """Returns cli/main.py's own file path, used to re-execute it with runpy."""
         import omnibioai_model_registry.cli.main as cli_mod
         return cli_mod.__file__
 
     def _run_cli(self, monkeypatch, argv):
+        """Sets sys.argv to argv and runs cli/main.py as __main__ via runpy."""
         monkeypatch.setattr("sys.argv", argv)
         runpy.run_path(self._get_cli_path(), run_name="__main__")
 
     def _register(self, tmp_path, task="t", model="m", version="v1"):
+        """Registers a minimal package for the given task/model/version directly through
+        ModelRegistry, for tests that need an existing model before exercising the CLI."""
         src = tmp_path / f"src_{task}_{model}_{version}"
         _make_minimal_package(src)
         reg = ModelRegistry.from_env()
@@ -1756,6 +1919,8 @@ class TestCLINewCommands:
     # omr metrics -------------------------------------------------------
 
     def test_cli_metrics_prints_version_metrics(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr metrics prints the registered metrics.json content, including the acc
+        key."""
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
         self._register(tmp_path)
         self._run_cli(monkeypatch, ["omr", "metrics", "--task", "t", "--ref", "m@v1"])
@@ -1763,6 +1928,7 @@ class TestCLINewCommands:
         assert "acc" in out
 
     def test_cli_metrics_json_output(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr metrics --json prints a JSON object containing the acc key."""
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
         self._register(tmp_path)
         self._run_cli(monkeypatch, ["omr", "metrics", "--task", "t", "--ref", "m@v1", "--json"])
@@ -1773,12 +1939,15 @@ class TestCLINewCommands:
     # omr aliases -------------------------------------------------------
 
     def test_cli_aliases_empty(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr aliases for a model registered with no alias prints a 'No aliases'
+        message."""
         self._register(tmp_path)  # register with set_alias=None → no aliases
         self._run_cli(monkeypatch, ["omr", "aliases", "--task", "t", "--model", "m"])
         out = capsys.readouterr().out
         assert "No aliases" in out
 
     def test_cli_aliases_shows_promoted(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr aliases lists an alias created by a prior promote_model call."""
         reg = self._register(tmp_path)
         reg.promote_model(task="t", model_name="m", alias="latest", version="v1")
         self._run_cli(monkeypatch, ["omr", "aliases", "--task", "t", "--model", "m"])
@@ -1786,6 +1955,8 @@ class TestCLINewCommands:
         assert "latest" in out
 
     def test_cli_aliases_json(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr aliases --json prints a list of alias objects including the promoted
+        alias."""
         reg = self._register(tmp_path)
         reg.promote_model(task="t", model_name="m", alias="prod", version="v1")
         self._run_cli(monkeypatch, ["omr", "aliases", "--task", "t", "--model", "m", "--json"])
@@ -1797,6 +1968,8 @@ class TestCLINewCommands:
     # omr tag -----------------------------------------------------------
 
     def test_cli_tag_writes_to_meta(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr tag writes the given key/value into model_meta.json's tags and prints a
+        Tagged confirmation."""
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
         self._register(tmp_path)
         self._run_cli(monkeypatch, [
@@ -1810,6 +1983,8 @@ class TestCLINewCommands:
         assert meta["tags"]["team"] == "bioml"
 
     def test_cli_tag_idempotent_merge(self, env_root, tmp_path, monkeypatch, capsys):
+        """Two successive omr tag calls with different keys leave both tags present in
+        model_meta.json."""
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
         self._register(tmp_path)
         self._run_cli(monkeypatch, [
@@ -1827,6 +2002,7 @@ class TestCLINewCommands:
     # omr stage ---------------------------------------------------------
 
     def test_cli_stage_sets_meta(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr stage sets model_meta.json's stage field and prints the new stage."""
         self._register(tmp_path)
         self._run_cli(monkeypatch, [
             "omr", "stage", "--task", "t", "--model", "m", "--version", "v1", "--stage", "staging",
@@ -1839,6 +2015,8 @@ class TestCLINewCommands:
         assert meta["stage"] == "staging"
 
     def test_cli_stage_production_creates_alias(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr stage --stage production also creates a production alias file pointing at
+        the staged version."""
         self._register(tmp_path)
         self._run_cli(monkeypatch, [
             "omr", "stage", "--task", "t", "--model", "m", "--version", "v1",
@@ -1850,6 +2028,7 @@ class TestCLINewCommands:
         assert data["version"] == "v1"
 
     def test_cli_stage_rejects_invalid(self, env_root, tmp_path, monkeypatch):
+        """omr stage with an unrecognized stage value exits with code 1."""
         self._register(tmp_path)
         with pytest.raises(SystemExit) as exc:
             self._run_cli(monkeypatch, [
@@ -1859,6 +2038,7 @@ class TestCLINewCommands:
         assert exc.value.code == 1
 
     def test_cli_stage_none_does_not_create_alias(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr stage --stage none does not create a none alias file."""
         self._register(tmp_path)
         self._run_cli(monkeypatch, [
             "omr", "stage", "--task", "t", "--model", "m", "--version", "v1", "--stage", "none",
@@ -1869,6 +2049,8 @@ class TestCLINewCommands:
     # omr compare -------------------------------------------------------
 
     def test_cli_compare_prints_table(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr compare prints a table including both compared versions and the acc
+        metric."""
         self._register(tmp_path, version="v1")
         self._register(tmp_path, version="v2")
         self._run_cli(monkeypatch, [
@@ -1880,6 +2062,8 @@ class TestCLINewCommands:
         assert "v2" in out
 
     def test_cli_compare_json(self, env_root, tmp_path, monkeypatch, capsys):
+        """omr compare --json prints a JSON object whose versions list includes both
+        compared versions."""
         self._register(tmp_path, version="v1")
         self._register(tmp_path, version="v2")
         self._run_cli(monkeypatch, [
@@ -1913,10 +2097,14 @@ def svc_client(tmp_path, monkeypatch):
 
 
 class TestServicePhase3Routes:
+    """The service's Phase 3 HTTP routes: GET /v1/aliases, POST /v1/stage, GET
+    /v1/compare, and GET /v1/models with the metric_gte filter."""
 
     # GET /v1/aliases ---------------------------------------------------
 
     def test_get_aliases_returns_entries(self, svc_client):
+        """GET /v1/aliases returns the one alias file on disk, with its alias and
+        version fields."""
         client, root = svc_client
         _write_unowned_ownership(root, "t", "m")
         aliases_dir = root / "tasks" / "t" / "models" / "m" / "aliases"
@@ -1944,6 +2132,8 @@ class TestServicePhase3Routes:
     # POST /v1/stage ----------------------------------------------------
 
     def test_post_stage_updates_meta_and_returns_stage(self, svc_client, tmp_path):
+        """POST /v1/stage updates model_meta.json's stage and returns the new stage and
+        version."""
         client, root = svc_client
         src = tmp_path / "src"
         _make_minimal_package(src)
@@ -1966,6 +2156,7 @@ class TestServicePhase3Routes:
         assert meta["stage"] == "staging"
 
     def test_post_stage_production_creates_alias(self, svc_client, tmp_path):
+        """POST /v1/stage with stage=production also creates a production alias file."""
         client, root = svc_client
         src = tmp_path / "src"
         _make_minimal_package(src)
@@ -1982,6 +2173,7 @@ class TestServicePhase3Routes:
         assert alias_file.exists()
 
     def test_post_stage_rejects_invalid(self, svc_client):
+        """POST /v1/stage with an unrecognized stage value returns 400."""
         client, _ = svc_client
         r = client.post("/v1/stage", json={
             "task": "t", "model_name": "m", "version": "v1", "stage": "deployed",
@@ -1991,6 +2183,7 @@ class TestServicePhase3Routes:
     # GET /v1/compare ---------------------------------------------------
 
     def test_get_compare_returns_metrics_for_both_versions(self, svc_client):
+        """GET /v1/compare returns each requested version's accuracy metric."""
         client, root = svc_client
         _write_unowned_ownership(root, "t", "m")
         for ver, acc in [("v1", 0.9), ("v2", 0.85)]:
@@ -2008,11 +2201,13 @@ class TestServicePhase3Routes:
         assert data["versions"]["v2"]["metrics"]["accuracy"] == 0.85
 
     def test_get_compare_requires_at_least_two_versions(self, svc_client):
+        """GET /v1/compare with only one version returns 400."""
         client, _ = svc_client
         r = client.get("/v1/compare", params={"task": "t", "model": "m", "versions": ["v1"]})
         assert r.status_code == 400
 
     def test_get_compare_zero_versions_returns_400(self, svc_client):
+        """GET /v1/compare with no versions parameter returns 400."""
         client, _ = svc_client
         r = client.get("/v1/compare", params={"task": "t", "model": "m"})
         assert r.status_code == 400
@@ -2020,6 +2215,8 @@ class TestServicePhase3Routes:
     # GET /v1/models with metric_gte ------------------------------------
 
     def test_get_models_metric_gte_filters_correctly(self, svc_client):
+        """GET /v1/models?metric_gte=accuracy:0.9 returns only the version whose
+        accuracy meets the threshold."""
         client, root = svc_client
         _write_unowned_ownership(root, "t", "m")
         for ver, acc in [("v1", 0.95), ("v2", 0.80)]:
@@ -2037,6 +2234,7 @@ class TestServicePhase3Routes:
         assert "v2" not in versions
 
     def test_get_models_without_metric_gte_returns_all(self, svc_client):
+        """GET /v1/models with no metric_gte returns every version."""
         client, root = svc_client
         _write_unowned_ownership(root, "t", "m")
         for ver in ["v1", "v2"]:
@@ -2050,6 +2248,7 @@ class TestServicePhase3Routes:
         assert len(r.json()) == 2
 
     def test_get_models_metric_gte_invalid_format_returns_400(self, svc_client):
+        """GET /v1/models with a metric_gte value that has no colon returns 400."""
         client, _ = svc_client
         r = client.get("/v1/models", params={"metric_gte": "no_colon_here"})
         assert r.status_code == 400
@@ -2061,9 +2260,13 @@ class TestServicePhase3Routes:
 
 
 class TestDBAndTracking:
+    """db.py's connection setup and DDL, and tracking.py's run/param/metric/tag CRUD,
+    all against a mocked pymysql connection and cursor (no real MySQL)."""
 
     @pytest.fixture
     def mock_conn(self):
+        """A MagicMock connection/cursor pair with cursor() as a context manager, for
+        stubbing pymysql without a real database."""
         from unittest.mock import MagicMock
 
         cursor = MagicMock()
@@ -2077,6 +2280,7 @@ class TestDBAndTracking:
     # ── db.py ──────────────────────────────────────────────────────────────
 
     def test_get_connection_raises_without_db_host(self, monkeypatch):
+        """get_connection raises RegistryNotConfigured when DB_HOST is unset."""
         monkeypatch.delenv("DB_HOST", raising=False)
         from omnibioai_model_registry.db import get_connection
         from omnibioai_model_registry.errors import RegistryNotConfigured
@@ -2085,6 +2289,8 @@ class TestDBAndTracking:
             get_connection()
 
     def test_get_connection_calls_pymysql_connect(self, monkeypatch):
+        """get_connection returns whatever pymysql.connect returns, with connection
+        parameters from the DB_* environment variables."""
         from unittest.mock import MagicMock, patch
 
         monkeypatch.setenv("DB_HOST", "localhost")
@@ -2100,6 +2306,8 @@ class TestDBAndTracking:
         assert conn is fake_conn
 
     def test_init_tables_executes_all_ddl(self, mock_conn):
+        """init_tables executes one statement per entry in _DDL plus the _ALTER_DDL
+        migration statements."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.db import _ALTER_DDL, _DDL, init_tables
 
@@ -2126,6 +2334,8 @@ class TestDBAndTracking:
         _run_alter_ddl_idempotent(conn)
 
     def test_alter_ddl_idempotent_reraises_other_errors(self, mock_conn):
+        """_run_alter_ddl_idempotent re-raises a MySQL error whose code is not the
+        duplicate-column error 1060."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.db import _run_alter_ddl_idempotent
 
@@ -2148,6 +2358,7 @@ class TestDBAndTracking:
     # ── tracking.py — create / finish ──────────────────────────────────────
 
     def test_create_run_returns_run_dict(self, mock_conn):
+        """create_run returns a dict with the new run's run_id and status running."""
         from datetime import datetime, timezone
 
         conn, cursor = mock_conn
@@ -2170,6 +2381,7 @@ class TestDBAndTracking:
         assert result["status"] == "running"
 
     def test_finish_run_updates_status(self, mock_conn):
+        """finish_run executes an UPDATE statement against the run's row."""
         conn, cursor = mock_conn
         cursor.rowcount = 1
         from omnibioai_model_registry.tracking import finish_run
@@ -2179,6 +2391,7 @@ class TestDBAndTracking:
         assert any("UPDATE" in s for s in sqls)
 
     def test_finish_run_raises_if_not_found(self, mock_conn):
+        """finish_run raises ModelNotFound when the update affects zero rows."""
         conn, cursor = mock_conn
         cursor.rowcount = 0
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2190,6 +2403,7 @@ class TestDBAndTracking:
     # ── tracking.py — params ───────────────────────────────────────────────
 
     def test_log_param_executes_insert(self, mock_conn):
+        """log_param executes an INSERT statement."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.tracking import log_param
 
@@ -2198,6 +2412,7 @@ class TestDBAndTracking:
         assert any("INSERT" in s for s in sqls)
 
     def test_log_params_calls_log_param_for_each(self, mock_conn):
+        """log_params executes at least two statements per parameter for two parameters."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.tracking import log_params
 
@@ -2207,6 +2422,7 @@ class TestDBAndTracking:
     # ── tracking.py — metrics ──────────────────────────────────────────────
 
     def test_log_metric_executes_insert(self, mock_conn):
+        """log_metric executes an INSERT statement."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.tracking import log_metric
 
@@ -2215,6 +2431,7 @@ class TestDBAndTracking:
         assert any("INSERT" in s for s in sqls)
 
     def test_log_metrics_iterates_dict(self, mock_conn):
+        """log_metrics executes at least two statements per metric for two metrics."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.tracking import log_metrics
 
@@ -2224,6 +2441,7 @@ class TestDBAndTracking:
     # ── tracking.py — tags ─────────────────────────────────────────────────
 
     def test_set_tag_executes_insert(self, mock_conn):
+        """set_tag executes an INSERT statement."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.tracking import set_tag
 
@@ -2232,6 +2450,7 @@ class TestDBAndTracking:
         assert any("INSERT" in s for s in sqls)
 
     def test_set_tags_iterates_dict(self, mock_conn):
+        """set_tags executes at least two statements per tag for two tags."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.tracking import set_tags
 
@@ -2241,6 +2460,9 @@ class TestDBAndTracking:
     # ── tracking.py — get_run ──────────────────────────────────────────────
 
     def test_get_run_returns_full_snapshot(self, mock_conn):
+        """get_run returns the run's id, task, actor, dict-typed
+        params/tags/metrics_summary, a null finished_at, and an ISO-formatted
+        started_at."""
         from datetime import datetime, timezone
 
         conn, cursor = mock_conn
@@ -2269,6 +2491,7 @@ class TestDBAndTracking:
         assert "T" in result["started_at"]
 
     def test_get_run_with_finished_datetime(self, mock_conn):
+        """get_run reports a non-null, ISO-formatted finished_at when the row has one."""
         from datetime import datetime, timezone
 
         conn, cursor = mock_conn
@@ -2291,6 +2514,7 @@ class TestDBAndTracking:
         assert "T" in result["finished_at"]
 
     def test_get_run_with_none_started_at(self, mock_conn):
+        """get_run reports a null started_at when the row's value is None."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {
             "run_id": "r1",
@@ -2309,6 +2533,7 @@ class TestDBAndTracking:
         assert result["started_at"] is None
 
     def test_get_run_raises_if_not_found(self, mock_conn):
+        """get_run raises ModelNotFound when no row is found."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = None
 
@@ -2319,6 +2544,7 @@ class TestDBAndTracking:
             get_run(conn, "nonexistent")
 
     def test_get_run_parses_params_from_json(self, mock_conn):
+        """get_run parses a JSON-encoded param value (0.001) into its native type."""
         from datetime import datetime, timezone
 
         conn, cursor = mock_conn
@@ -2344,6 +2570,7 @@ class TestDBAndTracking:
         assert result["params"]["lr"] == 0.001
 
     def test_get_run_handles_invalid_json_param(self, mock_conn):
+        """get_run keeps a non-JSON param value as its raw string rather than raising."""
         from datetime import datetime, timezone
 
         conn, cursor = mock_conn
@@ -2400,6 +2627,8 @@ class TestDBAndTracking:
     # ── tracking.py — get_metric_history ───────────────────────────────────
 
     def test_get_metric_history_returns_list(self, mock_conn):
+        """get_metric_history returns each row's value, step and an ISO-formatted
+        timestamp, in order."""
         from datetime import datetime, timezone
 
         conn, cursor = mock_conn
@@ -2418,6 +2647,7 @@ class TestDBAndTracking:
         assert "T" in result[0]["ts_utc"]
 
     def test_get_metric_history_handles_none_ts_utc(self, mock_conn):
+        """get_metric_history reports a null timestamp when the row's ts_utc is None."""
         conn, cursor = mock_conn
         cursor.fetchall.return_value = [
             {"value": 0.9, "step": 0, "ts_utc": None},
@@ -2431,6 +2661,8 @@ class TestDBAndTracking:
     # ── tracking.py — list_runs ────────────────────────────────────────────
 
     def test_list_runs_returns_list(self, mock_conn):
+        """list_runs returns the run's id with a null finished_at for a still-running
+        run."""
         from datetime import datetime, timezone
 
         conn, cursor = mock_conn
@@ -2447,6 +2679,7 @@ class TestDBAndTracking:
         assert result[0]["finished_at"] is None
 
     def test_list_runs_with_finished_at(self, mock_conn):
+        """list_runs reports a non-null finished_at for a finished run."""
         from datetime import datetime, timezone
 
         conn, cursor = mock_conn
@@ -2461,6 +2694,7 @@ class TestDBAndTracking:
         assert result[0]["finished_at"] is not None
 
     def test_list_runs_empty(self, mock_conn):
+        """list_runs returns an empty list when no rows match."""
         conn, cursor = mock_conn
         cursor.fetchall.return_value = []
 
@@ -2471,6 +2705,7 @@ class TestDBAndTracking:
     # ── tracking.py — version tags ─────────────────────────────────────────
 
     def test_set_version_tag_executes_insert(self, mock_conn):
+        """set_version_tag executes an INSERT statement."""
         conn, cursor = mock_conn
         from omnibioai_model_registry.tracking import set_version_tag
 
@@ -2479,6 +2714,7 @@ class TestDBAndTracking:
         assert any("INSERT" in s for s in sqls)
 
     def test_get_version_tags_returns_dict(self, mock_conn):
+        """get_version_tags returns a dict of every key/value tag row."""
         conn, cursor = mock_conn
         cursor.fetchall.return_value = [
             {"key_name": "team", "value_text": "bioml"},
@@ -2492,6 +2728,7 @@ class TestDBAndTracking:
         assert result["env"] == "prod"
 
     def test_get_version_tags_empty(self, mock_conn):
+        """get_version_tags returns an empty dict when no rows exist."""
         conn, cursor = mock_conn
         cursor.fetchall.return_value = []
 
@@ -2517,6 +2754,8 @@ class TestTrackingPhase2COwnership:
 
     @pytest.fixture
     def mock_conn(self):
+        """A MagicMock connection/cursor pair with cursor() as a context manager, for
+        stubbing pymysql without a real database."""
         from unittest.mock import MagicMock
 
         cursor = MagicMock()
@@ -2529,6 +2768,8 @@ class TestTrackingPhase2COwnership:
     # ── _evaluate_run_ownership (pure decision, mirrors ownership.py) ──────
 
     def test_owned_matching_org_allowed(self):
+        """_evaluate_run_ownership allows a caller whose org matches the run's owning
+        org, with reason owned_by_caller."""
         from omnibioai_model_registry.tracking import _evaluate_run_ownership
 
         result = _evaluate_run_ownership("org-A", "owned", requesting_org_id="org-A")
@@ -2536,6 +2777,8 @@ class TestTrackingPhase2COwnership:
         assert result.reason == "owned_by_caller"
 
     def test_owned_different_org_denied(self):
+        """_evaluate_run_ownership denies a caller from a different org than the run's
+        owner, with reason owned_by_other_org."""
         from omnibioai_model_registry.tracking import _evaluate_run_ownership
 
         result = _evaluate_run_ownership("org-A", "owned", requesting_org_id="org-B")
@@ -2543,6 +2786,8 @@ class TestTrackingPhase2COwnership:
         assert result.reason == "owned_by_other_org"
 
     def test_unowned_open_mode_caller_allowed(self):
+        """_evaluate_run_ownership allows an anonymous caller against an unowned run,
+        with reason open_mode_match."""
         from omnibioai_model_registry.tracking import _evaluate_run_ownership
 
         result = _evaluate_run_ownership(None, "unowned", requesting_org_id=None)
@@ -2558,6 +2803,8 @@ class TestTrackingPhase2COwnership:
         assert result.reason == "owned_by_other_org"
 
     def test_legacy_unowned_denied_for_every_caller(self):
+        """_evaluate_run_ownership denies every caller, org or anonymous, against a
+        legacy_unowned run."""
         from omnibioai_model_registry.tracking import _evaluate_run_ownership
 
         for requesting_org_id in ("org-A", None):
@@ -2568,6 +2815,8 @@ class TestTrackingPhase2COwnership:
     # ── check_run_ownership (DB-touching wrapper) ───────────────────────────
 
     def test_check_run_ownership_not_found(self, mock_conn):
+        """check_run_ownership reports not allowed, does not exist, with reason
+        run_not_found when no row matches."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = None
         from omnibioai_model_registry.tracking import check_run_ownership
@@ -2578,6 +2827,8 @@ class TestTrackingPhase2COwnership:
         assert result.reason == "run_not_found"
 
     def test_check_run_ownership_owned_by_caller(self, mock_conn):
+        """check_run_ownership reports allowed and exists for a run owned by the
+        requesting org."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.tracking import check_run_ownership
@@ -2589,6 +2840,8 @@ class TestTrackingPhase2COwnership:
     # ── _ensure_run (write-path pre-check) ──────────────────────────────────
 
     def test_ensure_run_creates_new_run_attributed_to_caller(self, mock_conn):
+        """_ensure_run inserts a new run row attributed to the requesting org with
+        ownership_status owned."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = None  # not found -> creatable
         from omnibioai_model_registry.tracking import _ensure_run
@@ -2603,6 +2856,8 @@ class TestTrackingPhase2COwnership:
         assert params[-2:] == ("org-A", "owned")
 
     def test_ensure_run_new_run_no_org_is_unowned(self, mock_conn):
+        """_ensure_run inserts a new run row with a null org and ownership_status
+        unowned when no requesting org is given."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = None
         from omnibioai_model_registry.tracking import _ensure_run
@@ -2613,6 +2868,8 @@ class TestTrackingPhase2COwnership:
         assert params[-2:] == (None, "unowned")
 
     def test_ensure_run_existing_run_other_org_denied_no_insert(self, mock_conn):
+        """_ensure_run raises ModelNotFound for an existing run owned by another org and
+        performs no INSERT IGNORE."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2629,6 +2886,8 @@ class TestTrackingPhase2COwnership:
         assert insert_calls == []
 
     def test_ensure_run_existing_run_same_org_allowed(self, mock_conn):
+        """_ensure_run succeeds and still issues its INSERT IGNORE for an existing run
+        owned by the same org."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.tracking import _ensure_run
@@ -2641,6 +2900,8 @@ class TestTrackingPhase2COwnership:
         assert len(insert_calls) == 1
 
     def test_ensure_run_legacy_unowned_denied(self, mock_conn):
+        """_ensure_run raises ModelNotFound for a legacy_unowned run regardless of the
+        requesting org."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": None, "ownership_status": "legacy_unowned"}
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2666,6 +2927,8 @@ class TestTrackingPhase2COwnership:
     # ── log_metric / log_param / set_tag thread enforcement through ────────
 
     def test_log_metric_cross_org_denied_no_metric_insert(self, mock_conn):
+        """log_metric raises ModelNotFound and performs no omr_metrics insert when the
+        requesting org does not own the run."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2680,6 +2943,8 @@ class TestTrackingPhase2COwnership:
         assert metric_inserts == []
 
     def test_log_param_cross_org_denied_no_param_insert(self, mock_conn):
+        """log_param raises ModelNotFound and performs no omr_params insert when the
+        requesting org does not own the run."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2694,6 +2959,8 @@ class TestTrackingPhase2COwnership:
         assert param_inserts == []
 
     def test_set_tag_cross_org_denied_no_tag_insert(self, mock_conn):
+        """set_tag raises ModelNotFound and performs no omr_tags insert when the
+        requesting org does not own the run."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2708,6 +2975,7 @@ class TestTrackingPhase2COwnership:
         assert tag_inserts == []
 
     def test_log_metric_same_org_allowed(self, mock_conn):
+        """log_metric inserts into omr_metrics when the requesting org owns the run."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.tracking import log_metric
@@ -2722,6 +2990,8 @@ class TestTrackingPhase2COwnership:
     # ── get_run enforcement (reuses the row it already fetched) ────────────
 
     def _run_row(self, **overrides):
+        """Builds a fake omr_runs row dict with sensible defaults, overridable by
+        keyword, for cursor.fetchone.return_value."""
         from datetime import datetime, timezone
 
         row = {
@@ -2733,6 +3003,7 @@ class TestTrackingPhase2COwnership:
         return row
 
     def test_get_run_same_org_allowed(self, mock_conn):
+        """get_run returns the run when the requesting org owns it."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = self._run_row()
         cursor.fetchall.return_value = []
@@ -2742,6 +3013,8 @@ class TestTrackingPhase2COwnership:
         assert result["run_id"] == "r1"
 
     def test_get_run_other_org_denied_same_shape_as_not_found(self, mock_conn):
+        """get_run raises ModelNotFound with the same message as a genuinely missing run
+        when a different org requests it."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = self._run_row()
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2751,6 +3024,7 @@ class TestTrackingPhase2COwnership:
             get_run(conn, "r1", requesting_org_id="org-B", enforce_ownership=True)
 
     def test_get_run_legacy_unowned_denied(self, mock_conn):
+        """get_run raises ModelNotFound for a legacy_unowned run."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = self._run_row(organization_id=None, ownership_status="legacy_unowned")
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2775,6 +3049,8 @@ class TestTrackingPhase2COwnership:
     # ── list_runs query-layer filtering ──────────────────────────────────────
 
     def test_list_runs_enforce_ownership_adds_org_filter(self, mock_conn):
+        """With enforce_ownership on, list_runs' SQL filters on organization_id and
+        ownership_status and binds the requesting org id."""
         conn, cursor = mock_conn
         cursor.fetchall.return_value = []
         from omnibioai_model_registry.tracking import list_runs
@@ -2800,6 +3076,8 @@ class TestTrackingPhase2COwnership:
     # ── get_metric_history enforcement ──────────────────────────────────────
 
     def test_get_metric_history_cross_org_denied_no_metrics_query(self, mock_conn):
+        """get_metric_history raises ModelNotFound and never queries omr_metrics when
+        the requesting org does not own the run."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2811,6 +3089,7 @@ class TestTrackingPhase2COwnership:
         assert metric_selects == []
 
     def test_get_metric_history_same_org_allowed(self, mock_conn):
+        """get_metric_history returns its result when the requesting org owns the run."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         cursor.fetchall.return_value = []
@@ -2822,6 +3101,8 @@ class TestTrackingPhase2COwnership:
     # ── finish_run / create_run passthrough ─────────────────────────────────
 
     def test_finish_run_cross_org_denied_no_update(self, mock_conn):
+        """finish_run raises ModelNotFound and performs no omr_runs update when the
+        requesting org does not own the run."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = {"organization_id": "org-A", "ownership_status": "owned"}
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2833,6 +3114,8 @@ class TestTrackingPhase2COwnership:
         assert update_calls == []
 
     def test_create_run_threads_ownership_through(self, mock_conn):
+        """create_run threads the requesting org through to the newly created run,
+        returning its run_id."""
         conn, cursor = mock_conn
         cursor.fetchone.return_value = None  # brand new
         cursor.fetchall.return_value = []
@@ -2853,6 +3136,8 @@ class TestVersionTagOwnership:
 
     @pytest.fixture
     def mock_conn(self):
+        """A MagicMock connection/cursor pair with cursor() as a context manager, for
+        stubbing pymysql without a real database."""
         from unittest.mock import MagicMock
 
         cursor = MagicMock()
@@ -2862,6 +3147,9 @@ class TestVersionTagOwnership:
         return conn, cursor
 
     def _own(self, env_root, task, model_name, org_id, *, legacy=False):
+        """Writes an ownership.json record for task/model directly (or a legacy unowned
+        record when legacy=True) so version-tag ownership checks have a real filesystem
+        record to read."""
         from omnibioai_model_registry.ownership import ensure_model_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -2872,6 +3160,8 @@ class TestVersionTagOwnership:
         )
 
     def test_set_version_tag_same_org_allowed(self, env_root, mock_conn):
+        """set_version_tag inserts into omr_version_tags when the requesting org matches
+        the model's ownership record."""
         conn, cursor = mock_conn
         self._own(env_root, "t", "m", "org-A")
         from omnibioai_model_registry.tracking import set_version_tag
@@ -2884,6 +3174,8 @@ class TestVersionTagOwnership:
         assert len(inserts) == 1
 
     def test_set_version_tag_other_org_denied_no_insert(self, env_root, mock_conn):
+        """set_version_tag raises ModelNotFound and performs no insert when the
+        requesting org differs from the ownership record."""
         conn, cursor = mock_conn
         self._own(env_root, "t", "m", "org-A")
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2898,6 +3190,8 @@ class TestVersionTagOwnership:
         assert inserts == []
 
     def test_set_version_tag_legacy_unowned_denied(self, env_root, mock_conn):
+        """set_version_tag raises ModelNotFound for a model with a legacy unowned
+        ownership record."""
         conn, cursor = mock_conn
         self._own(env_root, "t", "old_model", None, legacy=True)
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2910,6 +3204,8 @@ class TestVersionTagOwnership:
             )
 
     def test_get_version_tags_other_org_denied(self, env_root, mock_conn):
+        """get_version_tags raises ModelNotFound and performs no select when the
+        requesting org differs from the ownership record."""
         conn, cursor = mock_conn
         self._own(env_root, "t", "m", "org-A")
         from omnibioai_model_registry.errors import ModelNotFound
@@ -2941,6 +3237,8 @@ class TestVersionTagOwnership:
 
 
 class TestPluginClient:
+    """PluginClient's URL resolution and its HTTP calls to the run-tracking endpoints,
+    with urllib.request.urlopen mocked; error handling on HTTP and connection failures."""
 
     def _fake_urlopen(self, posted: list, body: bytes = b'{"ok": true}'):
         """Return a fake urlopen side_effect that records the posted payloads."""
@@ -2959,18 +3257,22 @@ class TestPluginClient:
     # ── __init__ ───────────────────────────────────────────────────────────
 
     def test_init_with_explicit_url(self):
+        """An explicit registry_url is stored verbatim."""
         from omnibioai_model_registry.plugin_client import PluginClient
 
         client = PluginClient(registry_url="http://example.com:9000")
         assert client._url == "http://example.com:9000"
 
     def test_init_strips_trailing_slash(self):
+        """A trailing slash on registry_url is stripped."""
         from omnibioai_model_registry.plugin_client import PluginClient
 
         client = PluginClient(registry_url="http://example.com/")
         assert client._url == "http://example.com"
 
     def test_init_without_url_uses_default(self, monkeypatch):
+        """With OMNIBIOAI_REGISTRY_URL unset and no explicit URL, the client defaults to
+        a localhost:8000-style URL."""
         monkeypatch.delenv("OMNIBIOAI_REGISTRY_URL", raising=False)
         from omnibioai_model_registry.plugin_client import PluginClient
 
@@ -2978,6 +3280,8 @@ class TestPluginClient:
         assert "localhost" in client._url or "8000" in client._url
 
     def test_init_uses_env_var(self, monkeypatch):
+        """OMNIBIOAI_REGISTRY_URL is used as the registry URL when no explicit one is
+        given."""
         monkeypatch.setenv("OMNIBIOAI_REGISTRY_URL", "http://myregistry:7000")
         from omnibioai_model_registry.plugin_client import PluginClient
 
@@ -2987,6 +3291,7 @@ class TestPluginClient:
     # ── start ──────────────────────────────────────────────────────────────
 
     def test_start_creates_run_id(self):
+        """start() returns a non-empty run id and stores it on the client."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3001,6 +3306,7 @@ class TestPluginClient:
         assert client._run_id == run_id
 
     def test_start_posts_to_runs_start(self):
+        """start() posts exactly one request carrying the task and model_name."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3017,6 +3323,7 @@ class TestPluginClient:
     # ── log_param / log_params ─────────────────────────────────────────────
 
     def test_log_param_posts_correct_payload(self):
+        """log_param posts the key, value and the client's run_id."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3033,6 +3340,7 @@ class TestPluginClient:
         assert posted[0]["run_id"] == "run123"
 
     def test_log_params_posts_each_param(self):
+        """log_params posts one request per parameter, covering every given key."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3050,6 +3358,7 @@ class TestPluginClient:
     # ── log_metric / log_metrics ───────────────────────────────────────────
 
     def test_log_metric_posts_correct_payload(self):
+        """log_metric posts the key, value and step."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3066,6 +3375,7 @@ class TestPluginClient:
         assert posted[0]["step"] == 1
 
     def test_log_metrics_posts_each_metric(self):
+        """log_metrics posts one request per metric, each carrying the given step."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3085,6 +3395,7 @@ class TestPluginClient:
     # ── set_tag ────────────────────────────────────────────────────────────
 
     def test_set_tag_posts_correct_payload(self):
+        """set_tag posts the key and value."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3102,6 +3413,7 @@ class TestPluginClient:
     # ── finish ─────────────────────────────────────────────────────────────
 
     def test_finish_returns_run_id(self):
+        """finish() returns the client's run_id."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3115,6 +3427,7 @@ class TestPluginClient:
         assert result == "run123"
 
     def test_finish_with_no_run_id_returns_none(self):
+        """finish() returns None when no run was ever started."""
         from omnibioai_model_registry.plugin_client import PluginClient
 
         client = PluginClient(registry_url="http://test")
@@ -3123,6 +3436,8 @@ class TestPluginClient:
     # ── context manager ────────────────────────────────────────────────────
 
     def test_context_manager_calls_finish_on_exit(self):
+        """Using PluginClient as a context manager posts a request tagged with the
+        run_id, showing finish ran on exit."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3139,6 +3454,8 @@ class TestPluginClient:
     # ── _post error handling ───────────────────────────────────────────────
 
     def test_post_handles_http_error_gracefully(self):
+        """An HTTPError from urlopen is caught and returned as a result dict with code
+        500, rather than raised."""
         import urllib.error
         from unittest.mock import patch
 
@@ -3162,6 +3479,8 @@ class TestPluginClient:
         assert result.get("code") == 500
 
     def test_post_handles_connection_error_gracefully(self):
+        """A ConnectionError from urlopen is caught and _post returns None rather than
+        raising."""
         from unittest.mock import patch
 
         from omnibioai_model_registry.plugin_client import PluginClient
@@ -3183,8 +3502,12 @@ class TestPluginClient:
 
 
 class TestAuth:
+    """auth.py's building blocks: require_auth's disabled-auth fallback, Bearer token
+    extraction, and the actor identifier derived from a UserContext."""
 
     def test_require_auth_returns_system_when_disabled(self, monkeypatch):
+        """With AUTH_ENABLED unset, require_auth returns the actor system without
+        needing an Authorization header."""
         import asyncio
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
@@ -3193,18 +3516,21 @@ class TestAuth:
         assert actor == "system"
 
     def test_extract_token_raises_on_missing_header(self):
+        """extract_token raises AuthError with status 401 when no header is given."""
         from omnibioai_model_registry.auth import AuthError, extract_token
         with pytest.raises(AuthError) as exc_info:
             extract_token(None)
         assert exc_info.value.status_code == 401
 
     def test_extract_token_raises_on_non_bearer_header(self):
+        """extract_token raises AuthError with status 401 for a non-Bearer scheme."""
         from omnibioai_model_registry.auth import AuthError, extract_token
         with pytest.raises(AuthError) as exc_info:
             extract_token("Basic abc123")
         assert exc_info.value.status_code == 401
 
     def test_extract_token_returns_token_on_valid_bearer(self):
+        """extract_token returns the token from a valid Bearer header."""
         from omnibioai_model_registry.auth import extract_token
         token = extract_token("Bearer mytoken123")
         assert token == "mytoken123"
@@ -3216,6 +3542,7 @@ class TestAuth:
     # _actor_identifier() reads a verified UserContext, not a raw dict.
 
     def test_actor_identifier_prefers_email(self):
+        """_actor_identifier returns the user's email when one is set."""
         from iam_client.models import UserContext
         from omnibioai_model_registry.auth import _actor_identifier
         user = UserContext(
@@ -3224,6 +3551,7 @@ class TestAuth:
         assert _actor_identifier(user) == "user@example.com"
 
     def test_actor_identifier_falls_back_to_user_id(self):
+        """_actor_identifier returns the user's id when the email is empty."""
         from iam_client.models import UserContext
         from omnibioai_model_registry.auth import _actor_identifier
         user = UserContext(user_id="42", email="", roles=[], permissions=[], valid=True)
@@ -3237,11 +3565,15 @@ class TestVerifyAndAuthorize:
 
     @pytest.fixture(autouse=True)
     def _registry_root(self, monkeypatch):
+        """A temp registry root with AUTH_ENABLED and IAM_URL set, for
+        verify_and_authorize tests."""
         # load_config() (called inside verify_and_authorize) requires this
         # regardless of auth -- matches every other test class's setup.
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
 
     def _mock_iam_client(self, monkeypatch, user_context):
+        """Patches AsyncIAMClient.get_user to return the given UserContext (or None for
+        an invalid token)."""
         from unittest.mock import AsyncMock, MagicMock
         import omnibioai_model_registry.auth as auth_mod
 
@@ -3252,6 +3584,8 @@ class TestVerifyAndAuthorize:
         return mock_client
 
     def _mock_audit(self, monkeypatch):
+        """Patches the module's audit client and returns the mock so log_event calls can
+        be asserted."""
         from unittest.mock import MagicMock
         import omnibioai_model_registry.auth as auth_mod
 
@@ -3260,6 +3594,8 @@ class TestVerifyAndAuthorize:
         return mock_audit
 
     def test_valid_jwt_with_model_use_is_allowed(self, monkeypatch):
+        """A user with model.use is returned by verify_and_authorize and a
+        model_access_success event is logged with the user's organization_id."""
         import asyncio
         from iam_client.models import UserContext
         from omnibioai_model_registry.auth import verify_and_authorize
@@ -3280,6 +3616,8 @@ class TestVerifyAndAuthorize:
         assert call.kwargs["metadata"]["organization_id"] == "org-1"
 
     def test_valid_jwt_without_model_use_is_denied(self, monkeypatch):
+        """A valid user lacking model.use raises AuthError 403 and logs
+        model_access_denied with reason missing_permission and the user's org id."""
         import asyncio
         from fastapi import HTTPException
         from iam_client.models import UserContext
@@ -3303,6 +3641,8 @@ class TestVerifyAndAuthorize:
         assert call.kwargs["metadata"]["organization_id"] == "org-2"
 
     def test_invalid_jwt_is_denied(self, monkeypatch):
+        """A token the IAM client cannot resolve raises AuthError 401 and logs
+        model_access_denied with reason invalid_token and actor unknown."""
         from omnibioai_model_registry.auth import AuthError, verify_and_authorize
         import asyncio
 
@@ -3397,14 +3737,20 @@ class TestVerifyAndAuthorize:
 
 
 class TestAuditClient:
+    """AuditClient's fire-and-forget HTTP audit posting: a no-op when unconfigured,
+    background-thread dispatch, silent failure on connection errors, and the posted
+    payload shape."""
 
     def test_log_event_with_empty_audit_url_does_nothing(self):
+        """log_event on a client with an empty audit URL returns without raising or
+        starting a thread."""
         from omnibioai_model_registry.audit_client import AuditClient
         client = AuditClient("")
         # Should complete silently without raising or spawning a thread
         client.log_event("register_model", "system", "t/m@v1")
 
     def test_log_event_fires_http_post_in_background_thread(self):
+        """log_event starts a daemon thread to perform the HTTP post."""
         from unittest.mock import MagicMock, patch
         from omnibioai_model_registry.audit_client import AuditClient
 
@@ -3420,6 +3766,8 @@ class TestAuditClient:
             mock_thread.start.assert_called_once()
 
     def test_send_swallows_connection_errors_silently(self):
+        """_send does not raise when the underlying urlopen call raises a
+        ConnectionError."""
         from unittest.mock import patch
         from omnibioai_model_registry.audit_client import AuditClient
 
@@ -3432,6 +3780,8 @@ class TestAuditClient:
             client._send({"action": "test", "actor": "system"})
 
     def test_payload_shape_matches_spec(self):
+        """_send posts a JSON payload containing service, action, actor, resource and
+        ts_utc, along with the given metadata."""
         from unittest.mock import MagicMock, patch
         from omnibioai_model_registry.audit_client import AuditClient
 
@@ -3476,6 +3826,8 @@ class TestAuditClient:
 
 
 class TestRunLoggerCoverageGaps:
+    """Additional run.py coverage: resolving the registry root from the environment when
+    none is passed explicitly, and cleanup on a failed atomic write."""
 
     def test_run_logger_without_registry_root_uses_env(self, env_root):
         """Covers run.py _resolve_registry_root(None) → load_config() path."""
@@ -3525,6 +3877,9 @@ class TestServiceAllRoutes:
     """Exercise previously untested routes for coverage."""
 
     def _register(self, root, tmp_path, task="t", model="m", version="v1"):
+        """Registers a minimal package for the given task/model/version directly on the
+        shared service registry, for tests that need an existing model before hitting an
+        endpoint."""
         src = tmp_path / f"src_{task}_{model}_{version}"
         _make_minimal_package(src)
         import omnibioai_model_registry.service.app.main as _svc
@@ -3535,6 +3890,7 @@ class TestServiceAllRoutes:
         return src
 
     def test_health_endpoint(self, full_svc_client):
+        """GET /health returns ok true and a version field."""
         client, _ = full_svc_client
         r = client.get("/health")
         assert r.status_code == 200
@@ -3542,6 +3898,7 @@ class TestServiceAllRoutes:
         assert "version" in r.json()
 
     def test_register_endpoint_success(self, full_svc_client, tmp_path):
+        """POST /v1/register returns ok true with the registered version."""
         client, root = full_svc_client
         src = tmp_path / "src"
         _make_minimal_package(src)
@@ -3575,6 +3932,8 @@ class TestServiceAllRoutes:
         assert kwargs["organization_id"] is None
 
     def test_register_endpoint_emits_with_real_org_id_when_auth_enabled(self, full_svc_client, tmp_path, monkeypatch):
+        """With auth enabled and a resolved user, registering emits usage with the
+        user's organization_id and user_id."""
         from unittest.mock import AsyncMock, MagicMock, patch
         from iam_client.models import UserContext
         import omnibioai_model_registry.auth as auth_mod
@@ -3633,6 +3992,7 @@ class TestServiceAllRoutes:
         assert r.status_code == 200
 
     def test_register_endpoint_error(self, full_svc_client):
+        """POST /v1/register with a nonexistent artifacts_dir returns 400."""
         client, _ = full_svc_client
         r = client.post("/v1/register", json={
             "task": "t", "model_name": "m", "version": "v1",
@@ -3641,6 +4001,7 @@ class TestServiceAllRoutes:
         assert r.status_code == 400
 
     def test_promote_endpoint_success(self, full_svc_client, tmp_path):
+        """POST /v1/promote returns ok true for a registered model."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         r = client.post("/v1/promote", json={
@@ -3650,6 +4011,7 @@ class TestServiceAllRoutes:
         assert r.json()["ok"] is True
 
     def test_promote_endpoint_error(self, full_svc_client):
+        """POST /v1/promote for a nonexistent version returns 400."""
         client, _ = full_svc_client
         r = client.post("/v1/promote", json={
             "task": "t", "model_name": "m", "alias": "prod", "version": "nonexistent",
@@ -3657,6 +4019,7 @@ class TestServiceAllRoutes:
         assert r.status_code == 400
 
     def test_resolve_endpoint_success(self, full_svc_client, tmp_path):
+        """GET /v1/resolve returns ok true with a path for a registered model."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"})
@@ -3665,11 +4028,13 @@ class TestServiceAllRoutes:
         assert "path" in r.json()
 
     def test_resolve_endpoint_missing(self, full_svc_client):
+        """GET /v1/resolve for a missing alias returns 400."""
         client, _ = full_svc_client
         r = client.get("/v1/resolve", params={"task": "t", "ref": "m@missing"})
         assert r.status_code == 400
 
     def test_verify_endpoint_success(self, full_svc_client, tmp_path):
+        """POST /v1/verify returns ok true for a registered model."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         r = client.post("/v1/verify", json={"task": "t", "ref": "m@v1"})
@@ -3677,6 +4042,7 @@ class TestServiceAllRoutes:
         assert r.json()["ok"] is True
 
     def test_show_endpoint_success(self, full_svc_client, tmp_path):
+        """GET /v1/show returns ok true with meta and package_dir."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         r = client.get("/v1/show", params={"task": "t", "ref": "m@v1"})
@@ -3687,6 +4053,8 @@ class TestServiceAllRoutes:
         assert "package_dir" in data
 
     def test_show_endpoint_missing_meta(self, full_svc_client, tmp_path):
+        """GET /v1/show for a version whose model_meta.json was deleted returns 500,
+        since the 404 raised internally is re-wrapped."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         meta_path = root / "tasks" / "t" / "models" / "m" / "versions" / "v1" / "model_meta.json"
@@ -3696,6 +4064,8 @@ class TestServiceAllRoutes:
         assert r.status_code == 500
 
     def test_metrics_endpoint_success(self, full_svc_client, tmp_path):
+        """GET /v1/metrics returns ok true with version_metrics (including the
+        registered acc value) and run_history."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"})
@@ -3707,6 +4077,7 @@ class TestServiceAllRoutes:
         assert data["version_metrics"]["acc"] == 0.9
 
     def test_artifacts_endpoint_success(self, full_svc_client, tmp_path):
+        """GET /v1/artifacts returns ok true with a non-empty files list."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         r = client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"})
@@ -3717,6 +4088,7 @@ class TestServiceAllRoutes:
         assert len(data["files"]) > 0
 
     def test_runs_log_metric_returns_503_without_db(self, full_svc_client):
+        """POST /v1/runs/log-metric returns 503 when no database is configured."""
         client, _ = full_svc_client
         r = client.post("/v1/runs/log-metric", json={
             "task": "t", "model_name": "m", "run_id": "r1",
@@ -3725,6 +4097,7 @@ class TestServiceAllRoutes:
         assert r.status_code == 503
 
     def test_runs_log_param_returns_503_without_db(self, full_svc_client):
+        """POST /v1/runs/log-param returns 503 when no database is configured."""
         client, _ = full_svc_client
         r = client.post("/v1/runs/log-param", json={
             "task": "t", "model_name": "m", "run_id": "r1",
@@ -3733,6 +4106,7 @@ class TestServiceAllRoutes:
         assert r.status_code == 503
 
     def test_runs_log_batch_returns_503_without_db(self, full_svc_client):
+        """POST /v1/runs/log-batch returns 503 when no database is configured."""
         client, _ = full_svc_client
         r = client.post("/v1/runs/log-batch", json={
             "task": "t", "model_name": "m", "run_id": "r1",
@@ -3741,16 +4115,19 @@ class TestServiceAllRoutes:
         assert r.status_code == 503
 
     def test_runs_get_returns_503_without_db(self, full_svc_client):
+        """GET /v1/runs/get returns 503 when no database is configured."""
         client, _ = full_svc_client
         r = client.get("/v1/runs/get", params={"task": "t", "model": "m", "run_id": "r1"})
         assert r.status_code == 503
 
     def test_runs_list_returns_503_without_db(self, full_svc_client):
+        """GET /v1/runs/list returns 503 when no database is configured."""
         client, _ = full_svc_client
         r = client.get("/v1/runs/list", params={"task": "t", "model": "m"})
         assert r.status_code == 503
 
     def test_tags_endpoint_success(self, full_svc_client, tmp_path):
+        """PUT /v1/tags sets a tag on the version's model_meta.json and returns ok true."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         r = client.put("/v1/tags", json={
@@ -3764,6 +4141,8 @@ class TestServiceAllRoutes:
         assert meta["tags"]["team"] == "bioml"
 
     def test_versions_patch_success(self, full_svc_client, tmp_path):
+        """POST /v1/versions/patch updates a registered version's description and tags
+        and returns ok true."""
         client, root = full_svc_client
         self._register(root, tmp_path)
         r = client.post("/v1/versions/patch", json={
@@ -3775,6 +4154,7 @@ class TestServiceAllRoutes:
         assert r.json()["ok"] is True
 
     def test_versions_patch_not_found(self, full_svc_client):
+        """POST /v1/versions/patch for a nonexistent model/version returns 404."""
         client, _ = full_svc_client
         r = client.post("/v1/versions/patch", json={
             "task": "t", "model_name": "nonexistent", "version": "v99",
@@ -3782,6 +4162,8 @@ class TestServiceAllRoutes:
         assert r.status_code == 404
 
     def test_auth_status_open_mode(self, full_svc_client, monkeypatch):
+        """GET /v1/auth/status reports auth_enabled false, mode open and a null iam_url
+        when AUTH_ENABLED is unset."""
         client, _ = full_svc_client
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
         r = client.get("/v1/auth/status")
@@ -3792,6 +4174,8 @@ class TestServiceAllRoutes:
         assert data["iam_url"] is None
 
     def test_auth_status_jwt_mode(self, full_svc_client, monkeypatch):
+        """GET /v1/auth/status reports auth_enabled true, mode jwt and the configured
+        iam_url when AUTH_ENABLED and IAM_URL are set."""
         client, _ = full_svc_client
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("IAM_URL", "http://auth-service:8001")
@@ -3965,12 +4349,16 @@ class TestUsageEmit:
     FastAPI route layer."""
 
     def test_client_constructs_a_real_usage_client(self):
+        """_client() returns a real UsageClient instance."""
         from omnibioai_model_registry.usage_emit import _client
         from usage_client import UsageClient
 
         assert isinstance(_client(), UsageClient)
 
     def test_emits_correct_fields(self):
+        """emit_model_registered emits a usage event with service model.registry,
+        resource model.register, action registered, quantity 1, unit count, and the
+        given organization_id/user_id/trace_id."""
         from unittest.mock import MagicMock, patch
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
@@ -3990,6 +4378,7 @@ class TestUsageEmit:
         )
 
     def test_skips_emission_when_organization_id_none(self):
+        """emit_model_registered emits no usage event when organization_id is None."""
         from unittest.mock import MagicMock, patch
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
@@ -4000,6 +4389,7 @@ class TestUsageEmit:
         mock_client.emit_usage_event.assert_not_called()
 
     def test_client_exception_is_swallowed(self):
+        """emit_model_registered does not raise when emit_usage_event itself raises."""
         from unittest.mock import MagicMock, patch
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
@@ -4009,6 +4399,8 @@ class TestUsageEmit:
             emit_model_registered(organization_id="77")  # must not raise
 
     def test_client_construction_failure_is_swallowed(self):
+        """emit_model_registered does not raise when constructing the usage client
+        itself raises."""
         from unittest.mock import patch
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
@@ -4020,12 +4412,14 @@ class TestUsageEmit:
     # -----------------------------------------------------------------
 
     def _states(self, caplog):
+        """Extracts the usage_emit state field from every captured log record, in order."""
         return [
             r.usage_event_state for r in caplog.records
             if hasattr(r, "usage_event_state")
         ]
 
     def test_success_logs_attempted_then_succeeded(self, caplog):
+        """A successful emission logs attempted then succeeded."""
         from unittest.mock import MagicMock, patch
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
@@ -4037,6 +4431,7 @@ class TestUsageEmit:
         assert self._states(caplog) == ["attempted", "succeeded"]
 
     def test_missing_org_logs_attempted_then_skipped(self, caplog):
+        """Emission with no organization_id logs attempted then skipped_missing_org."""
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
         with caplog.at_level("INFO", logger="omnibioai_model_registry.usage_emit"):
@@ -4045,6 +4440,8 @@ class TestUsageEmit:
         assert self._states(caplog) == ["attempted", "skipped_missing_org"]
 
     def test_exception_logs_attempted_then_failed(self, caplog):
+        """An emission that raises internally logs attempted then failed_exception,
+        without raising."""
         from unittest.mock import MagicMock, patch
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
@@ -4073,6 +4470,8 @@ class TestAuthRequireWriteAuth:
         return mock_client
 
     def test_require_write_auth_disabled_returns_system(self, monkeypatch):
+        """With AUTH_ENABLED unset, require_write_auth returns the actor system with no
+        Authorization header."""
         import asyncio
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
@@ -4081,6 +4480,8 @@ class TestAuthRequireWriteAuth:
         assert actor == "system"
 
     def test_require_write_auth_enabled_valid_jwt_with_model_use_is_allowed(self, monkeypatch):
+        """With auth enabled, a valid token carrying model.use resolves to that user's
+        email as the actor."""
         import asyncio
         from iam_client.models import UserContext
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
@@ -4094,6 +4495,8 @@ class TestAuthRequireWriteAuth:
         assert actor == "user@test.com"
 
     def test_require_auth_enabled_valid_jwt_without_model_use_raises_403(self, monkeypatch):
+        """With auth enabled, require_auth raises HTTPException 403 for a valid token
+        lacking model.use."""
         import asyncio
         from fastapi import HTTPException
         from iam_client.models import UserContext
@@ -4109,6 +4512,8 @@ class TestAuthRequireWriteAuth:
         assert exc_info.value.status_code == 403
 
     def test_require_auth_enabled_invalid_token_raises_401(self, monkeypatch):
+        """With auth enabled, require_auth raises HTTPException 401 for a token the IAM
+        client cannot resolve."""
         import asyncio
         from fastapi import HTTPException
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
@@ -4137,6 +4542,7 @@ class TestAuthRequireWriteAuth:
         assert exc_info.value.status_code == 401
 
     def test_require_auth_enabled_missing_header_raises_401(self, monkeypatch):
+        """With auth enabled, no Authorization header raises HTTPException 401."""
         import asyncio
         from fastapi import HTTPException
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
@@ -4166,6 +4572,8 @@ class TestRequireWriteAuthWithContext:
         return mock_client
 
     def test_disabled_returns_synthetic_system_context_with_none_org_id(self, monkeypatch):
+        """With auth disabled, require_write_auth_with_context returns a context with
+        org_id None and actor system."""
         import asyncio
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
@@ -4175,6 +4583,8 @@ class TestRequireWriteAuthWithContext:
         assert _actor_identifier(user) == "system"
 
     def test_enabled_valid_jwt_returns_full_context_with_org_id(self, monkeypatch):
+        """With auth enabled, a valid token carrying model.use returns the full
+        UserContext including its org_id."""
         import asyncio
         from iam_client.models import UserContext
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
@@ -4190,6 +4600,8 @@ class TestRequireWriteAuthWithContext:
         assert _actor_identifier(user) == "user@test.com"
 
     def test_enabled_without_model_use_raises_403(self, monkeypatch):
+        """With auth enabled, require_write_auth_with_context raises HTTPException 403
+        for a valid token lacking model.use."""
         import asyncio
         from fastapi import HTTPException
         from iam_client.models import UserContext
@@ -4205,6 +4617,8 @@ class TestRequireWriteAuthWithContext:
         assert exc_info.value.status_code == 403
 
     def test_enabled_invalid_token_raises_401(self, monkeypatch):
+        """With auth enabled, require_write_auth_with_context raises HTTPException 401
+        for a token the IAM client cannot resolve."""
         import asyncio
         from fastapi import HTTPException
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
@@ -4733,6 +5147,9 @@ class TestPhase1ReadEndpointsRequireAuth:
         "metrics", "aliases", "compare", "artifacts", "hf_push_status",
     ])
     def test_read_endpoint_without_authorization_returns_401(self, auth_client, method, path, params):
+        """Parametrized over every previously-open GET route (models, show, resolve,
+        runs/get, runs/list, metrics, aliases, compare, artifacts, hf/push/status): each
+        returns 401 with no Authorization header."""
         client, _ = auth_client
         r = getattr(client, method)(path, params=params)
         assert r.status_code == 401
@@ -4749,6 +5166,7 @@ class TestPhase1ReadEndpointsRequireAuth:
     # ── malformed / expired / revoked tokens ────────────────────────────────
 
     def test_malformed_authorization_header_returns_401(self, auth_client):
+        """GET /v1/models with a non-Bearer scheme (NotBearer) returns 401."""
         client, _ = auth_client
         r = client.get("/v1/models", headers={"Authorization": "NotBearer sometoken"})
         assert r.status_code == 401
@@ -4764,6 +5182,7 @@ class TestPhase1ReadEndpointsRequireAuth:
         assert r.status_code == 401
 
     def test_valid_token_without_model_use_returns_403(self, auth_client, monkeypatch):
+        """GET /v1/models with a valid token lacking model.use returns 403."""
         from iam_client.models import UserContext
         self._mock_iam_client(monkeypatch, UserContext(
             user_id="1", email="user@test.com", roles=[], permissions=[], valid=True,
@@ -4775,6 +5194,8 @@ class TestPhase1ReadEndpointsRequireAuth:
     # ── authenticated + model.use → existing behavior fully preserved ──────
 
     def test_authenticated_with_model_use_preserves_models_behavior(self, auth_client, monkeypatch):
+        """GET /v1/models with a valid model.use token returns 200 with the registered
+        model in the list, unchanged from before the auth requirement."""
         from iam_client.models import UserContext
         self._mock_iam_client(monkeypatch, UserContext(
             user_id="1", email="user@test.com", roles=[], permissions=["model.use"], valid=True,
@@ -4787,6 +5208,8 @@ class TestPhase1ReadEndpointsRequireAuth:
         assert any(m.get("model_name") == "m" for m in models)
 
     def test_authenticated_with_model_use_preserves_resolve_behavior(self, auth_client, monkeypatch):
+        """GET /v1/resolve with a valid model.use token returns 200 with ok true and the
+        resolved path ending in the version."""
         from iam_client.models import UserContext
         self._mock_iam_client(monkeypatch, UserContext(
             user_id="1", email="user@test.com", roles=[], permissions=["model.use"], valid=True,
@@ -4818,6 +5241,8 @@ class TestPhase1ReadEndpointsRequireAuth:
         assert r.status_code == 400
 
     def test_compare_requires_two_versions_after_auth(self, auth_client, monkeypatch):
+        """GET /v1/compare with only one version, authenticated with model.use, still
+        returns 400."""
         from iam_client.models import UserContext
         self._mock_iam_client(monkeypatch, UserContext(
             user_id="1", email="user@test.com", roles=[], permissions=["model.use"], valid=True,
@@ -4894,16 +5319,22 @@ class TestPhase1ReadEndpointsRequireAuth:
     # ── informational endpoints deliberately remain public ─────────────────
 
     def test_health_remains_public(self, auth_client):
+        """GET /health stays reachable with no Authorization header even with auth
+        enabled."""
         client, _ = auth_client
         r = client.get("/health")
         assert r.status_code == 200
 
     def test_auth_status_remains_public(self, auth_client):
+        """GET /v1/auth/status stays reachable with no Authorization header even with
+        auth enabled."""
         client, _ = auth_client
         r = client.get("/v1/auth/status")
         assert r.status_code == 200
 
     def test_hf_settings_remains_public(self, auth_client):
+        """GET /v1/hf/settings stays reachable with no Authorization header even with
+        auth enabled."""
         client, _ = auth_client
         r = client.get("/v1/hf/settings")
         assert r.status_code == 200
@@ -4926,6 +5357,9 @@ class TestOwnershipModule:
     HTTP layer."""
 
     def test_new_model_owned_by_given_org(self, env_root, tmp_path):
+        """ensure_model_ownership on a brand-new model records the given
+        organization_id, status owned, the registering actor, a registered_at timestamp
+        and no discovered_at."""
         from omnibioai_model_registry.ownership import ensure_model_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -4941,6 +5375,8 @@ class TestOwnershipModule:
         assert rec.discovered_at is None
 
     def test_new_model_with_no_org_is_unowned_not_guessed(self, env_root):
+        """ensure_model_ownership on a brand-new model with no organization_id records
+        status unowned rather than guessing an org."""
         from omnibioai_model_registry.ownership import ensure_model_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -4970,6 +5406,9 @@ class TestOwnershipModule:
         assert rec.discovered_at is not None
 
     def test_ownership_is_write_once_second_call_does_not_overwrite(self, env_root):
+        """A second ensure_model_ownership call for the same model with a different org
+        and actor is a no-op: it returns and leaves on disk the original ownership
+        record."""
         from omnibioai_model_registry.ownership import ensure_model_ownership, read_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -4991,10 +5430,13 @@ class TestOwnershipModule:
         assert on_disk == first
 
     def test_read_ownership_none_when_never_established(self, env_root):
+        """read_ownership returns None for a model that was never registered."""
         from omnibioai_model_registry.ownership import read_ownership
         assert read_ownership(env_root, "t", "never_touched") is None
 
     def test_write_once_text_second_writer_loses_race(self, env_root):
+        """write_once_text returns True for the first write and False for a second write
+        to the same target, leaving the first content in place."""
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         backend = LocalFS()
@@ -5006,6 +5448,9 @@ class TestOwnershipModule:
         assert target.read_text() == "first\n"
 
     def test_backfill_scans_and_migrates_only_unowned_models(self, env_root, tmp_path):
+        """backfill_legacy_ownership migrates only the version directories with no
+        ownership.json to legacy_unowned, leaving an already-owned model's status
+        untouched, and reports scanned/migrated/already_had_ownership counts."""
         from omnibioai_model_registry import register_model
         from omnibioai_model_registry.ownership import (
             backfill_legacy_ownership,
@@ -5048,6 +5493,8 @@ class TestOwnershipModule:
         assert summary == {"scanned": 0, "migrated": 0, "already_had_ownership": 0, "skipped_invalid": 0}
 
     def test_backfill_is_idempotent_on_rerun(self, env_root):
+        """Running backfill_legacy_ownership a second time migrates nothing further,
+        reporting migrated 0 and already_had_ownership 1."""
         from omnibioai_model_registry.ownership import backfill_legacy_ownership
 
         legacy_dir = env_root / "tasks" / "t" / "models" / "legacy" / "versions" / "v1"
@@ -5132,6 +5579,8 @@ class TestRegisterModelOwnership:
     HTTP tests below also exercise end-to-end."""
 
     def test_register_response_includes_server_derived_ownership(self, env_root, tmp_path):
+        """register_model's result includes the organization_id and ownership_status
+        (owned) the ownership module derived."""
         from omnibioai_model_registry import register_model
 
         src = tmp_path / "src"
@@ -5268,6 +5717,8 @@ class TestPhase2AHTTPRegisterOwnership:
         ))
 
     def test_register_authenticated_as_org_a_owns_model(self, auth_client, tmp_path, monkeypatch):
+        """POST /v1/register authenticated as org-A returns organization_id org-A and
+        ownership_status owned."""
         self._as_org(monkeypatch, "org-A")
         client, _ = auth_client
         r = client.post(
@@ -5313,6 +5764,8 @@ class TestPhase2AHTTPRegisterOwnership:
     def test_conflicting_metadata_body_field_is_rejected_server_derived_wins(
         self, auth_client, tmp_path, monkeypatch
     ):
+        """An organization_id supplied in the request body's metadata is ignored; the
+        response's organization_id is the one derived from the verified JWT."""
         self._as_org(monkeypatch, "org-A")
         client, _ = auth_client
         payload = self._register_payload(
@@ -5439,6 +5892,8 @@ class TestMigrateOwnershipCLI:
     `omr migrate-ownership` backfill command."""
 
     def test_register_with_org_id_flag(self, env_root, tmp_path, capsys):
+        """omr register --org-id prints organization_id=org-A and status=owned for the
+        newly registered model."""
         from omnibioai_model_registry.cli.main import build_parser
 
         src = tmp_path / "src"
@@ -5456,6 +5911,8 @@ class TestMigrateOwnershipCLI:
         assert "status=owned" in out
 
     def test_migrate_ownership_cli_json_summary(self, env_root, capsys):
+        """omr migrate-ownership --json prints the backfill summary matching one
+        migrated legacy model."""
         from omnibioai_model_registry.cli.main import build_parser
 
         legacy_dir = env_root / "tasks" / "t" / "models" / "legacy" / "versions" / "v1"
@@ -5471,6 +5928,8 @@ class TestMigrateOwnershipCLI:
         assert summary == {"scanned": 1, "migrated": 1, "already_had_ownership": 0, "skipped_invalid": 0}
 
     def test_migrate_ownership_cli_human_readable(self, env_root, capsys):
+        """omr migrate-ownership without --json prints human-readable Scanned: and
+        Migrated to legacy: lines."""
         from omnibioai_model_registry.cli.main import build_parser
 
         parser = build_parser()
@@ -5497,6 +5956,8 @@ class TestCheckModelOwnership:
     centralized authorization decision every route above goes through."""
 
     def test_owned_model_matching_org_allowed(self, env_root):
+        """check_model_ownership allows a caller whose org matches the model's owning
+        org, with reason owned_by_caller."""
         from omnibioai_model_registry.ownership import (
             check_model_ownership, ensure_model_ownership,
         )
@@ -5511,6 +5972,9 @@ class TestCheckModelOwnership:
         assert result.reason == "owned_by_caller"
 
     def test_owned_model_different_org_denied(self, env_root):
+        """check_model_ownership denies a caller from a different org, with reason
+        owned_by_other_org, while still reporting the real owner on the result for
+        server-side audit visibility."""
         from omnibioai_model_registry.ownership import (
             check_model_ownership, ensure_model_ownership,
         )
@@ -5562,6 +6026,8 @@ class TestCheckModelOwnership:
         assert result.reason == "owned_by_other_org"
 
     def test_legacy_unowned_denied_for_every_caller(self, env_root):
+        """check_model_ownership denies every caller, org or anonymous, against a
+        legacy_unowned model, with reason legacy_unowned."""
         from omnibioai_model_registry.ownership import (
             check_model_ownership, ensure_model_ownership,
         )
@@ -5579,6 +6045,8 @@ class TestCheckModelOwnership:
             assert result.reason == "legacy_unowned"
 
     def test_nonexistent_model_denied_not_a_crash(self, env_root):
+        """check_model_ownership denies a model that was never registered with reason
+        model_not_found and no ownership record, rather than raising."""
         from omnibioai_model_registry.ownership import check_model_ownership
 
         result = check_model_ownership(env_root, "t", "never_registered", requesting_org_id="org-A")
@@ -5785,6 +6253,8 @@ class TestPhase2BOrgEnforcement:
     # ── reads: org-A allowed, org-B denied, across every read route ────────
 
     def test_resolve_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """GET /v1/resolve succeeds for the owning org-A and returns 400 (ModelNotFound)
+        for org-B."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.get("/v1/resolve", params={"task": "t", "ref": "m@v1"},
@@ -5797,6 +6267,7 @@ class TestPhase2BOrgEnforcement:
         assert r.status_code == 400  # ModelNotFound -> _handle_registry_error
 
     def test_show_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """GET /v1/show succeeds for the owning org-A and returns 400 for org-B."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.get("/v1/show", params={"task": "t", "ref": "m@v1"},
@@ -5809,6 +6280,7 @@ class TestPhase2BOrgEnforcement:
         assert r.status_code == 400
 
     def test_verify_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """POST /v1/verify succeeds for the owning org-A and returns 400 for org-B."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.post("/v1/verify", json={"task": "t", "ref": "m@v1"},
@@ -5821,6 +6293,7 @@ class TestPhase2BOrgEnforcement:
         assert r.status_code == 400
 
     def test_artifacts_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """GET /v1/artifacts succeeds for the owning org-A and returns 400 for org-B."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.get("/v1/artifacts", params={"task": "t", "ref": "m@v1"},
@@ -5833,6 +6306,7 @@ class TestPhase2BOrgEnforcement:
         assert r.status_code == 400
 
     def test_metrics_org_b_denied(self, org_a_model, monkeypatch):
+        """GET /v1/metrics returns 400 for org-B, which does not own the model."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-B")
         r = client.get("/v1/metrics", params={"task": "t", "ref": "m@v1"},
@@ -5840,6 +6314,8 @@ class TestPhase2BOrgEnforcement:
         assert r.status_code == 400
 
     def test_aliases_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """GET /v1/aliases returns the one alias for the owning org-A and returns 404
+        for org-B."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.get("/v1/aliases", params={"task": "t", "model": "m"},
@@ -5853,6 +6329,8 @@ class TestPhase2BOrgEnforcement:
         assert r.status_code == 404
 
     def test_compare_org_a_allowed_org_b_denied(self, org_a_model, tmp_path, monkeypatch):
+        """GET /v1/compare across two versions succeeds for the owning org-A and returns
+        404 for org-B."""
         client, _ = org_a_model
         self._register(client, tmp_path, monkeypatch, "org-A", version="v2", set_alias=None)
 
@@ -5900,6 +6378,9 @@ class TestPhase2BOrgEnforcement:
     # ── writes: org-A allowed, org-B denied ─────────────────────────────────
 
     def test_register_new_version_org_a_allowed_org_b_denied(self, org_a_model, tmp_path, monkeypatch):
+        """A new version registered by owning org-A succeeds; org-B's attempt to
+        register a further version returns 400, creates no directory, and leaves
+        ownership recorded as org-A."""
         client, root = org_a_model
         out = self._register(client, tmp_path, monkeypatch, "org-A", version="v2", set_alias=None)
         assert out["organization_id"] == "org-A"
@@ -5922,6 +6403,7 @@ class TestPhase2BOrgEnforcement:
         assert read_ownership(root, "t", "m").organization_id == "org-A"
 
     def test_promote_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """POST /v1/promote succeeds for the owning org-A and returns 400 for org-B."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.post("/v1/promote", json={
@@ -5936,6 +6418,8 @@ class TestPhase2BOrgEnforcement:
         assert r.status_code == 400
 
     def test_tags_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """PUT /v1/tags succeeds for the owning org-A; org-B's attempt returns 404 and
+        does not overwrite the tag org-A set."""
         client, root = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.put("/v1/tags", json={
@@ -5953,6 +6437,8 @@ class TestPhase2BOrgEnforcement:
         assert meta.get("tags", {}).get("team") == "bioml"  # org-B's write never landed
 
     def test_versions_patch_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """POST /v1/versions/patch succeeds for the owning org-A; org-B's attempt
+        returns 404 and does not overwrite the description org-A set."""
         client, root = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.post("/v1/versions/patch", json={
@@ -5970,6 +6456,7 @@ class TestPhase2BOrgEnforcement:
         assert meta.get("description") == "org-A note"  # org-B's write never landed
 
     def test_stage_org_a_allowed_org_b_denied(self, org_a_model, monkeypatch):
+        """POST /v1/stage succeeds for the owning org-A and returns 404 for org-B."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-A")
         r = client.post("/v1/stage", json={
@@ -5986,6 +6473,8 @@ class TestPhase2BOrgEnforcement:
     # ── HF push ──────────────────────────────────────────────────────────────
 
     def test_hf_push_org_a_allowed(self, org_a_model, monkeypatch):
+        """POST /v1/hf/push succeeds for the owning org-A, with the underlying push
+        runner invoked once."""
         import omnibioai_model_registry.hf_routes as hf_mod
         from unittest.mock import MagicMock
 
@@ -6020,6 +6509,7 @@ class TestPhase2BOrgEnforcement:
         mock_run_push.assert_not_called()
 
     def test_hf_push_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        """A successful HF push audit event carries the owning org's organization_id."""
         import omnibioai_model_registry.hf_routes as hf_mod
         from unittest.mock import MagicMock, patch
 
@@ -6144,6 +6634,7 @@ class TestPhase2BOrgEnforcement:
     # ── audit org_id propagation (security requirement #16) ────────────────
 
     def test_promote_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        """A successful promote audit event carries the caller's organization_id."""
         from unittest.mock import patch
         client, _ = org_a_model
         import omnibioai_model_registry.service.app.main as _svc
@@ -6157,6 +6648,7 @@ class TestPhase2BOrgEnforcement:
         assert kwargs["metadata"]["organization_id"] == "org-A"
 
     def test_tag_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        """A successful tag-set audit event carries the caller's organization_id."""
         from unittest.mock import patch
         client, _ = org_a_model
         import omnibioai_model_registry.service.app.main as _svc
@@ -6170,6 +6662,7 @@ class TestPhase2BOrgEnforcement:
         assert kwargs["metadata"]["organization_id"] == "org-A"
 
     def test_patch_version_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        """A successful version-patch audit event carries the caller's organization_id."""
         from unittest.mock import patch
         client, _ = org_a_model
         import omnibioai_model_registry.service.app.main as _svc
@@ -6184,6 +6677,7 @@ class TestPhase2BOrgEnforcement:
         assert kwargs["metadata"]["organization_id"] == "org-A"
 
     def test_stage_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
+        """A successful stage-set audit event carries the caller's organization_id."""
         from unittest.mock import patch
         client, _ = org_a_model
         import omnibioai_model_registry.service.app.main as _svc
@@ -6232,6 +6726,9 @@ class TestPhase2BConcurrency:
     def test_concurrent_brand_new_model_registration_has_one_consistent_winner(
         self, env_root, tmp_path
     ):
+        """Eight threads registering different versions of the same brand-new model
+        concurrently produce exactly one winning organization_id, agreed on by every
+        thread's own response, with every version still written to disk."""
         import threading
         from omnibioai_model_registry import register_model
         from omnibioai_model_registry.ownership import read_ownership
@@ -6340,6 +6837,8 @@ class TestPhase2CHTTPRunTracking:
     # ── log-metric: create + cross-org denial ───────────────────────────────
 
     def test_log_metric_org_a_creates_new_run(self, auth_client, monkeypatch):
+        """POST /v1/runs/log-metric for a brand-new run_id inserts it attributed to the
+        caller's org (org-A, owned)."""
         from unittest.mock import patch
         client, _ = auth_client
         import omnibioai_model_registry.service.app.main as _svc
@@ -6395,6 +6894,8 @@ class TestPhase2CHTTPRunTracking:
         assert param_inserts == []
 
     def test_log_batch_org_b_denied_on_org_a_run_nothing_written(self, auth_client, monkeypatch):
+        """POST /v1/runs/log-batch from org-B against a run owned by org-A returns 400
+        and writes no metric, param or tag row."""
         from unittest.mock import patch
         client, _ = auth_client
         import omnibioai_model_registry.service.app.main as _svc
@@ -6487,6 +6988,8 @@ class TestPhase2CHTTPRunTracking:
         assert r.status_code == 400
 
     def test_runs_get_same_org_allowed(self, auth_client, monkeypatch):
+        """GET /v1/runs/get returns the run when the requesting org matches the run's
+        owner."""
         from unittest.mock import patch
         client, _ = auth_client
         import omnibioai_model_registry.service.app.main as _svc
@@ -6527,6 +7030,8 @@ class TestPhase2CHTTPRunTracking:
     # ── header/query/body spoofing cannot bypass ─────────────────────────────
 
     def test_spoofed_x_organization_id_header_cannot_bypass_log_metric(self, auth_client, monkeypatch):
+        """An X-Organization-ID/X-Team-ID header claiming org-A does not let org-B log a
+        metric on org-A's run; the request still returns 400."""
         from unittest.mock import patch
         client, _ = auth_client
         import omnibioai_model_registry.service.app.main as _svc
@@ -6542,6 +7047,8 @@ class TestPhase2CHTTPRunTracking:
         assert r.status_code == 400
 
     def test_query_param_organization_id_cannot_bypass_runs_get(self, auth_client, monkeypatch):
+        """An organization_id query parameter claiming org-A does not let org-B read
+        org-A's run; the request still returns 400."""
         from unittest.mock import patch
         client, _ = auth_client
         import omnibioai_model_registry.service.app.main as _svc
@@ -6581,6 +7088,7 @@ class TestPhase2CHTTPRunTracking:
     # ── audit propagation ─────────────────────────────────────────────────
 
     def test_log_metric_audit_carries_organization_id(self, auth_client, monkeypatch):
+        """A successful log-metric audit event carries the caller's organization_id."""
         from unittest.mock import patch
         client, _ = auth_client
         import omnibioai_model_registry.service.app.main as _svc
@@ -6624,6 +7132,7 @@ class TestPhase2CHTTPRunTracking:
     # ── Phase 1 auth still required on the write routes ─────────────────────
 
     def test_log_metric_without_authorization_returns_401(self, auth_client):
+        """POST /v1/runs/log-metric with no Authorization header returns 401."""
         client, _ = auth_client
         r = client.post("/v1/runs/log-metric", json={
             "task": "t", "model_name": "m", "run_id": "r1", "key": "acc", "value": 0.1, "step": 0,
@@ -6631,6 +7140,7 @@ class TestPhase2CHTTPRunTracking:
         assert r.status_code == 401
 
     def test_log_param_without_authorization_returns_401(self, auth_client):
+        """POST /v1/runs/log-param with no Authorization header returns 401."""
         client, _ = auth_client
         r = client.post("/v1/runs/log-param", json={
             "task": "t", "model_name": "m", "run_id": "r1", "key": "lr", "value": 0.1,
@@ -6638,6 +7148,7 @@ class TestPhase2CHTTPRunTracking:
         assert r.status_code == 401
 
     def test_log_batch_without_authorization_returns_401(self, auth_client):
+        """POST /v1/runs/log-batch with no Authorization header returns 401."""
         client, _ = auth_client
         r = client.post("/v1/runs/log-batch", json={"task": "t", "model_name": "m", "run_id": "r1"})
         assert r.status_code == 401
@@ -6784,6 +7295,8 @@ class TestPhase2DHFPushStatusOwnership:
         return r.json()["job_id"]
 
     def test_org_a_can_poll_its_own_job(self, auth_client, tmp_path, monkeypatch):
+        """GET /v1/hf/push/status/{job_id} returns ok true for the org that started the
+        push."""
         client, _ = auth_client
         job_id = self._push_and_get_job_id(client, tmp_path, monkeypatch, "org-A")
         self._as_org(monkeypatch, "org-A")
@@ -6807,6 +7320,8 @@ class TestPhase2DHFPushStatusOwnership:
         assert r_cross_org.json() == r_unknown.json()
 
     def test_spoofed_x_organization_id_header_cannot_bypass_push_status(self, auth_client, tmp_path, monkeypatch):
+        """An X-Organization-ID header claiming org-A does not let org-B poll org-A's
+        push job; the request still returns 404."""
         client, _ = auth_client
         job_id = self._push_and_get_job_id(client, tmp_path, monkeypatch, "org-A")
         self._as_org(monkeypatch, "org-B")
@@ -6896,6 +7411,10 @@ class TestPhase2DFinalConsistencyAudit:
         return client, new_reg.root
 
     def test_every_model_route_denies_org_b(self, org_a_model, monkeypatch):
+        """Org-B is denied (with each route's documented status) on resolve, show,
+        verify, artifacts, metrics, aliases, compare, promote, tags, versions/patch and
+        stage against org-A's model, and org-A's model is absent from org-B's /v1/models
+        listing."""
         client, _ = org_a_model
         self._as_org(monkeypatch, "org-B")
         headers = {"Authorization": "Bearer org-B"}
@@ -6961,6 +7480,8 @@ class TestPathSafetyModule:
         "model-name_with.dots-and-hyphens123",
     ])
     def test_safe_component_accepts_legitimate_identifiers(self, value):
+        """Parametrized over legitimate identifiers (plain names, dated versions, a
+        128-char name, dots and hyphens): safe_component returns the value unchanged."""
         from omnibioai_model_registry.path_safety import safe_component
         assert safe_component(value, "field") == value
 
@@ -6992,6 +7513,10 @@ class TestPathSafetyModule:
         ("a" * 200, "too_long"),
     ])
     def test_safe_component_rejects_dangerous_variants(self, value, label):
+        """Parametrized over dangerous variants (dot/dotdot forms, embedded or backslash
+        separators, absolute paths, whitespace and control characters, a leading or
+        trailing dot, a URL-encoded literal, and an over-length string): safe_component
+        raises PathTraversalError for every one."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.path_safety import safe_component
 
@@ -7012,6 +7537,7 @@ class TestPathSafetyModule:
         assert "task" in str(excinfo.value)
 
     def test_safe_component_rejects_non_string(self):
+        """safe_component raises PathTraversalError for a non-string value."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.path_safety import safe_component
 
@@ -7021,6 +7547,8 @@ class TestPathSafetyModule:
     # ── assert_contained ────────────────────────────────────────────────────
 
     def test_assert_contained_allows_nested_existing_path(self, tmp_path):
+        """assert_contained returns the path unchanged for an existing path nested under
+        the root."""
         from omnibioai_model_registry.path_safety import assert_contained
 
         root = tmp_path / "root"
@@ -7039,6 +7567,8 @@ class TestPathSafetyModule:
         assert assert_contained(not_yet_created, root) == not_yet_created
 
     def test_assert_contained_rejects_escape(self, tmp_path):
+        """assert_contained raises PathTraversalError for a path that is a sibling of,
+        not nested under, the root."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.path_safety import assert_contained
 
@@ -7086,6 +7616,7 @@ class TestLayoutPathSafetyIntegration:
     reject bad components for every identifier kind."""
 
     def test_task_root_rejects_traversal(self):
+        """layout.task_root raises PathTraversalError for a task containing '../../etc'."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.package import layout as L
 
@@ -7093,6 +7624,8 @@ class TestLayoutPathSafetyIntegration:
             L.task_root(Path("/registry"), "../../etc")
 
     def test_model_root_rejects_traversal_in_model_name(self):
+        """layout.model_root raises PathTraversalError for a model_name containing
+        '../../etc'."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.package import layout as L
 
@@ -7100,6 +7633,8 @@ class TestLayoutPathSafetyIntegration:
             L.model_root(Path("/registry"), "t", "../../etc")
 
     def test_version_dir_rejects_traversal_in_version(self):
+        """layout.version_dir raises PathTraversalError for a version containing
+        '../../../etc'."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.package import layout as L
 
@@ -7107,6 +7642,8 @@ class TestLayoutPathSafetyIntegration:
             L.version_dir(Path("/registry"), "t", "m", "../../../etc")
 
     def test_alias_path_rejects_traversal_in_alias(self):
+        """layout.alias_path raises PathTraversalError for an alias containing
+        '../../etc/passwd'."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.package import layout as L
 
@@ -7114,6 +7651,8 @@ class TestLayoutPathSafetyIntegration:
             L.alias_path(Path("/registry"), "t", "m", "../../etc/passwd")
 
     def test_run_dir_rejects_traversal_in_run_id(self):
+        """layout.run_dir raises PathTraversalError for a run_id containing
+        '../../../etc'."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.package import layout as L
 
@@ -7121,6 +7660,8 @@ class TestLayoutPathSafetyIntegration:
             L.run_dir(Path("/registry"), "t", "m", "../../../etc")
 
     def test_run_metric_log_path_rejects_traversal_in_metric_key(self):
+        """layout.run_metric_log_path raises PathTraversalError for a metric key
+        containing '../../etc/passwd'."""
         from omnibioai_model_registry.errors import PathTraversalError
         from omnibioai_model_registry.package import layout as L
 
@@ -7143,6 +7684,9 @@ class TestRegisterModelPathSafety:
     artifacts_dir handling."""
 
     def test_traversal_in_model_name_rejected_no_directory_created(self, env_root, tmp_path):
+        """register_model with a path-traversal model_name raises PathTraversalError and
+        creates neither the escaped target directory nor anything under the registry
+        root."""
         from omnibioai_model_registry import register_model
         from omnibioai_model_registry.errors import PathTraversalError
 
@@ -7159,6 +7703,7 @@ class TestRegisterModelPathSafety:
         assert not (env_root / "tasks").exists()
 
     def test_traversal_in_task_rejected(self, env_root, tmp_path):
+        """register_model with a path-traversal task raises PathTraversalError."""
         from omnibioai_model_registry import register_model
         from omnibioai_model_registry.errors import PathTraversalError
 
@@ -7171,6 +7716,7 @@ class TestRegisterModelPathSafety:
             )
 
     def test_traversal_in_version_rejected(self, env_root, tmp_path):
+        """register_model with a path-traversal version raises PathTraversalError."""
         from omnibioai_model_registry import register_model
         from omnibioai_model_registry.errors import PathTraversalError
 
@@ -7244,6 +7790,9 @@ class TestRegisterModelPathSafety:
         assert out["ok"] is True
 
     def test_artifacts_allowed_roots_rejects_outside_when_configured(self, env_root, tmp_path, monkeypatch):
+        """With OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS configured,
+        register_model raises ValidationError for an artifacts_dir outside every allowed
+        root."""
         from omnibioai_model_registry import register_model
         from omnibioai_model_registry.errors import ValidationError
 
@@ -7260,6 +7809,8 @@ class TestRegisterModelPathSafety:
             )
 
     def test_artifacts_allowed_roots_accepts_inside_when_configured(self, env_root, tmp_path, monkeypatch):
+        """With OMNIBIOAI_MODEL_REGISTRY_ARTIFACTS_ALLOWED_ROOTS configured,
+        register_model succeeds for an artifacts_dir nested under an allowed root."""
         from omnibioai_model_registry import register_model
 
         allowed = tmp_path / "allowed_training_outputs"
@@ -7289,6 +7840,8 @@ class TestResolvePromotePathSafety:
             resolve_model(task="t", model_ref="../../../etc@passwd")
 
     def test_resolve_rejects_traversal_in_selector(self, env_root, tmp_path):
+        """resolve_model raises a registry error for a model_ref whose selector contains
+        '../../../etc'."""
         from omnibioai_model_registry import register_model, resolve_model
         from omnibioai_model_registry.errors import ModelRegistryError
 
@@ -7302,6 +7855,8 @@ class TestResolvePromotePathSafety:
             resolve_model(task="t", model_ref="m@../../../etc")
 
     def test_promote_rejects_traversal_in_alias(self, env_root, tmp_path):
+        """promote_model raises PathTraversalError for an alias containing
+        '../../../etc/evil'."""
         from omnibioai_model_registry import promote_model, register_model
         from omnibioai_model_registry.errors import PathTraversalError
 
@@ -7336,6 +7891,8 @@ class TestSymlinkContainment:
     defense-in-depth containment check."""
 
     def test_symlinked_registry_root_round_trip(self, tmp_path, monkeypatch):
+        """A registry root that is itself a symlink to real storage still supports a
+        full register/resolve round trip."""
         real_root = tmp_path / "real_storage"
         real_root.mkdir()
         symlinked_root = tmp_path / "registry_via_symlink"
@@ -7430,6 +7987,8 @@ class TestPathSecurityHTTP:
     # ── malicious identifiers, one per route ────────────────────────────────
 
     def test_register_traversal_model_name_returns_400_no_disclosure(self, auth_client, tmp_path, monkeypatch):
+        """POST /v1/register with a path-traversal model_name returns 400, and the
+        response body discloses neither the registry root path nor a traceback."""
         client, root = auth_client
         self._as_org(monkeypatch, "org-A")
         src = tmp_path / "src"
@@ -7444,6 +8003,7 @@ class TestPathSecurityHTTP:
         assert "/etc" not in body and "Traceback" not in body
 
     def test_resolve_traversal_ref_returns_400(self, auth_client, monkeypatch):
+        """GET /v1/resolve with a path-traversal ref returns 400."""
         client, _ = auth_client
         self._as_org(monkeypatch, "org-A")
         r = client.get("/v1/resolve", params={"task": "t", "ref": "../../../etc@passwd"},
@@ -7451,6 +8011,7 @@ class TestPathSecurityHTTP:
         assert r.status_code == 400
 
     def test_show_traversal_ref_returns_400(self, auth_client, monkeypatch):
+        """GET /v1/show with a path-traversal selector in ref returns 400."""
         client, _ = auth_client
         self._as_org(monkeypatch, "org-A")
         r = client.get("/v1/show", params={"task": "t", "ref": "m@../../../etc"},
@@ -7458,6 +8019,7 @@ class TestPathSecurityHTTP:
         assert r.status_code == 400
 
     def test_artifacts_traversal_ref_returns_400(self, auth_client, monkeypatch):
+        """GET /v1/artifacts with a path-traversal task returns 400."""
         client, _ = auth_client
         self._as_org(monkeypatch, "org-A")
         r = client.get("/v1/artifacts", params={"task": "../../etc", "ref": "m@v1"},
@@ -7465,6 +8027,7 @@ class TestPathSecurityHTTP:
         assert r.status_code == 400
 
     def test_promote_traversal_alias_returns_400(self, auth_client, tmp_path, monkeypatch):
+        """POST /v1/promote with a path-traversal alias returns 400."""
         client, _ = auth_client
         self._register(client, tmp_path, monkeypatch, "org-A")
         self._as_org(monkeypatch, "org-A")
@@ -7474,6 +8037,8 @@ class TestPathSecurityHTTP:
         assert r.status_code == 400
 
     def test_tags_traversal_version_returns_error_no_mutation(self, auth_client, tmp_path, monkeypatch):
+        """PUT /v1/tags with a path-traversal version returns 400 or 500 and creates no
+        directory outside the registry root."""
         client, root = auth_client
         self._register(client, tmp_path, monkeypatch, "org-A")
         self._as_org(monkeypatch, "org-A")
@@ -7485,6 +8050,8 @@ class TestPathSecurityHTTP:
         assert not (root / "etc").exists()
 
     def test_versions_patch_traversal_version_returns_error(self, auth_client, tmp_path, monkeypatch):
+        """POST /v1/versions/patch with a path-traversal version returns 400, 404 or
+        500."""
         client, _ = auth_client
         self._register(client, tmp_path, monkeypatch, "org-A")
         self._as_org(monkeypatch, "org-A")
@@ -7494,6 +8061,7 @@ class TestPathSecurityHTTP:
         assert r.status_code in (400, 404, 500)
 
     def test_stage_traversal_version_returns_error(self, auth_client, tmp_path, monkeypatch):
+        """POST /v1/stage with a path-traversal version returns 400, 404 or 500."""
         client, _ = auth_client
         self._register(client, tmp_path, monkeypatch, "org-A")
         self._as_org(monkeypatch, "org-A")
@@ -7513,6 +8081,7 @@ class TestPathSecurityHTTP:
         assert r.status_code == 400
 
     def test_compare_traversal_model_returns_400_via_global_handler(self, auth_client, monkeypatch):
+        """GET /v1/compare with a path-traversal model returns 400."""
         client, _ = auth_client
         self._as_org(monkeypatch, "org-A")
         r = client.get(
@@ -7523,6 +8092,8 @@ class TestPathSecurityHTTP:
         assert r.status_code == 400
 
     def test_hf_push_traversal_returns_error_no_hf_call(self, auth_client, tmp_path, monkeypatch):
+        """POST /v1/hf/push with a path-traversal model_name returns 400 or 404 and
+        never invokes the push runner."""
         import omnibioai_model_registry.hf_routes as hf_mod
         from unittest.mock import MagicMock
 
@@ -7542,6 +8113,7 @@ class TestPathSecurityHTTP:
         mock_run_push.assert_not_called()
 
     def test_verify_traversal_ref_returns_400(self, auth_client, monkeypatch):
+        """POST /v1/verify with a path-traversal ref returns 400."""
         client, _ = auth_client
         self._as_org(monkeypatch, "org-A")
         r = client.post("/v1/verify", json={"task": "t", "ref": "../../../etc@passwd"},
@@ -7604,6 +8176,8 @@ class TestPathSecurityHTTP:
     # ── authorization composition: path safety never substitutes for it ────
 
     def test_spoofed_org_header_still_ignored_alongside_valid_path(self, auth_client, tmp_path, monkeypatch):
+        """A well-formed request with a spoofed X-Organization-ID header is still denied
+        (400) on ownership grounds for the wrong org."""
         client, _ = auth_client
         self._register(client, tmp_path, monkeypatch, "org-A")
         self._as_org(monkeypatch, "org-B")
@@ -7641,6 +8215,9 @@ class TestPathSecurityHTTP:
     # ── full regression across the ordinary happy path ──────────────────────
 
     def test_full_lifecycle_with_legitimate_identifiers_unaffected(self, auth_client, tmp_path, monkeypatch):
+        """resolve, show, artifacts, aliases, promote and tags all return 200 for a
+        model registered with ordinary, non-malicious identifiers, showing path-safety
+        hardening does not affect legitimate traffic."""
         client, _ = auth_client
         self._register(client, tmp_path, monkeypatch, "org-A", model_name="human_pbmc", set_alias="latest")
         self._as_org(monkeypatch, "org-A")
@@ -7689,6 +8266,8 @@ class TestOwnershipResolutionUnit:
         )
 
     def test_resolves_legacy_model_to_requesting_org(self, env_root):
+        """resolve_legacy_ownership assigns a legacy_unowned model to the requesting
+        org, with status owned."""
         from omnibioai_model_registry.ownership import resolve_legacy_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -7700,6 +8279,8 @@ class TestOwnershipResolutionUnit:
         assert record.status == "owned"
 
     def test_resolution_persisted_to_ownership_json(self, env_root):
+        """After resolve_legacy_ownership, the ownership.json on disk reflects the new
+        organization_id and status owned."""
         from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -7710,6 +8291,8 @@ class TestOwnershipResolutionUnit:
         assert persisted.status == "owned"
 
     def test_repeated_resolution_by_same_org_is_idempotent(self, env_root):
+        """A second resolve_legacy_ownership call for the same org keeps the same
+        organization_id and status owned."""
         from omnibioai_model_registry.ownership import resolve_legacy_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -7721,6 +8304,8 @@ class TestOwnershipResolutionUnit:
         assert second.status == "owned"
 
     def test_already_owned_by_different_org_cannot_be_reassigned(self, env_root):
+        """resolve_legacy_ownership raises OwnershipResolutionNotEligible for an
+        already-owned model and leaves its recorded organization_id unchanged."""
         from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
         from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
@@ -7733,6 +8318,8 @@ class TestOwnershipResolutionUnit:
         assert read_ownership(env_root, "t", "m").organization_id == "org-A"
 
     def test_legacy_model_resolved_once_second_org_denied(self, env_root):
+        """Once a legacy model is resolved to org-A, a second org's resolution attempt
+        raises OwnershipResolutionNotEligible and the recorded owner stays org-A."""
         from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
         from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
@@ -7757,6 +8344,8 @@ class TestOwnershipResolutionUnit:
             resolve_legacy_ownership(LocalFS(), env_root, "t", "m", organization_id="org-A", actor="alice")
 
     def test_nonexistent_model_not_found(self, env_root):
+        """resolve_legacy_ownership raises ModelNotFound for a model that was never
+        registered."""
         from omnibioai_model_registry.errors import ModelNotFound
         from omnibioai_model_registry.ownership import resolve_legacy_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
@@ -7765,6 +8354,8 @@ class TestOwnershipResolutionUnit:
             resolve_legacy_ownership(LocalFS(), env_root, "t", "never_registered", organization_id="org-A", actor="alice")
 
     def test_requires_nonempty_organization_id(self, env_root):
+        """resolve_legacy_ownership raises ValidationError for an empty-string or None
+        organization_id."""
         from omnibioai_model_registry.errors import ValidationError
         from omnibioai_model_registry.ownership import resolve_legacy_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
@@ -7906,6 +8497,8 @@ class TestPhase2EAuthPermission:
         return mock_client
 
     def test_model_use_alone_is_insufficient(self, monkeypatch):
+        """require_ownership_resolve_auth_with_context raises HTTPException 403 for a
+        token that carries model.use but not model.resolve_ownership."""
         import asyncio
         from fastapi import HTTPException
         from iam_client.models import UserContext
@@ -7923,6 +8516,8 @@ class TestPhase2EAuthPermission:
         assert excinfo.value.status_code == 403
 
     def test_resolve_ownership_permission_alone_is_sufficient(self, monkeypatch):
+        """require_ownership_resolve_auth_with_context accepts a token carrying only
+        model.resolve_ownership and returns its org_id."""
         import asyncio
         from iam_client.models import UserContext
         from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
@@ -7938,6 +8533,8 @@ class TestPhase2EAuthPermission:
         assert user.org_id == "org-A"
 
     def test_no_permissions_at_all_denied(self, monkeypatch):
+        """require_ownership_resolve_auth_with_context raises HTTPException 403 for a
+        token with no permissions."""
         import asyncio
         from fastapi import HTTPException
         from iam_client.models import UserContext
@@ -8052,6 +8649,7 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── 1. unauthenticated -> 401 ────────────────────────────────────────
 
     def test_unauthenticated_returns_401(self, auth_client, tmp_path):
+        """POST /v1/ownership/resolve with no Authorization header returns 401."""
         client, root = auth_client
         self._make_legacy_model(root)
         r = client.post("/v1/ownership/resolve", json={"task": "t", "model_name": "m"})
@@ -8060,6 +8658,7 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── 2/3. authenticated but only model.use -> 403 ────────────────────
 
     def test_model_use_only_returns_403(self, auth_client, tmp_path, monkeypatch):
+        """POST /v1/ownership/resolve with a token carrying only model.use returns 403."""
         client, root = auth_client
         self._make_legacy_model(root)
         self._as(monkeypatch, "org-A", permissions=("model.use",))
@@ -8070,6 +8669,7 @@ class TestPhase2EOwnershipResolveHTTP:
         assert r.status_code == 403
 
     def test_no_permissions_returns_403(self, auth_client, tmp_path, monkeypatch):
+        """POST /v1/ownership/resolve with a token carrying no permissions returns 403."""
         client, root = auth_client
         self._make_legacy_model(root)
         self._as(monkeypatch, "org-A", permissions=())
@@ -8082,6 +8682,8 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── 4. authorized resolver succeeds ─────────────────────────────────
 
     def test_authorized_resolver_succeeds(self, auth_client, tmp_path, monkeypatch):
+        """A token carrying model.resolve_ownership resolves a legacy model to its own
+        org, with already_resolved false."""
         client, root = auth_client
         self._make_legacy_model(root)
         self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
@@ -8098,6 +8700,8 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── 5/6. spoofed headers no effect ──────────────────────────────────
 
     def test_spoofed_x_organization_id_header_no_effect(self, auth_client, tmp_path, monkeypatch):
+        """A spoofed X-Organization-ID header does not change which org the model is
+        resolved to."""
         client, root = auth_client
         self._make_legacy_model(root)
         self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
@@ -8109,6 +8713,8 @@ class TestPhase2EOwnershipResolveHTTP:
         assert r.json()["organization_id"] == "org-A"
 
     def test_spoofed_x_team_id_header_no_effect(self, auth_client, tmp_path, monkeypatch):
+        """A spoofed X-Team-ID header does not change which org the model is resolved
+        to."""
         client, root = auth_client
         self._make_legacy_model(root)
         self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
@@ -8136,6 +8742,8 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── 7. already-owned model cannot be reassigned ─────────────────────
 
     def test_already_owned_by_other_org_cannot_be_reassigned(self, auth_client, tmp_path, monkeypatch):
+        """Resolving a model already owned by another org returns 400 and leaves the
+        recorded owner unchanged."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-B", permissions=("model.resolve_ownership",))
@@ -8150,6 +8758,8 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── 8. legacy model resolved only once ──────────────────────────────
 
     def test_legacy_model_resolved_only_once(self, auth_client, tmp_path, monkeypatch):
+        """A second org's resolution attempt after a legacy model was already resolved
+        returns 400 and leaves the first resolver as the recorded owner."""
         client, root = auth_client
         self._make_legacy_model(root)
         self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
@@ -8171,6 +8781,8 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── 9. repeated resolution is safe/idempotent ───────────────────────
 
     def test_repeated_resolution_by_same_org_is_idempotent(self, auth_client, tmp_path, monkeypatch):
+        """A second resolution request by the same org that already resolved the model
+        returns 200 with already_resolved true."""
         client, root = auth_client
         self._make_legacy_model(root)
         self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
@@ -8192,6 +8804,8 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── unowned (not legacy) also rejected ──────────────────────────────
 
     def test_unowned_model_not_eligible(self, auth_client, tmp_path, monkeypatch):
+        """Resolving a model whose ownership record is unowned (not legacy_unowned)
+        returns 400."""
         client, root = auth_client
         from omnibioai_model_registry.ownership import ensure_model_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
@@ -8211,6 +8825,7 @@ class TestPhase2EOwnershipResolveHTTP:
         assert r.status_code == 400
 
     def test_nonexistent_model_returns_error(self, auth_client, monkeypatch):
+        """Resolving a model that was never registered returns 400."""
         client, root = auth_client
         self._as(monkeypatch, "org-A", permissions=("model.resolve_ownership",))
         r = client.post(
@@ -8220,6 +8835,8 @@ class TestPhase2EOwnershipResolveHTTP:
         assert r.status_code == 400
 
     def test_resolver_with_no_org_membership_rejected(self, auth_client, tmp_path, monkeypatch):
+        """A caller with model.resolve_ownership but no org membership is rejected with
+        400."""
         client, root = auth_client
         self._make_legacy_model(root)
         self._as(monkeypatch, None, permissions=("model.resolve_ownership",))
@@ -8232,6 +8849,9 @@ class TestPhase2EOwnershipResolveHTTP:
     # ── 10/11. audit content, no secret leakage ─────────────────────────
 
     def test_audit_event_contains_authenticated_organization_id(self, auth_client, tmp_path, monkeypatch):
+        """A successful resolution logs a resolve_legacy_ownership audit event carrying
+        the authenticated actor, the previous legacy_unowned status and the resulting
+        org id and owned status."""
         from unittest.mock import patch
         client, root = auth_client
         self._make_legacy_model(root)
@@ -8253,6 +8873,8 @@ class TestPhase2EOwnershipResolveHTTP:
         assert kwargs["metadata"]["resulting_ownership_status"] == "owned"
 
     def test_audit_event_on_denial_recorded_separately(self, auth_client, tmp_path, monkeypatch):
+        """A denied cross-org resolution logs a resolve_legacy_ownership_denied audit
+        event carrying the denied org's id."""
         from unittest.mock import patch
         client, root = auth_client
         self._make_owned_model(root, "org-A")
@@ -8270,6 +8892,8 @@ class TestPhase2EOwnershipResolveHTTP:
         assert kwargs["metadata"]["organization_id"] == "org-B"
 
     def test_no_secret_or_token_in_response_or_audit(self, auth_client, tmp_path, monkeypatch):
+        """The caller's bearer token never appears in the response body, the audit
+        metadata, or the persisted ownership record."""
         from unittest.mock import patch
         client, root = auth_client
         self._make_legacy_model(root)
@@ -8391,6 +9015,7 @@ class TestModelReadUseAuthorizationSplit:
     # ── A. model.read can list the catalog ───────────────────────────────
 
     def test_model_read_only_can_list_models(self, auth_client, monkeypatch):
+        """A token carrying only model.read can list models via GET /v1/models."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8402,6 +9027,8 @@ class TestModelReadUseAuthorizationSplit:
     # ── B. model.read cannot resolve (the actual use-enabling route) ────
 
     def test_model_read_only_cannot_resolve(self, auth_client, monkeypatch):
+        """A token carrying only model.read cannot GET /v1/resolve, which returns 403
+        with the same missing-permission message as before this split."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8417,6 +9044,7 @@ class TestModelReadUseAuthorizationSplit:
     # ── C. model.read cannot verify (a pre-use integrity gate) ──────────
 
     def test_model_read_only_cannot_verify(self, auth_client, monkeypatch):
+        """A token carrying only model.read cannot POST /v1/verify, which returns 403."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8429,6 +9057,7 @@ class TestModelReadUseAuthorizationSplit:
     # ── D. model.read cannot mutate ──────────────────────────────────────
 
     def test_model_read_only_cannot_register(self, auth_client, monkeypatch, tmp_path):
+        """A token carrying only model.read cannot POST /v1/register, which returns 403."""
         client, root = auth_client
         self._as(monkeypatch, "org-A", permissions=("model.read",))
         src = tmp_path / "src"
@@ -8442,6 +9071,7 @@ class TestModelReadUseAuthorizationSplit:
         assert r.status_code == 403
 
     def test_model_read_only_cannot_promote(self, auth_client, monkeypatch):
+        """A token carrying only model.read cannot POST /v1/promote, which returns 403."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8451,6 +9081,7 @@ class TestModelReadUseAuthorizationSplit:
         assert r.status_code == 403
 
     def test_model_read_only_cannot_set_tag(self, auth_client, monkeypatch):
+        """A token carrying only model.read cannot PUT /v1/tags, which returns 403."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8460,6 +9091,7 @@ class TestModelReadUseAuthorizationSplit:
         assert r.status_code == 403
 
     def test_model_read_only_cannot_set_stage(self, auth_client, monkeypatch):
+        """A token carrying only model.read cannot POST /v1/stage, which returns 403."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8501,6 +9133,8 @@ class TestModelReadUseAuthorizationSplit:
     # is: by the resulting JWT `permissions` claim. ──────────────────────
 
     def test_model_read_reaches_every_approved_catalog_endpoint(self, auth_client, monkeypatch):
+        """A token carrying only model.read succeeds on every route moved to the
+        read/use split: models, aliases, compare, metrics, artifacts and show."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8535,6 +9169,8 @@ class TestModelReadUseAuthorizationSplit:
     # from, the model.use/model.read check. ─────────────────────────────
 
     def test_model_read_cannot_see_another_orgs_models_in_list(self, auth_client, monkeypatch):
+        """A model.read caller's GET /v1/models lists only their own org's models,
+        excluding another org's."""
         client, root = auth_client
         self._make_owned_model(root, "org-A", task="t", model_name="m-a")
         self._make_owned_model(root, "org-B", task="t", model_name="m-b")
@@ -8577,6 +9213,8 @@ class TestModelReadUseAuthorizationSplit:
         assert nonexistent.json()["detail"] == "Model not found: task=t, model_name=does-not-exist"
 
     def test_model_read_cannot_see_another_orgs_aliases_or_compare(self, auth_client, monkeypatch):
+        """A model.read caller gets 404 from /v1/aliases and /v1/compare for a model
+        owned by a different org."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-B", permissions=("model.read",))
@@ -8608,6 +9246,8 @@ class TestModelReadUseAuthorizationSplit:
     # ── J. /v1/show: package_dir redaction decision ──────────────────────
 
     def test_show_redacts_package_dir_for_model_read_only(self, auth_client, monkeypatch):
+        """For a model.read-only caller, GET /v1/show returns package_dir null while the
+        meta fields remain real data."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8624,6 +9264,7 @@ class TestModelReadUseAuthorizationSplit:
         assert body["meta"]["task"] == "t"
 
     def test_show_includes_package_dir_for_model_use(self, auth_client, monkeypatch):
+        """For a model.use caller, GET /v1/show returns a real, non-null package_dir."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.use",))
@@ -8656,6 +9297,8 @@ class TestModelReadUseAuthorizationSplit:
     # capability anywhere in this service) ───────────────────────────────
 
     def test_artifacts_returns_full_listing_for_model_read_only(self, auth_client, monkeypatch):
+        """A model.read-only caller's GET /v1/artifacts lists every required file with
+        only name, sha256 and size_bytes fields, no path or content."""
         client, root = auth_client
         self._make_owned_model(root, "org-A")
         self._as(monkeypatch, "org-A", permissions=("model.read",))
@@ -8678,6 +9321,8 @@ class TestOwnershipResolutionCLI:
     out-of-band trust boundary as `omr register --org-id`."""
 
     def test_cli_resolves_legacy_model(self, env_root, capsys):
+        """omr resolve-ownership --json resolves a legacy model to the given org and
+        reports organization_id and ownership_status owned."""
         from omnibioai_model_registry.cli.main import build_parser
         from omnibioai_model_registry.ownership import ensure_model_ownership
         from omnibioai_model_registry.storage.localfs import LocalFS
@@ -8700,6 +9345,8 @@ class TestOwnershipResolutionCLI:
         assert out["ownership_status"] == "owned"
 
     def test_cli_cannot_reassign_already_owned_model(self, env_root, capsys):
+        """omr resolve-ownership for an already-owned model raises
+        OwnershipResolutionNotEligible."""
         from omnibioai_model_registry.cli.main import build_parser
         from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
         from omnibioai_model_registry.ownership import ensure_model_ownership

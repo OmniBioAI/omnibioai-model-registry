@@ -3,6 +3,9 @@
 These tests call the route functions directly so the asynchronous push worker,
 token fallback, and job ownership checks are tested without requiring a live
 FastAPI server or the Hugging Face service.
+
+Developer:
+    Manish Kumar <manish@omnibioai.org>
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from iam_client.models import UserContext
 
 
 def _user(org_id: str | None = "org-a") -> UserContext:
+    """Builds a UserContext with model.use and the given org_id, defaulting to org-a."""
     return UserContext(
         user_id="user-1",
         email="user@example.test",
@@ -29,6 +33,8 @@ def _user(org_id: str | None = "org-a") -> UserContext:
 
 @pytest.fixture
 def hf_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Reloads omnibioai_model_registry.hf_routes with a temp registry root and no
+    HF_TOKEN set, and clears its in-memory job store."""
     monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(tmp_path / "registry"))
     monkeypatch.delenv("HF_TOKEN", raising=False)
     import omnibioai_model_registry.hf_routes as module
@@ -38,6 +44,9 @@ def hf_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_run_push_success_uploads_immutable_version_and_card(hf_module, tmp_path, monkeypatch):
+    """_run_push creates the HF repo, uploads the version folder, uploads a model card
+    containing the given license and card text, marks the job success with the repo URL,
+    and does not leave a README.md in the version directory."""
     vdir = tmp_path / "v1"
     vdir.mkdir()
     (vdir / "model.pt").write_bytes(b"weights")
@@ -66,6 +75,8 @@ def test_run_push_success_uploads_immutable_version_and_card(hf_module, tmp_path
 
 
 def test_run_push_records_downstream_failure(hf_module, tmp_path, monkeypatch):
+    """_run_push records the job as status error with the underlying exception message
+    when create_repo raises."""
     fake_api = MagicMock()
     fake_api.create_repo.side_effect = RuntimeError("HF unavailable")
     monkeypatch.setitem(
@@ -82,6 +93,8 @@ def test_run_push_records_downstream_failure(hf_module, tmp_path, monkeypatch):
 
 
 def test_hf_push_requires_request_or_server_token(hf_module, monkeypatch):
+    """hf_push raises HTTPException 400 naming HF_TOKEN when neither the request nor the
+    server has a token configured."""
     request = hf_module.HFPushRequest(
         task="t", model_name="m", version="v1", repo_id="org/m",
     )
@@ -94,6 +107,9 @@ def test_hf_push_requires_request_or_server_token(hf_module, monkeypatch):
 
 
 def test_hf_push_uses_server_token_and_records_org_scoped_job(hf_module, monkeypatch):
+    """hf_push falls back to the server's HF_TOKEN, starts the push in a background
+    thread with that token, records the job under the caller's organization_id, returns
+    the generated job_id, and logs an audit event."""
     request = hf_module.HFPushRequest(
         task="t", model_name="m", version="v1", repo_id="org/m",
     )
@@ -125,6 +141,8 @@ def test_hf_push_uses_server_token_and_records_org_scoped_job(hf_module, monkeyp
 
 
 def test_hf_status_hides_jobs_from_other_organizations(hf_module):
+    """hf_push_status returns 404 Unknown job_id for a caller in a different org than
+    the job's owner, and returns the real status for the owning org."""
     hf_module._set_job("job-a", status="success", organization_id="org-a", url="safe")
 
     with pytest.raises(HTTPException) as exc_info:
@@ -140,6 +158,7 @@ def test_hf_status_hides_jobs_from_other_organizations(hf_module):
 
 
 def test_hf_status_unknown_job_is_non_enumerating(hf_module):
+    """hf_push_status returns 404 Unknown job_id for a job id that was never created."""
     with pytest.raises(HTTPException) as exc_info:
         hf_module.hf_push_status("does-not-exist", _user())
 

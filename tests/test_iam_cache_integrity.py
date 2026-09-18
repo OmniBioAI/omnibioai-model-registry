@@ -20,6 +20,9 @@ Mirrors the FakeAsyncRedis pattern from omnibioai-iam-client's own
 tests/conftest.py (`raw_set` = a forger planting a value with independent
 Redis write access, bypassing AsyncIAMClient entirely) rather than
 inventing a new one.
+
+Developer:
+    Manish Kumar <manish@omnibioai.org>
 """
 from __future__ import annotations
 
@@ -55,6 +58,8 @@ class FakeAsyncRedis:
 
 
 def _make_client(fake_redis: FakeAsyncRedis, **kwargs):
+    """Builds a real AsyncIAMClient with its redis and httpx clients replaced by the
+    given FakeAsyncRedis and a mocked httpx client."""
     mock_http = AsyncMock()
     with patch("iam_client.client.redis") as mock_redis_module, \
          patch("iam_client.client.httpx") as mock_httpx:
@@ -81,6 +86,8 @@ class TestVerifyAndAuthorizeConfiguresCacheSecret:
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
 
     def test_cache_secret_kwarg_matches_configured_jwt_secret(self, monkeypatch):
+        """verify_and_authorize constructs AsyncIAMClient with cache_secret equal to the
+        configured JWT_SECRET."""
         import omnibioai_model_registry.auth as auth_mod
         from iam_client.models import UserContext
 
@@ -145,6 +152,8 @@ class TestIAMClientCacheIntegrity:
     SECRET = "shared-jwt-secret-for-this-deployment"
 
     def test_forged_unsigned_entry_rejected_when_secret_configured(self):
+        """A cache entry planted directly with no MAC prefix at all is rejected by
+        get_cached_user, returning None."""
         fake_redis = FakeAsyncRedis()
         client, _ = _make_client(fake_redis, cache_secret=self.SECRET)
 
@@ -163,6 +172,8 @@ class TestIAMClientCacheIntegrity:
         assert result is None, "an unsigned forged entry must never be trusted"
 
     def test_tampered_signed_entry_rejected(self):
+        """A signed cache entry whose body was altered after signing (org_id flipped) is
+        rejected by get_cached_user, since its MAC no longer matches."""
         fake_redis = FakeAsyncRedis()
         client, _ = _make_client(fake_redis, cache_secret=self.SECRET)
         token = "some-real-token"
@@ -180,6 +191,8 @@ class TestIAMClientCacheIntegrity:
         assert result is None, "a signed-but-tampered entry must be rejected, not trusted"
 
     def test_malformed_entry_treated_as_cache_miss(self):
+        """A cache entry that is neither valid JSON nor MAC-prefixed is treated as a
+        cache miss, returning None."""
         fake_redis = FakeAsyncRedis()
         client, _ = _make_client(fake_redis, cache_secret=self.SECRET)
         token = "some-token"
@@ -211,6 +224,8 @@ class TestIAMClientCacheIntegrity:
         assert result is None, "a MAC produced with a different secret must never verify"
 
     def test_valid_signed_entry_written_by_this_client_is_accepted(self):
+        """A cache entry written through set_cache by this same client is accepted by
+        get_cached_user, returning the same user_id and permissions."""
         fake_redis = FakeAsyncRedis()
         client, _ = _make_client(fake_redis, cache_secret=self.SECRET)
         token = "legit-token"
