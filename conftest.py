@@ -1,25 +1,12 @@
-"""
-conftest.py — root-level pytest configuration.
+"""Root-level pytest configuration. Installs a MetaPathFinder before any test module is
+imported so the Cython .so extensions for manifest, validate and localfs are replaced
+with their pure-Python source files: a MetaPathFinder runs the full import machinery
+(including setattr(parent, child, module) on the package), which sys.modules pre-seeding
+would skip. It execs the real .py source via spec_from_file_location, giving real
+coverage on those files while still intercepting the import before the .so can load.
 
-Must run before any test module is imported so that the Cython .so extensions
-(manifest, validate, localfs) are replaced with the pure-Python source files.
-
-WHY MetaPathFinder instead of sys.modules pre-seeding:
-  When a module is already in sys.modules, Python's _find_and_load() returns
-  immediately, skipping the code that does setattr(parent, child, module).
-  This means `import omnibioai_model_registry.storage.localfs as lfs_mod`
-  would succeed for the module lookup but then fail on the IMPORT_FROM
-  bytecode that does getattr(omnibioai_model_registry, 'storage') because
-  `storage` was never set as an attribute on the package object.
-
-  A MetaPathFinder lets Python run the full _find_and_load_unlocked() path,
-  which imports parent packages normally, then calls our loader, and finally
-  does setattr(parent, child, module) — so all attribute links are wired up.
-
-WHY exec real .py source files instead of hand-crafted mocks:
-  Loading the actual manifest.py, validate.py, and localfs.py source files
-  via spec_from_file_location gives real code coverage on those files while
-  still intercepting the import BEFORE the .so Cython extension can load.
+Developer:
+    Manish Kumar <manish@omnibioai.org>
 """
 from __future__ import annotations
 
@@ -61,6 +48,8 @@ class _MockLoader(importlib.abc.Loader):
 
 
 class _MockFinder(importlib.abc.MetaPathFinder):
+    """MetaPathFinder that redirects imports of the three Cython modules in _PY_SOURCES
+    to _MockLoader; every other import is left alone."""
     def find_spec(self, fullname: str, path, target=None):  # noqa: ANN001
         if fullname in _PY_SOURCES:
             loader = _MockLoader(fullname)

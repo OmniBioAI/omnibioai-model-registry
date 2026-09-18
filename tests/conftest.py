@@ -1,4 +1,8 @@
-"""Test-only compatibility adapter for the current Starlette/httpx stack."""
+"""Test-only compatibility adapter for the current Starlette/httpx stack.
+
+Developer:
+    Manish Kumar <manish@omnibioai.org>
+"""
 
 import asyncio
 
@@ -6,10 +10,15 @@ import httpx
 
 
 class SyncASGIClient:
+    """Test-only synchronous adapter that runs requests against a FastAPI app through
+    httpx's ASGI transport, standing in for fastapi.testclient.TestClient on the current
+    Starlette/httpx stack."""
     def __init__(self, app, **kwargs):
         self.app = app
 
     def request(self, method, url, **kwargs):
+        """Runs the given HTTP method/URL against the wrapped ASGI app over
+        httpx.ASGITransport, blocking via asyncio.run, and returns the response."""
         async def send():
             transport = httpx.ASGITransport(app=self.app)
             async with httpx.AsyncClient(
@@ -39,6 +48,8 @@ class SyncASGIClient:
 
 
 def pytest_configure():
+    """Replaces fastapi.testclient.TestClient with SyncASGIClient for the duration of
+    the test session."""
     import fastapi.testclient
 
     fastapi.testclient.TestClient = SyncASGIClient
