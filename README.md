@@ -1,6 +1,7 @@
 # OmniBioAI ModelHub
 
-> README last reviewed: **2026-09-12**
+> README last reviewed: **2026-09-12**. Runtime behavior and API schemas take
+> precedence over this overview when the implementation changes.
 
 **OmniBioAI ModelHub** is a production-oriented experiment tracking and model lifecycle management system for AI/ML models within the OmniBioAI ecosystem — purpose-built for biomedical AI plugins.
 
