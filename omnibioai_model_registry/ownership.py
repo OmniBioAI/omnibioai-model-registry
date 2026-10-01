@@ -88,7 +88,12 @@ from pathlib import Path
 from typing import Optional
 
 from .audit.audit_log import now_utc_iso
-from .errors import ModelNotFound, OwnershipResolutionNotEligible, PathTraversalError, ValidationError
+from .errors import (
+    ModelNotFound,
+    OwnershipResolutionNotEligible,
+    PathTraversalError,
+    ValidationError,
+)
 from .package import layout as L
 from .storage.localfs import LocalFS
 

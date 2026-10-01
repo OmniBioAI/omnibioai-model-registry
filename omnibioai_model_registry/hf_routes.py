@@ -13,7 +13,11 @@ from pydantic import BaseModel
 
 from .api import ModelRegistry
 from .audit_client import AuditClient
-from .auth import _actor_identifier, require_auth_with_context, require_write_auth_with_context
+from .auth import (
+    _actor_identifier,
+    require_auth_with_context,
+    require_write_auth_with_context,
+)
 
 router = APIRouter()
 

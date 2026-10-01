@@ -7,9 +7,8 @@ Developer:
     Manish Kumar <manish@omnibioai.org>
 """
 
-from pathlib import Path
 import re
-
+from pathlib import Path
 
 DOCKERFILE = Path(__file__).resolve().parents[1] / "Dockerfile"
 

@@ -1878,7 +1878,10 @@ class TestRunLogger:
 
     def test_invalid_stage_transition_error_exists(self):
         """Covers errors.py: InvalidStageTransition is exported and inherits correctly."""
-        from omnibioai_model_registry.errors import InvalidStageTransition, ModelRegistryError
+        from omnibioai_model_registry.errors import (
+            InvalidStageTransition,
+            ModelRegistryError,
+        )
 
         e = InvalidStageTransition("cannot go from production to none")
         assert isinstance(e, ModelRegistryError)
@@ -2088,8 +2091,9 @@ def svc_client(tmp_path, monkeypatch):
     monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
     monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
 
-    import omnibioai_model_registry.service.app.main as _svc
     from fastapi.testclient import TestClient
+
+    import omnibioai_model_registry.service.app.main as _svc
 
     new_reg = _svc.ModelRegistry.from_env()
     monkeypatch.setattr(_svc, "registry", new_reg)
@@ -3544,6 +3548,7 @@ class TestAuth:
     def test_actor_identifier_prefers_email(self):
         """_actor_identifier returns the user's email when one is set."""
         from iam_client.models import UserContext
+
         from omnibioai_model_registry.auth import _actor_identifier
         user = UserContext(
             user_id="42", email="user@example.com", roles=[], permissions=["model.use"], valid=True,
@@ -3553,6 +3558,7 @@ class TestAuth:
     def test_actor_identifier_falls_back_to_user_id(self):
         """_actor_identifier returns the user's id when the email is empty."""
         from iam_client.models import UserContext
+
         from omnibioai_model_registry.auth import _actor_identifier
         user = UserContext(user_id="42", email="", roles=[], permissions=[], valid=True)
         assert _actor_identifier(user) == "42"
@@ -3575,6 +3581,7 @@ class TestVerifyAndAuthorize:
         """Patches AsyncIAMClient.get_user to return the given UserContext (or None for
         an invalid token)."""
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -3587,6 +3594,7 @@ class TestVerifyAndAuthorize:
         """Patches the module's audit client and returns the mock so log_event calls can
         be asserted."""
         from unittest.mock import MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_audit = MagicMock()
@@ -3597,7 +3605,9 @@ class TestVerifyAndAuthorize:
         """A user with model.use is returned by verify_and_authorize and a
         model_access_success event is logged with the user's organization_id."""
         import asyncio
+
         from iam_client.models import UserContext
+
         from omnibioai_model_registry.auth import verify_and_authorize
 
         user = UserContext(
@@ -3619,8 +3629,9 @@ class TestVerifyAndAuthorize:
         """A valid user lacking model.use raises AuthError 403 and logs
         model_access_denied with reason missing_permission and the user's org id."""
         import asyncio
-        from fastapi import HTTPException
+
         from iam_client.models import UserContext
+
         from omnibioai_model_registry.auth import AuthError, verify_and_authorize
 
         user = UserContext(
@@ -3643,8 +3654,9 @@ class TestVerifyAndAuthorize:
     def test_invalid_jwt_is_denied(self, monkeypatch):
         """A token the IAM client cannot resolve raises AuthError 401 and logs
         model_access_denied with reason invalid_token and actor unknown."""
-        from omnibioai_model_registry.auth import AuthError, verify_and_authorize
         import asyncio
+
+        from omnibioai_model_registry.auth import AuthError, verify_and_authorize
 
         self._mock_iam_client(monkeypatch, None)  # get_user() returns None: unverifiable token
         audit = self._mock_audit(monkeypatch)
@@ -3663,8 +3675,9 @@ class TestVerifyAndAuthorize:
         this layer, which is the correct fail-closed behavior: this
         service never re-derives *why* a token failed from a raw payload,
         it only ever trusts the IAM client's verified verdict."""
-        from omnibioai_model_registry.auth import AuthError, verify_and_authorize
         import asyncio
+
+        from omnibioai_model_registry.auth import AuthError, verify_and_authorize
 
         self._mock_iam_client(monkeypatch, None)
 
@@ -3675,10 +3688,11 @@ class TestVerifyAndAuthorize:
     def test_iam_client_exception_is_denied_not_raised(self, monkeypatch):
         """A network/connection failure talking to the IAM/auth service
         must fail closed (401), never propagate as an unhandled 500."""
+        import asyncio
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
         from omnibioai_model_registry.auth import AuthError, verify_and_authorize
-        import asyncio
 
         mock_client = MagicMock()
         mock_client.get_user = AsyncMock(side_effect=ConnectionError("auth service unreachable"))
@@ -3696,7 +3710,9 @@ class TestVerifyAndAuthorize:
         -- it is not used to filter registry data (no tenant concept
         exists in the data model yet; see auth.py's module docstring)."""
         import asyncio
+
         from iam_client.models import UserContext
+
         from omnibioai_model_registry.auth import verify_and_authorize
 
         user_org_a = UserContext(
@@ -3716,7 +3732,9 @@ class TestVerifyAndAuthorize:
         (model.use is a global concept here, not org-scoped in this
         service) and logged with organization_id=None, not crash."""
         import asyncio
+
         from iam_client.models import UserContext
+
         from omnibioai_model_registry.auth import verify_and_authorize
 
         user_no_org = UserContext(
@@ -3752,6 +3770,7 @@ class TestAuditClient:
     def test_log_event_fires_http_post_in_background_thread(self):
         """log_event starts a daemon thread to perform the HTTP post."""
         from unittest.mock import MagicMock, patch
+
         from omnibioai_model_registry.audit_client import AuditClient
 
         client = AuditClient("http://test-audit:8004")
@@ -3769,6 +3788,7 @@ class TestAuditClient:
         """_send does not raise when the underlying urlopen call raises a
         ConnectionError."""
         from unittest.mock import patch
+
         from omnibioai_model_registry.audit_client import AuditClient
 
         def bad_urlopen(req, timeout=None):
@@ -3783,6 +3803,7 @@ class TestAuditClient:
         """_send posts a JSON payload containing service, action, actor, resource and
         ts_utc, along with the given metadata."""
         from unittest.mock import MagicMock, patch
+
         from omnibioai_model_registry.audit_client import AuditClient
 
         captured = []
@@ -3843,8 +3864,6 @@ class TestRunLoggerCoverageGaps:
 
         replace_calls = []
 
-        orig_replace = run_mod.os.replace
-
         def bad_replace(src, dst):
             replace_calls.append(src)
             raise OSError("simulated replace failure")
@@ -3866,8 +3885,9 @@ def full_svc_client(tmp_path, monkeypatch):
     monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", str(root))
     monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
     monkeypatch.delenv("AUTH_ENABLED", raising=False)
-    import omnibioai_model_registry.service.app.main as _svc
     from fastapi.testclient import TestClient
+
+    import omnibioai_model_registry.service.app.main as _svc
     new_reg = _svc.ModelRegistry.from_env()
     monkeypatch.setattr(_svc, "registry", new_reg)
     return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
@@ -3935,7 +3955,9 @@ class TestServiceAllRoutes:
         """With auth enabled and a resolved user, registering emits usage with the
         user's organization_id and user_id."""
         from unittest.mock import AsyncMock, MagicMock, patch
+
         from iam_client.models import UserContext
+
         import omnibioai_model_registry.auth as auth_mod
         import omnibioai_model_registry.service.app.main as _svc
 
@@ -3985,7 +4007,7 @@ class TestServiceAllRoutes:
         require_write_auth (bare str), not require_write_auth_with_context
         -- unaffected by this PR."""
         client, root = full_svc_client
-        src = self._register(root, tmp_path)
+        self._register(root, tmp_path)
         r = client.post("/v1/promote", json={
             "task": "t", "model_name": "m", "version": "v1", "alias": "prod",
         })
@@ -4350,8 +4372,9 @@ class TestUsageEmit:
 
     def test_client_constructs_a_real_usage_client(self):
         """_client() returns a real UsageClient instance."""
-        from omnibioai_model_registry.usage_emit import _client
         from usage_client import UsageClient
+
+        from omnibioai_model_registry.usage_emit import _client
 
         assert isinstance(_client(), UsageClient)
 
@@ -4360,6 +4383,7 @@ class TestUsageEmit:
         resource model.register, action registered, quantity 1, unit count, and the
         given organization_id/user_id/trace_id."""
         from unittest.mock import MagicMock, patch
+
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
         mock_client = MagicMock()
@@ -4380,6 +4404,7 @@ class TestUsageEmit:
     def test_skips_emission_when_organization_id_none(self):
         """emit_model_registered emits no usage event when organization_id is None."""
         from unittest.mock import MagicMock, patch
+
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
         mock_client = MagicMock()
@@ -4391,6 +4416,7 @@ class TestUsageEmit:
     def test_client_exception_is_swallowed(self):
         """emit_model_registered does not raise when emit_usage_event itself raises."""
         from unittest.mock import MagicMock, patch
+
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
         mock_client = MagicMock()
@@ -4402,6 +4428,7 @@ class TestUsageEmit:
         """emit_model_registered does not raise when constructing the usage client
         itself raises."""
         from unittest.mock import patch
+
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
         with patch("omnibioai_model_registry.usage_emit._client", side_effect=RuntimeError("boom")):
@@ -4421,6 +4448,7 @@ class TestUsageEmit:
     def test_success_logs_attempted_then_succeeded(self, caplog):
         """A successful emission logs attempted then succeeded."""
         from unittest.mock import MagicMock, patch
+
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
         mock_client = MagicMock()
@@ -4443,6 +4471,7 @@ class TestUsageEmit:
         """An emission that raises internally logs attempted then failed_exception,
         without raising."""
         from unittest.mock import MagicMock, patch
+
         from omnibioai_model_registry.usage_emit import emit_model_registered
 
         mock_client = MagicMock()
@@ -4461,6 +4490,7 @@ class TestAuthRequireWriteAuth:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -4483,6 +4513,7 @@ class TestAuthRequireWriteAuth:
         """With auth enabled, a valid token carrying model.use resolves to that user's
         email as the actor."""
         import asyncio
+
         from iam_client.models import UserContext
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -4498,6 +4529,7 @@ class TestAuthRequireWriteAuth:
         """With auth enabled, require_auth raises HTTPException 403 for a valid token
         lacking model.use."""
         import asyncio
+
         from fastapi import HTTPException
         from iam_client.models import UserContext
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
@@ -4515,6 +4547,7 @@ class TestAuthRequireWriteAuth:
         """With auth enabled, require_auth raises HTTPException 401 for a token the IAM
         client cannot resolve."""
         import asyncio
+
         from fastapi import HTTPException
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -4531,6 +4564,7 @@ class TestAuthRequireWriteAuth:
         the IAM client's verdict (see TestVerifyAndAuthorize's identical
         assertion for the underlying implementation)."""
         import asyncio
+
         from fastapi import HTTPException
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -4544,6 +4578,7 @@ class TestAuthRequireWriteAuth:
     def test_require_auth_enabled_missing_header_raises_401(self, monkeypatch):
         """With auth enabled, no Authorization header raises HTTPException 401."""
         import asyncio
+
         from fastapi import HTTPException
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -4563,6 +4598,7 @@ class TestRequireWriteAuthWithContext:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -4577,7 +4613,10 @@ class TestRequireWriteAuthWithContext:
         import asyncio
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
-        from omnibioai_model_registry.auth import require_write_auth_with_context, _actor_identifier
+        from omnibioai_model_registry.auth import (
+            _actor_identifier,
+            require_write_auth_with_context,
+        )
         user = asyncio.run(require_write_auth_with_context(authorization=None))
         assert user.org_id is None
         assert _actor_identifier(user) == "system"
@@ -4586,6 +4625,7 @@ class TestRequireWriteAuthWithContext:
         """With auth enabled, a valid token carrying model.use returns the full
         UserContext including its org_id."""
         import asyncio
+
         from iam_client.models import UserContext
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -4594,7 +4634,10 @@ class TestRequireWriteAuthWithContext:
             user_id="1", email="user@test.com", roles=[], permissions=["model.use"],
             valid=True, org_id="77",
         ))
-        from omnibioai_model_registry.auth import require_write_auth_with_context, _actor_identifier
+        from omnibioai_model_registry.auth import (
+            _actor_identifier,
+            require_write_auth_with_context,
+        )
         user = asyncio.run(require_write_auth_with_context(authorization="Bearer sometoken"))
         assert user.org_id == "77"
         assert _actor_identifier(user) == "user@test.com"
@@ -4603,6 +4646,7 @@ class TestRequireWriteAuthWithContext:
         """With auth enabled, require_write_auth_with_context raises HTTPException 403
         for a valid token lacking model.use."""
         import asyncio
+
         from fastapi import HTTPException
         from iam_client.models import UserContext
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
@@ -4620,6 +4664,7 @@ class TestRequireWriteAuthWithContext:
         """With auth enabled, require_write_auth_with_context raises HTTPException 401
         for a token the IAM client cannot resolve."""
         import asyncio
+
         from fastapi import HTTPException
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -5063,8 +5108,9 @@ class TestRunCoverageGaps:
 
     def test_atomic_write_json_cleanup_exception_suppressed(self, tmp_path):
         """Cover lines 34-35: os.path.exists raises → except Exception: pass."""
-        import omnibioai_model_registry.run as run_mod
         from unittest.mock import patch
+
+        import omnibioai_model_registry.run as run_mod
         from omnibioai_model_registry.run import _atomic_write_json
 
         with patch.object(run_mod.os, "replace", side_effect=OSError("replace fail")):
@@ -5097,6 +5143,7 @@ class TestPhase1ReadEndpointsRequireAuth:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -5115,8 +5162,9 @@ class TestPhase1ReadEndpointsRequireAuth:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -5306,8 +5354,9 @@ class TestPhase1ReadEndpointsRequireAuth:
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -5409,7 +5458,10 @@ class TestOwnershipModule:
         """A second ensure_model_ownership call for the same model with a different org
         and actor is a no-op: it returns and leaves on disk the original ownership
         record."""
-        from omnibioai_model_registry.ownership import ensure_model_ownership, read_ownership
+        from omnibioai_model_registry.ownership import (
+            ensure_model_ownership,
+            read_ownership,
+        )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         backend = LocalFS()
@@ -5676,6 +5728,7 @@ class TestPhase2AHTTPRegisterOwnership:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -5692,8 +5745,9 @@ class TestPhase2AHTTPRegisterOwnership:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -5837,8 +5891,9 @@ class TestPhase2AHTTPRegisterOwnership:
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -5959,7 +6014,8 @@ class TestCheckModelOwnership:
         """check_model_ownership allows a caller whose org matches the model's owning
         org, with reason owned_by_caller."""
         from omnibioai_model_registry.ownership import (
-            check_model_ownership, ensure_model_ownership,
+            check_model_ownership,
+            ensure_model_ownership,
         )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -5976,7 +6032,8 @@ class TestCheckModelOwnership:
         owned_by_other_org, while still reporting the real owner on the result for
         server-side audit visibility."""
         from omnibioai_model_registry.ownership import (
-            check_model_ownership, ensure_model_ownership,
+            check_model_ownership,
+            ensure_model_ownership,
         )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -5997,7 +6054,8 @@ class TestCheckModelOwnership:
         sides genuinely have no org context -- unchanged pre-Phase-2B dev
         mode."""
         from omnibioai_model_registry.ownership import (
-            check_model_ownership, ensure_model_ownership,
+            check_model_ownership,
+            ensure_model_ownership,
         )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -6013,7 +6071,8 @@ class TestCheckModelOwnership:
         """A real org_id reaching into a None-org model is NOT treated as
         'everyone's' -- denied the same as any other org mismatch."""
         from omnibioai_model_registry.ownership import (
-            check_model_ownership, ensure_model_ownership,
+            check_model_ownership,
+            ensure_model_ownership,
         )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -6029,7 +6088,8 @@ class TestCheckModelOwnership:
         """check_model_ownership denies every caller, org or anonymous, against a
         legacy_unowned model, with reason legacy_unowned."""
         from omnibioai_model_registry.ownership import (
-            check_model_ownership, ensure_model_ownership,
+            check_model_ownership,
+            ensure_model_ownership,
         )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -6060,7 +6120,10 @@ class TestCheckModelOwnership:
         must fail closed for every caller, with the SAME anti-enumerating
         'not found' shape a genuinely missing record already uses, not a
         raised parse exception."""
-        from omnibioai_model_registry.ownership import check_model_ownership, read_ownership
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership,
+            read_ownership,
+        )
         from omnibioai_model_registry.package.layout import ownership_path
 
         path = ownership_path(env_root, "t", "corrupt_model")
@@ -6080,7 +6143,10 @@ class TestCheckModelOwnership:
         """A syntactically valid JSON value (e.g. a bare list/string) that
         isn't an object -- so has no `.items()` -- must also fail closed,
         not raise AttributeError."""
-        from omnibioai_model_registry.ownership import check_model_ownership, read_ownership
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership,
+            read_ownership,
+        )
         from omnibioai_model_registry.package.layout import ownership_path
 
         path = ownership_path(env_root, "t", "list_model")
@@ -6095,7 +6161,10 @@ class TestCheckModelOwnership:
     def test_ownership_record_missing_required_field_fails_closed(self, env_root):
         """Valid JSON object, but missing a required (no-default)
         OwnershipRecord field -- must fail closed, not raise TypeError."""
-        from omnibioai_model_registry.ownership import check_model_ownership, read_ownership
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership,
+            read_ownership,
+        )
         from omnibioai_model_registry.package.layout import ownership_path
 
         path = ownership_path(env_root, "t", "partial_model")
@@ -6115,7 +6184,8 @@ class TestCheckModelOwnership:
         owned/unowned match logic just because it isn't literally
         'legacy_unowned'."""
         from omnibioai_model_registry.ownership import (
-            OwnershipRecord, check_model_ownership,
+            OwnershipRecord,
+            check_model_ownership,
         )
         from omnibioai_model_registry.package.layout import ownership_path
 
@@ -6139,7 +6209,10 @@ class TestCheckModelOwnership:
         """Same defense-in-depth for the resolution path: an unrecognized
         status must never be treated as the eligible legacy_unowned case."""
         from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
-        from omnibioai_model_registry.ownership import OwnershipRecord, resolve_legacy_ownership
+        from omnibioai_model_registry.ownership import (
+            OwnershipRecord,
+            resolve_legacy_ownership,
+        )
         from omnibioai_model_registry.package.layout import ownership_path
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -6168,6 +6241,7 @@ class TestPhase2BOrgEnforcement:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -6191,9 +6265,10 @@ class TestPhase2BOrgEnforcement:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
-        import omnibioai_model_registry.hf_routes as _hf
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.hf_routes as _hf
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -6475,8 +6550,9 @@ class TestPhase2BOrgEnforcement:
     def test_hf_push_org_a_allowed(self, org_a_model, monkeypatch):
         """POST /v1/hf/push succeeds for the owning org-A, with the underlying push
         runner invoked once."""
-        import omnibioai_model_registry.hf_routes as hf_mod
         from unittest.mock import MagicMock
+
+        import omnibioai_model_registry.hf_routes as hf_mod
 
         client, _ = org_a_model
         mock_run_push = MagicMock()
@@ -6494,8 +6570,9 @@ class TestPhase2BOrgEnforcement:
         """Security requirements #7/#14: HF push cannot be used to
         exfiltrate another organization's model artifacts, and a denial
         never reaches the HF API at all."""
-        import omnibioai_model_registry.hf_routes as hf_mod
         from unittest.mock import MagicMock
+
+        import omnibioai_model_registry.hf_routes as hf_mod
 
         client, _ = org_a_model
         mock_run_push = MagicMock()
@@ -6510,8 +6587,9 @@ class TestPhase2BOrgEnforcement:
 
     def test_hf_push_audit_event_carries_organization_id(self, org_a_model, monkeypatch):
         """A successful HF push audit event carries the owning org's organization_id."""
-        import omnibioai_model_registry.hf_routes as hf_mod
         from unittest.mock import MagicMock, patch
+
+        import omnibioai_model_registry.hf_routes as hf_mod
 
         client, _ = org_a_model
         monkeypatch.setattr(hf_mod, "_run_push", MagicMock())
@@ -6564,8 +6642,9 @@ class TestPhase2BOrgEnforcement:
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_STRICT_VERIFY", "0")
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -6730,6 +6809,7 @@ class TestPhase2BConcurrency:
         concurrently produce exactly one winning organization_id, agreed on by every
         thread's own response, with every version still written to disk."""
         import threading
+
         from omnibioai_model_registry import register_model
         from omnibioai_model_registry.ownership import read_ownership
 
@@ -6786,6 +6866,7 @@ class TestPhase2CHTTPRunTracking:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -6809,8 +6890,9 @@ class TestPhase2CHTTPRunTracking:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -7178,8 +7260,9 @@ class TestPhase2CHTTPRunTracking:
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
         monkeypatch.delenv("DB_HOST", raising=False)
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -7220,6 +7303,7 @@ class TestPhase2DHFPushStatusOwnership:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -7244,9 +7328,10 @@ class TestPhase2DHFPushStatusOwnership:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
-        import omnibioai_model_registry.hf_routes as _hf
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.hf_routes as _hf
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -7269,8 +7354,9 @@ class TestPhase2DHFPushStatusOwnership:
         return TestClient(_svc.app, raise_server_exceptions=False), new_reg.root
 
     def _push_and_get_job_id(self, client, tmp_path, monkeypatch, org_id, *, task="t", model_name="m", version="v1"):
-        import omnibioai_model_registry.hf_routes as hf_mod
         from unittest.mock import MagicMock
+
+        import omnibioai_model_registry.hf_routes as hf_mod
 
         self._as_org(monkeypatch, org_id)
         src = tmp_path / f"src_{org_id}_{task}_{model_name}_{version}"
@@ -7366,6 +7452,7 @@ class TestPhase2DFinalConsistencyAudit:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -7389,9 +7476,10 @@ class TestPhase2DFinalConsistencyAudit:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
-        import omnibioai_model_registry.hf_routes as _hf
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.hf_routes as _hf
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -7941,6 +8029,7 @@ class TestPathSecurityHTTP:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -7964,8 +8053,9 @@ class TestPathSecurityHTTP:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -8094,8 +8184,9 @@ class TestPathSecurityHTTP:
     def test_hf_push_traversal_returns_error_no_hf_call(self, auth_client, tmp_path, monkeypatch):
         """POST /v1/hf/push with a path-traversal model_name returns 400 or 404 and
         never invokes the push runner."""
-        import omnibioai_model_registry.hf_routes as hf_mod
         from unittest.mock import MagicMock
+
+        import omnibioai_model_registry.hf_routes as hf_mod
 
         client, _ = auth_client
         self._register(client, tmp_path, monkeypatch, "org-A")
@@ -8281,7 +8372,10 @@ class TestOwnershipResolutionUnit:
     def test_resolution_persisted_to_ownership_json(self, env_root):
         """After resolve_legacy_ownership, the ownership.json on disk reflects the new
         organization_id and status owned."""
-        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.ownership import (
+            read_ownership,
+            resolve_legacy_ownership,
+        )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         self._own(env_root, "t", "m", None, legacy=True)
@@ -8307,7 +8401,10 @@ class TestOwnershipResolutionUnit:
         """resolve_legacy_ownership raises OwnershipResolutionNotEligible for an
         already-owned model and leaves its recorded organization_id unchanged."""
         from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
-        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.ownership import (
+            read_ownership,
+            resolve_legacy_ownership,
+        )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         self._own(env_root, "t", "m", "org-A")  # already owned, not legacy
@@ -8321,7 +8418,10 @@ class TestOwnershipResolutionUnit:
         """Once a legacy model is resolved to org-A, a second org's resolution attempt
         raises OwnershipResolutionNotEligible and the recorded owner stays org-A."""
         from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
-        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.ownership import (
+            read_ownership,
+            resolve_legacy_ownership,
+        )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         self._own(env_root, "t", "m", None, legacy=True)
@@ -8385,7 +8485,10 @@ class TestOwnershipResolutionUnit:
         """check_model_ownership() -- the actual authorization decision
         every route uses -- never reads the resolution marker file, only
         ownership.json."""
-        from omnibioai_model_registry.ownership import check_model_ownership, resolve_legacy_ownership
+        from omnibioai_model_registry.ownership import (
+            check_model_ownership,
+            resolve_legacy_ownership,
+        )
         from omnibioai_model_registry.package import layout as L
         from omnibioai_model_registry.storage.localfs import LocalFS
 
@@ -8405,8 +8508,12 @@ class TestOwnershipResolutionUnit:
         """Security requirement: two concurrent resolution attempts must
         not produce conflicting ownership records."""
         import threading
-        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+
         from omnibioai_model_registry.errors import OwnershipResolutionNotEligible
+        from omnibioai_model_registry.ownership import (
+            read_ownership,
+            resolve_legacy_ownership,
+        )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         self._own(env_root, "t", "m", None, legacy=True)
@@ -8447,7 +8554,11 @@ class TestOwnershipResolutionUnit:
         must have every caller succeed with identical results -- no
         spurious denials among callers who agree."""
         import threading
-        from omnibioai_model_registry.ownership import read_ownership, resolve_legacy_ownership
+
+        from omnibioai_model_registry.ownership import (
+            read_ownership,
+            resolve_legacy_ownership,
+        )
         from omnibioai_model_registry.storage.localfs import LocalFS
 
         self._own(env_root, "t", "m", None, legacy=True)
@@ -8488,6 +8599,7 @@ class TestPhase2EAuthPermission:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -8500,9 +8612,13 @@ class TestPhase2EAuthPermission:
         """require_ownership_resolve_auth_with_context raises HTTPException 403 for a
         token that carries model.use but not model.resolve_ownership."""
         import asyncio
+
         from fastapi import HTTPException
         from iam_client.models import UserContext
-        from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
+
+        from omnibioai_model_registry.auth import (
+            require_ownership_resolve_auth_with_context,
+        )
 
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -8519,8 +8635,12 @@ class TestPhase2EAuthPermission:
         """require_ownership_resolve_auth_with_context accepts a token carrying only
         model.resolve_ownership and returns its org_id."""
         import asyncio
+
         from iam_client.models import UserContext
-        from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
+
+        from omnibioai_model_registry.auth import (
+            require_ownership_resolve_auth_with_context,
+        )
 
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -8536,9 +8656,13 @@ class TestPhase2EAuthPermission:
         """require_ownership_resolve_auth_with_context raises HTTPException 403 for a
         token with no permissions."""
         import asyncio
+
         from fastapi import HTTPException
         from iam_client.models import UserContext
-        from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
+
+        from omnibioai_model_registry.auth import (
+            require_ownership_resolve_auth_with_context,
+        )
 
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.setenv("AUTH_ENABLED", "true")
@@ -8556,7 +8680,9 @@ class TestPhase2EAuthPermission:
         model.use exactly as before -- verify_and_authorize()'s new
         required_permission parameter defaults correctly."""
         import asyncio
+
         from iam_client.models import UserContext
+
         from omnibioai_model_registry.auth import require_auth_with_context
 
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
@@ -8575,7 +8701,10 @@ class TestPhase2EAuthPermission:
         mode remains "no enforcement" for whichever permission a given
         dependency checks."""
         import asyncio
-        from omnibioai_model_registry.auth import require_ownership_resolve_auth_with_context
+
+        from omnibioai_model_registry.auth import (
+            require_ownership_resolve_auth_with_context,
+        )
 
         monkeypatch.setenv("OMNIBIOAI_MODEL_REGISTRY_ROOT", "/tmp/reg")
         monkeypatch.delenv("AUTH_ENABLED", raising=False)
@@ -8590,6 +8719,7 @@ class TestPhase2EOwnershipResolveHTTP:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -8613,8 +8743,9 @@ class TestPhase2EOwnershipResolveHTTP:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)
@@ -8961,6 +9092,7 @@ class TestModelReadUseAuthorizationSplit:
 
     def _mock_iam_client(self, monkeypatch, user_context):
         from unittest.mock import AsyncMock, MagicMock
+
         import omnibioai_model_registry.auth as auth_mod
 
         mock_client = MagicMock()
@@ -8984,8 +9116,9 @@ class TestModelReadUseAuthorizationSplit:
         monkeypatch.setenv("AUTH_ENABLED", "true")
         monkeypatch.setenv("JWT_SECRET", "testsecret")
 
-        import omnibioai_model_registry.service.app.main as _svc
         from fastapi.testclient import TestClient
+
+        import omnibioai_model_registry.service.app.main as _svc
 
         new_reg = _svc.ModelRegistry.from_env()
         monkeypatch.setattr(_svc, "registry", new_reg)

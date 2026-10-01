@@ -59,7 +59,6 @@ from typing import Any, Dict, List, Optional
 from .errors import ModelNotFound
 from .ownership import check_model_ownership
 
-
 # --------------------------------------------------------------------------- #
 # Phase 2C -- run ownership decision (mirrors ownership.check_model_ownership) #
 # --------------------------------------------------------------------------- #

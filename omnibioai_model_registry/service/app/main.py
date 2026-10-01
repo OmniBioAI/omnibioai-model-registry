@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging as _logging
 import os
-from fastapi.middleware.cors import CORSMiddleware
 from importlib.metadata import version as pkg_version
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from iam_client.models import UserContext
+from pydantic import BaseModel, Field
 
 from omnibioai_model_registry import (
     ModelRegistry,
@@ -20,8 +21,7 @@ from omnibioai_model_registry import (
     resolve_model,
     verify_model_ref,
 )
-from omnibioai_model_registry.errors import ModelRegistryError, PathTraversalError, RegistryNotConfigured
-from omnibioai_model_registry.config import load_config
+from omnibioai_model_registry.audit_client import AuditClient
 from omnibioai_model_registry.auth import (
     MODEL_USE_PERMISSION,
     _actor_identifier,
@@ -30,12 +30,20 @@ from omnibioai_model_registry.auth import (
     require_read_auth_with_context,
     require_write_auth_with_context,
 )
-from omnibioai_model_registry.ownership import check_model_ownership, read_ownership, resolve_legacy_ownership
-from omnibioai_model_registry.package import layout as L
-from omnibioai_model_registry.audit_client import AuditClient
+from omnibioai_model_registry.config import load_config
+from omnibioai_model_registry.errors import (
+    ModelRegistryError,
+    PathTraversalError,
+    RegistryNotConfigured,
+)
 from omnibioai_model_registry.hf_routes import router as hf_router
+from omnibioai_model_registry.ownership import (
+    check_model_ownership,
+    read_ownership,
+    resolve_legacy_ownership,
+)
+from omnibioai_model_registry.package import layout as L
 from omnibioai_model_registry.usage_emit import emit_model_registered
-import logging as _logging
 
 _audit = AuditClient(os.environ.get("AUDIT_URL", ""))
 _logger = _logging.getLogger(__name__)

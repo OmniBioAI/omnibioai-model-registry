@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Model Registry IAM Integration.
 
 Centralized authentication via the IAM client (omnibioai-iam-client, the
@@ -66,6 +64,8 @@ require_auth/require_write_auth keep their existing `str` return contract
 route handlers (which pass this value straight through to storage, e.g.
 omr_runs.actor) need to change -- only this module does.
 """
+
+from __future__ import annotations
 
 from typing import Annotated
 

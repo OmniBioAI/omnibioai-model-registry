@@ -1,6 +1,4 @@
 # File: omnibioai_model_registry/path_safety.py
-from __future__ import annotations
-
 """
 Centralized filesystem-path safety for every caller-supplied identifier
 this service turns into a path component: task, model_name, version,
@@ -54,6 +52,8 @@ manages (confirmed by inspection), so there is no legitimate in-repo
 symlink layout this needs to special-case -- but the check still never
 assumes symlinks are inherently forbidden.
 """
+
+from __future__ import annotations
 
 import re
 from pathlib import Path

@@ -196,9 +196,9 @@ def cmd_show(args):
 
 def _resolve_vdir_no_verify(registry: ModelRegistry, task: str, model_ref: str) -> Path:
     """Resolve model ref → version dir without triggering Cython integrity checks."""
-    from omnibioai_model_registry.refs import parse_model_ref
-    from omnibioai_model_registry.package import layout as L
     from omnibioai_model_registry.errors import ModelNotFound
+    from omnibioai_model_registry.package import layout as L
+    from omnibioai_model_registry.refs import parse_model_ref
 
     ref = parse_model_ref(model_ref)
     alias_file = L.alias_path(registry.root, task, ref.model_name, ref.selector)
@@ -353,8 +353,8 @@ def cmd_stage(args):
             f"Invalid stage '{args.stage}'. Must be one of: {sorted(_VALID_STAGES)}"
         )
 
-    from omnibioai_model_registry.package.layout import version_dir as vdir_fn
     from omnibioai_model_registry.errors import ModelNotFound
+    from omnibioai_model_registry.package.layout import version_dir as vdir_fn
 
     registry = ModelRegistry.from_env()
     vdir = vdir_fn(registry.root, args.task, args.model, args.version)

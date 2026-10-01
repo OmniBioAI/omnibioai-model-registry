@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -88,8 +87,9 @@ class TestVerifyAndAuthorizeConfiguresCacheSecret:
     def test_cache_secret_kwarg_matches_configured_jwt_secret(self, monkeypatch):
         """verify_and_authorize constructs AsyncIAMClient with cache_secret equal to the
         configured JWT_SECRET."""
-        import omnibioai_model_registry.auth as auth_mod
         from iam_client.models import UserContext
+
+        import omnibioai_model_registry.auth as auth_mod
 
         monkeypatch.setenv("JWT_SECRET", "hipaa-p1-5-test-secret")
         monkeypatch.setenv("IAM_URL", "http://iam.test")
@@ -120,8 +120,9 @@ class TestVerifyAndAuthorizeConfiguresCacheSecret:
         not a statement that an empty secret is itself acceptable in
         production (a deployment running with JWT_SECRET unset has larger
         problems than this cache)."""
-        import omnibioai_model_registry.auth as auth_mod
         from iam_client.models import UserContext
+
+        import omnibioai_model_registry.auth as auth_mod
 
         monkeypatch.delenv("JWT_SECRET", raising=False)
         monkeypatch.setenv("IAM_URL", "http://iam.test")
