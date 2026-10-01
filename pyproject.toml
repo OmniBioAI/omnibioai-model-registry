@@ -47,7 +47,9 @@ dependencies = [
   "httpx>=0.27.0",
   "boto3>=1.34.0",
   "PyMySQL>=1.1.0",
-  "cryptography>=41.0.0",
+  # cryptography 50.x ARM64 wheels SIGILL during x509 imports on Apple
+  # Silicon; 46.0.3 is the validated native-ARM64 compatibility release.
+  "cryptography==46.0.3",
   "PyJWT>=2.8.0",
   "huggingface_hub>=0.20.0",
   # Model Registry IAM integration: centralized JWT verification via the
