@@ -8,6 +8,11 @@ on:
         required: true
         default: fadc51719a25bce5abf007ae605bf5184f3055bf
         type: string
+      source_ref:
+        description: Immutable remote ref resolving to source_sha
+        required: true
+        default: model-registry-source-fadc517
+        type: string
       version:
         description: New immutable release version, for example v0.1.4
         required: true
@@ -36,7 +41,7 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ inputs.source_ref }}
           path: omnibioai-model-registry
 
       - name: Assert exact source revision
@@ -98,7 +103,7 @@ jobs:
       - name: Checkout exact source in parent workspace layout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ inputs.source_ref }}
           path: omnibioai-model-registry
 
       - name: Assert native AMD64 and exact source
@@ -154,7 +159,7 @@ jobs:
       - name: Checkout exact source in parent workspace layout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ inputs.source_ref }}
           path: omnibioai-model-registry
 
       - name: Assert native ARM64 and exact source
