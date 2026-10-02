@@ -120,3 +120,23 @@ def test_runtime_smoke_jobs_are_fail_closed_and_bounded() -> None:
     assert "timeout-minutes: 5" in text
     assert "curl -sf --max-time 3" in text
     assert "trap cleanup EXIT" in text
+
+
+def test_runtime_smoke_supplies_the_mandatory_registry_root() -> None:
+    """v0.1.9 proved (run 37033200067, both architectures) that the published
+    image crashes at import time with RegistryNotConfigured unless
+    OMNIBIOAI_MODEL_REGISTRY_ROOT is set -- this is a deliberate, tested,
+    documented application contract (config.py has never had a default for
+    it; path_safety.py relies on it as the filesystem sandbox boundary; the
+    README's own standalone `docker run` example sets it explicitly), not a
+    missing application default. The smoke harness, not the application, was
+    the defect: it must supply this value itself, the same way the repo's
+    own (now-disabled) legacy CI workflow already did for its test runs."""
+    text = _workflow()
+    smoke_start = text.index("smoke_amd64:")
+    smoke_text = text[smoke_start:]
+    assert smoke_text.count("-e OMNIBIOAI_MODEL_REGISTRY_ROOT=") == 2
+    # Must be a deterministic, container-local path -- not a developer- or
+    # host-specific location, and not reliant on a host bind mount.
+    assert "~" not in smoke_text.split("-e OMNIBIOAI_MODEL_REGISTRY_ROOT=")[1].split()[0]
+    assert "-v " not in smoke_text  # no host bind mount required for the smoke probe

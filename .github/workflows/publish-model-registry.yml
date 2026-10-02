@@ -344,7 +344,17 @@ jobs:
       - name: Run container and probe /health
         run: |
           set -eu
-          cid=$(docker run -d --platform linux/amd64 -p 18095:8095 "$IMAGE@$DIGEST")
+          # OMNIBIOAI_MODEL_REGISTRY_ROOT is a mandatory, security-relevant
+          # (path-safety sandbox boundary) config value with no application
+          # default by design -- see config.py/path_safety.py and the
+          # documented production `docker run` contract in README.md (it
+          # passes this same env var explicitly). The value here is an
+          # ephemeral, container-local path (auto-created by localfs.py),
+          # matching the same convention the repo's own disabled legacy
+          # CI workflow already used for test runs.
+          cid=$(docker run -d --platform linux/amd64 -p 18095:8095 \
+            -e OMNIBIOAI_MODEL_REGISTRY_ROOT=/data/model_registry \
+            "$IMAGE@$DIGEST")
           cleanup() {
             status=$?
             docker logs "$cid" 2>&1 | tail -n 100 || true
@@ -395,7 +405,10 @@ jobs:
       - name: Run container and probe /health
         run: |
           set -eu
-          cid=$(docker run -d --platform linux/arm64 -p 18095:8095 "$IMAGE@$DIGEST")
+          # See the AMD64 smoke job for why this env var is required.
+          cid=$(docker run -d --platform linux/arm64 -p 18095:8095 \
+            -e OMNIBIOAI_MODEL_REGISTRY_ROOT=/data/model_registry \
+            "$IMAGE@$DIGEST")
           cleanup() {
             status=$?
             docker logs "$cid" 2>&1 | tail -n 100 || true
