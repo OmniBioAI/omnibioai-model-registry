@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint & test (Python 3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # omnibioai-iam-client and omnibioai-usage-client are private repos
+      # pinned by git URL in pyproject.toml. GITHUB_TOKEN cannot read other
+      # private repositories, so a read-only token scoped to those two
+      # repositories (Contents: read) is supplied as PRIVATE_DEPS_TOKEN.
+      - name: Install dependencies
+        env:
+          PRIVATE_DEPS_TOKEN: ${{ secrets.PRIVATE_DEPS_TOKEN }}
+        run: |
+          if [ -z "$PRIVATE_DEPS_TOKEN" ]; then
+            echo "::error::Repository secret PRIVATE_DEPS_TOKEN is not set; it must grant read access to omnibioai-iam-client and omnibioai-usage-client."
+            exit 1
+          fi
+          for repo in omnibioai-iam-client omnibioai-usage-client; do
+            git config --global \
+              "url.https://x-access-token:${PRIVATE_DEPS_TOKEN}@github.com/OmniBioAI/${repo}.git.insteadOf" \
+              "https://github.com/OmniBioAI/${repo}.git"
+          done
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test (coverage gate from pyproject.toml)
+        run: pytest
