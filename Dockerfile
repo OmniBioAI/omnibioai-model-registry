@@ -1,9 +1,14 @@
 # syntax=docker/dockerfile:1
+# OmniBioAI — Model Registry
+# Purpose: Build the model registry API and nginx-served React UI.
+# Author: Manish Kumar <manish@omnibioai.org>
+
 # ── Stage 1: Build React UI ────────────────────────────────────────────────────
 FROM --platform=$BUILDPLATFORM node:20-bookworm-slim AS ui-builder
 WORKDIR /ui
 COPY omnibioai-model-registry/frontend/omnibioai-model-registry-ui/package*.json ./
 RUN npm ci
+# Application source
 COPY omnibioai-model-registry/frontend/omnibioai-model-registry-ui/ ./
 RUN npm run build
 
@@ -11,11 +16,13 @@ RUN npm run build
 FROM python:3.12-slim-bookworm AS backend
 LABEL org.opencontainers.image.source=https://github.com/man4ish/omnibioai
 
+# System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+# Python dependencies
 COPY omnibioai-model-registry/pyproject.toml .
 
 # Model Registry IAM integration: pyproject.toml declares omnibioai-iam-client
@@ -65,7 +72,9 @@ RUN printf 'server {\n\
     location /docs { proxy_pass http://127.0.0.1:8095; }\n\
 }\n' > /etc/nginx/sites-available/default
 
+# Runtime configuration
 ENV HOST=0.0.0.0 PORT=8095 PYTHONUNBUFFERED=1
 ENV MODEL_REGISTRY_APP=omnibioai_model_registry.service.app.main:app
 EXPOSE 8095 5176
+# Entrypoint and default command
 CMD ["bash", "-c", "nginx && python -m uvicorn omnibioai_model_registry.service.app.main:app --host 0.0.0.0 --port 8095"]
