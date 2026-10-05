@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/run.py
+"""
+OmniBioAI omnibioai_model_registry.run.
+
+Purpose:
+    Defines RunLogger with run_id, log_param, log_params and log_metric methods for omnibioai_model_registry.run.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 import json

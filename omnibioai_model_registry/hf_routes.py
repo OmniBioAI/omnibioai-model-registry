@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/hf_routes.py
+"""
+OmniBioAI omnibioai_model_registry.hf_routes.
+
+Purpose:
+    Defines HTTP route handlers for omnibioai_model_registry.hf_routes, including hf_push, hf_push_status and hf_settings.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 import os

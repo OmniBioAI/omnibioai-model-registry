@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/__init__.py
+"""
+OmniBioAI omnibioai_model_registry.
+
+Purpose:
+    Initializes the omnibioai_model_registry package and imports api, ownership and run.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from .api import (
     ModelRegistry,
     promote_model,

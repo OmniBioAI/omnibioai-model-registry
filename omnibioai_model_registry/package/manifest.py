@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/package/manifest.py
+"""
+OmniBioAI omnibioai_model_registry.package.manifest.
+
+Purpose:
+    Defines sha256_file, write_sha256_manifest, read_sha256_manifest and verify_sha256_manifest for omnibioai_model_registry.package.manifest.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 import hashlib

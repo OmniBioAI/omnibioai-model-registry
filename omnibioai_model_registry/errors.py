@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/errors.py
+"""
+OmniBioAI omnibioai_model_registry.errors.
+
+Purpose:
+    Defines ModelRegistryError, RegistryNotConfigured, ModelNotFound and VersionAlreadyExists for omnibioai_model_registry.errors.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 class ModelRegistryError(Exception):
     pass
 

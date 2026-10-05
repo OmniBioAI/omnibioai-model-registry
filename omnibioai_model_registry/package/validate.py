@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/package/validate.py
+"""
+OmniBioAI omnibioai_model_registry.package.validate.
+
+Purpose:
+    Defines validate_package_files for omnibioai_model_registry.package.validate.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

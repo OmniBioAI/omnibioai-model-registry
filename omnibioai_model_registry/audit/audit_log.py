@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/audit/audit_log.py
+"""
+OmniBioAI omnibioai_model_registry.audit.audit_log.
+
+Purpose:
+    Defines PromotionEvent, append_promotion_event and now_utc_iso for omnibioai_model_registry.audit.audit_log.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 import json

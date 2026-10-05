@@ -1,3 +1,13 @@
+"""
+OmniBioAI omnibioai_model_registry.audit_client.
+
+Purpose:
+    Defines AuditClient with log_event methods for omnibioai_model_registry.audit_client.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 import json

@@ -1,3 +1,13 @@
+"""
+OmniBioAI omnibioai_model_registry.service.app.main.
+
+Purpose:
+    Defines HTTP route handlers for omnibioai_model_registry.service.app.main, including health, api_register, api_resolve_ownership and api_promote.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 import json

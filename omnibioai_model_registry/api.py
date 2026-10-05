@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/api.py
+"""
+OmniBioAI omnibioai_model_registry.api.
+
+Purpose:
+    Defines ModelRegistry, register_model, resolve_model and promote_model for omnibioai_model_registry.api.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 import json

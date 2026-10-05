@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/refs.py
+"""
+OmniBioAI omnibioai_model_registry.refs.
+
+Purpose:
+    Defines ModelRef and parse_model_ref for omnibioai_model_registry.refs.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from dataclasses import dataclass
 
 from .errors import InvalidModelRef, PathTraversalError

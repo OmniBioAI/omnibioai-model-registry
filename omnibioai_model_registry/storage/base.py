@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/storage/base.py
+"""
+OmniBioAI omnibioai_model_registry.storage.base.
+
+Purpose:
+    Defines StorageBackend with ensure_dirs, exists, copy_tree and atomic_write_text methods for omnibioai_model_registry.storage.base.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

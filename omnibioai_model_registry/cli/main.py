@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/cli/main.py
+"""
+OmniBioAI omnibioai_model_registry.cli.main.
+
+Purpose:
+    Defines cmd_list, cmd_resolve, cmd_promote and cmd_verify for omnibioai_model_registry.cli.main.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 import argparse
 import json
 import os

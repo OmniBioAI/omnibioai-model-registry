@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/package/layout.py
+"""
+OmniBioAI omnibioai_model_registry.package.layout.
+
+Purpose:
+    Defines PackagePaths, task_root, model_root and versions_root for omnibioai_model_registry.package.layout.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

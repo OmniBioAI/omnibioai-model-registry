@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/config.py
+"""
+OmniBioAI omnibioai_model_registry.config.
+
+Purpose:
+    Defines RegistryConfig and load_config for omnibioai_model_registry.config.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 import os
 from dataclasses import dataclass
 

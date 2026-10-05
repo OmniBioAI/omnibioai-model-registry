@@ -1,4 +1,14 @@
 # File: omnibioai_model_registry/storage/localfs.py
+"""
+OmniBioAI omnibioai_model_registry.storage.localfs.
+
+Purpose:
+    Defines LocalFS with ensure_dirs, exists, copy_tree and atomic_write_text methods for omnibioai_model_registry.storage.localfs.
+
+Author:
+    Manish Kumar <manish@omnibioai.org>
+"""
+
 from __future__ import annotations
 
 import os
