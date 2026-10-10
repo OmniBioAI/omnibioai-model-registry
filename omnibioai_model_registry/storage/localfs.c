@@ -2556,6 +2556,7 @@ int __pyx_module_is_main_omnibioai_model_registry__storage__localfs = 0;
 /* Implementation of "omnibioai_model_registry.storage.localfs" */
 /* #### Code section: global_var ### */
 /* #### Code section: string_decls ### */
+static const char __pyx_k_OmniBioAI_omnibioai_model_regis[] = "\nOmniBioAI omnibioai_model_registry.storage.localfs.\n\nPurpose:\n    Defines LocalFS with ensure_dirs, exists, copy_tree and atomic_write_text methods for omnibioai_model_registry.storage.localfs.\n\nAuthor:\n    Manish Kumar <manish@omnibioai.org>\n";
 /* #### Code section: decls ### */
 static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_ensure_dirs(CYTHON_UNUSED PyObject *__pyx_self, CYTHON_UNUSED PyObject *__pyx_v_self, PyObject *__pyx_v_path); /* proto */
 static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_2exists(CYTHON_UNUSED PyObject *__pyx_self, CYTHON_UNUSED PyObject *__pyx_v_self, PyObject *__pyx_v_path); /* proto */
@@ -2775,7 +2776,7 @@ return 0;
 #endif
 /* #### Code section: module_code ### */
 
-/* "omnibioai_model_registry/storage/localfs.py":13
+/* "omnibioai_model_registry/storage/localfs.py":23
  * 
  * class LocalFS(StorageBackend):
  *     def ensure_dirs(self, path: Path) -> None:             # <<<<<<<<<<<<<<
@@ -2823,39 +2824,39 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_self,&__pyx_mstate_global->__pyx_n_u_path,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 13, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 23, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 13, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 23, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 13, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 23, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "ensure_dirs", 0) < (0)) __PYX_ERR(0, 13, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "ensure_dirs", 0) < (0)) __PYX_ERR(0, 23, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 2; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("ensure_dirs", 1, 2, 2, i); __PYX_ERR(0, 13, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("ensure_dirs", 1, 2, 2, i); __PYX_ERR(0, 23, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 2)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 13, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 23, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 13, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 23, __pyx_L3_error)
     }
     __pyx_v_self = values[0];
     __pyx_v_path = values[1];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("ensure_dirs", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 13, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("ensure_dirs", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 23, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -2888,7 +2889,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("ensure_dirs", 0);
 
-  /* "omnibioai_model_registry/storage/localfs.py":14
+  /* "omnibioai_model_registry/storage/localfs.py":24
  * class LocalFS(StorageBackend):
  *     def ensure_dirs(self, path: Path) -> None:
  *         path.mkdir(parents=True, exist_ok=True)             # <<<<<<<<<<<<<<
@@ -2902,25 +2903,25 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     PyObject *__pyx_callargs[3] = {__pyx_t_2, Py_True, Py_True};
     #if CYTHON_VECTORCALL
     __pyx_t_4 = __pyx_mstate_global->__pyx_tuple[0];
-    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 14, __pyx_L1_error)
+    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 24, __pyx_L1_error)
     __Pyx_INCREF(__pyx_t_4);
     #else
     {
       PyObject *__pyx_temp[2] = {__pyx_mstate_global->__pyx_n_u_parents, __pyx_mstate_global->__pyx_n_u_exist_ok};
       __pyx_t_4 = __Pyx_MakeKwargDict(__pyx_temp, __pyx_callargs+1, 2);
-      if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 14, __pyx_L1_error)
+      if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 24, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
     }
     #endif
     __pyx_t_1 = __Pyx_Object_VectorcallMethodKwds((PyObject*)__pyx_mstate_global->__pyx_n_u_mkdir, __pyx_callargs+__pyx_t_3, (1-__pyx_t_3) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_4);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 14, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 24, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":13
+  /* "omnibioai_model_registry/storage/localfs.py":23
  * 
  * class LocalFS(StorageBackend):
  *     def ensure_dirs(self, path: Path) -> None:             # <<<<<<<<<<<<<<
@@ -2943,7 +2944,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   return __pyx_r;
 }
 
-/* "omnibioai_model_registry/storage/localfs.py":16
+/* "omnibioai_model_registry/storage/localfs.py":26
  *         path.mkdir(parents=True, exist_ok=True)
  * 
  *     def exists(self, path: Path) -> bool:             # <<<<<<<<<<<<<<
@@ -2991,39 +2992,39 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_self,&__pyx_mstate_global->__pyx_n_u_path,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 16, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 26, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 16, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 26, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 16, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 26, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "exists", 0) < (0)) __PYX_ERR(0, 16, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "exists", 0) < (0)) __PYX_ERR(0, 26, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 2; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("exists", 1, 2, 2, i); __PYX_ERR(0, 16, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("exists", 1, 2, 2, i); __PYX_ERR(0, 26, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 2)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 16, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 26, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 16, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 26, __pyx_L3_error)
     }
     __pyx_v_self = values[0];
     __pyx_v_path = values[1];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("exists", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 16, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("exists", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 26, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3055,7 +3056,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("exists", 0);
 
-  /* "omnibioai_model_registry/storage/localfs.py":17
+  /* "omnibioai_model_registry/storage/localfs.py":27
  * 
  *     def exists(self, path: Path) -> bool:
  *         return path.exists()             # <<<<<<<<<<<<<<
@@ -3069,7 +3070,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     PyObject *__pyx_callargs[2] = {__pyx_t_2, NULL};
     __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_3, (1-__pyx_t_3) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 17, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 27, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   {
@@ -3083,7 +3084,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":16
+  /* "omnibioai_model_registry/storage/localfs.py":26
  *         path.mkdir(parents=True, exist_ok=True)
  * 
  *     def exists(self, path: Path) -> bool:             # <<<<<<<<<<<<<<
@@ -3103,7 +3104,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   return __pyx_r;
 }
 
-/* "omnibioai_model_registry/storage/localfs.py":19
+/* "omnibioai_model_registry/storage/localfs.py":29
  *         return path.exists()
  * 
  *     def copy_tree(self, src_dir: Path, dst_dir: Path) -> None:             # <<<<<<<<<<<<<<
@@ -3152,38 +3153,38 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_self,&__pyx_mstate_global->__pyx_n_u_src_dir,&__pyx_mstate_global->__pyx_n_u_dst_dir,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 19, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 29, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 19, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 29, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 19, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 29, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 19, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 29, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "copy_tree", 0) < (0)) __PYX_ERR(0, 19, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "copy_tree", 0) < (0)) __PYX_ERR(0, 29, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("copy_tree", 1, 3, 3, i); __PYX_ERR(0, 19, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("copy_tree", 1, 3, 3, i); __PYX_ERR(0, 29, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 19, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 29, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 19, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 29, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 19, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 29, __pyx_L3_error)
     }
     __pyx_v_self = values[0];
     __pyx_v_src_dir = values[1];
@@ -3191,7 +3192,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("copy_tree", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 19, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("copy_tree", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 29, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3225,7 +3226,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("copy_tree", 0);
 
-  /* "omnibioai_model_registry/storage/localfs.py":21
+  /* "omnibioai_model_registry/storage/localfs.py":31
  *     def copy_tree(self, src_dir: Path, dst_dir: Path) -> None:
  *         # shutil.copytree requires dst doesn't exist
  *         shutil.copytree(src_dir, dst_dir)             # <<<<<<<<<<<<<<
@@ -3233,9 +3234,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *     def atomic_write_text(self, path: Path, text: str) -> None:
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_shutil); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_shutil); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 31, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_copytree); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_copytree); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 31, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_t_5 = 1;
@@ -3255,12 +3256,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __pyx_t_1 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_5, (3-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 21, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 31, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":19
+  /* "omnibioai_model_registry/storage/localfs.py":29
  *         return path.exists()
  * 
  *     def copy_tree(self, src_dir: Path, dst_dir: Path) -> None:             # <<<<<<<<<<<<<<
@@ -3284,7 +3285,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   return __pyx_r;
 }
 
-/* "omnibioai_model_registry/storage/localfs.py":23
+/* "omnibioai_model_registry/storage/localfs.py":33
  *         shutil.copytree(src_dir, dst_dir)
  * 
  *     def atomic_write_text(self, path: Path, text: str) -> None:             # <<<<<<<<<<<<<<
@@ -3333,38 +3334,38 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_self,&__pyx_mstate_global->__pyx_n_u_path,&__pyx_mstate_global->__pyx_n_u_text,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 23, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 33, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 23, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 33, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 23, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 33, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 23, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 33, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "atomic_write_text", 0) < (0)) __PYX_ERR(0, 23, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "atomic_write_text", 0) < (0)) __PYX_ERR(0, 33, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("atomic_write_text", 1, 3, 3, i); __PYX_ERR(0, 23, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("atomic_write_text", 1, 3, 3, i); __PYX_ERR(0, 33, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 23, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 33, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 23, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 33, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 23, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 33, __pyx_L3_error)
     }
     __pyx_v_self = values[0];
     __pyx_v_path = values[1];
@@ -3372,7 +3373,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("atomic_write_text", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 23, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("atomic_write_text", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 33, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3383,7 +3384,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_text), (&PyUnicode_Type), 0, "text", 2))) __PYX_ERR(0, 23, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_text), (&PyUnicode_Type), 0, "text", 2))) __PYX_ERR(0, 33, __pyx_L1_error)
   __pyx_r = __pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_6atomic_write_text(__pyx_self, __pyx_v_self, __pyx_v_path, __pyx_v_text);
 
   /* function exit code */
@@ -3437,14 +3438,14 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("atomic_write_text", 0);
 
-  /* "omnibioai_model_registry/storage/localfs.py":24
+  /* "omnibioai_model_registry/storage/localfs.py":34
  * 
  *     def atomic_write_text(self, path: Path, text: str) -> None:
  *         path.parent.mkdir(parents=True, exist_ok=True)             # <<<<<<<<<<<<<<
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:
 */
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_parent); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 24, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_parent); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 34, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __pyx_t_2 = __pyx_t_3;
   __Pyx_INCREF(__pyx_t_2);
@@ -3453,13 +3454,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     PyObject *__pyx_callargs[3] = {__pyx_t_2, Py_True, Py_True};
     #if CYTHON_VECTORCALL
     __pyx_t_5 = __pyx_mstate_global->__pyx_tuple[0];
-    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 24, __pyx_L1_error)
+    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 34, __pyx_L1_error)
     __Pyx_INCREF(__pyx_t_5);
     #else
     {
       PyObject *__pyx_temp[2] = {__pyx_mstate_global->__pyx_n_u_parents, __pyx_mstate_global->__pyx_n_u_exist_ok};
       __pyx_t_5 = __Pyx_MakeKwargDict(__pyx_temp, __pyx_callargs+1, 2);
-      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 24, __pyx_L1_error)
+      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 34, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
     }
     #endif
@@ -3467,12 +3468,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 24, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 34, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":25
+  /* "omnibioai_model_registry/storage/localfs.py":35
  *     def atomic_write_text(self, path: Path, text: str) -> None:
  *         path.parent.mkdir(parents=True, exist_ok=True)
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))             # <<<<<<<<<<<<<<
@@ -3480,19 +3481,19 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:
 */
   __pyx_t_3 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_tempfile); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_tempfile); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 35, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_mkstemp); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_mkstemp); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 35, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 35, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = PyNumber_Add(__pyx_t_5, __pyx_mstate_global->__pyx_kp_u_); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_6 = PyNumber_Add(__pyx_t_5, __pyx_mstate_global->__pyx_kp_u_); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 35, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_parent); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_parent); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 35, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_7 = __Pyx_PyObject_Unicode(__pyx_t_5); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyObject_Unicode(__pyx_t_5); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 35, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_4 = 1;
@@ -3511,13 +3512,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     PyObject *__pyx_callargs[3] = {__pyx_t_3, __pyx_t_6, __pyx_t_7};
     #if CYTHON_VECTORCALL
     __pyx_t_5 = __pyx_mstate_global->__pyx_tuple[1];
-    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 25, __pyx_L1_error)
+    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 35, __pyx_L1_error)
     __Pyx_INCREF(__pyx_t_5);
     #else
     {
       PyObject *__pyx_temp[2] = {__pyx_mstate_global->__pyx_n_u_prefix, __pyx_mstate_global->__pyx_n_u_dir};
       __pyx_t_5 = __Pyx_MakeKwargDict(__pyx_temp, __pyx_callargs+1, 2);
-      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 25, __pyx_L1_error)
+      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 35, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
     }
     #endif
@@ -3527,7 +3528,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 25, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 35, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   if ((likely(PyTuple_CheckExact(__pyx_t_1))) || (PyList_CheckExact(__pyx_t_1))) {
@@ -3536,7 +3537,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     if (unlikely(size != 2)) {
       if (size > 2) __Pyx_RaiseTooManyValuesError(2);
       else if (size >= 0) __Pyx_RaiseNeedMoreValuesError(size);
-      __PYX_ERR(0, 25, __pyx_L1_error)
+      __PYX_ERR(0, 35, __pyx_L1_error)
     }
     #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
     if (likely(PyTuple_CheckExact(sequence))) {
@@ -3546,22 +3547,22 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       __Pyx_INCREF(__pyx_t_5);
     } else {
       __pyx_t_2 = __Pyx_PyList_GET_ITEM_REF(sequence, 0, __Pyx_ReferenceSharing_SharedReference);
-      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 25, __pyx_L1_error)
+      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 35, __pyx_L1_error)
       __Pyx_XGOTREF(__pyx_t_2);
       __pyx_t_5 = __Pyx_PyList_GET_ITEM_REF(sequence, 1, __Pyx_ReferenceSharing_SharedReference);
-      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 25, __pyx_L1_error)
+      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 35, __pyx_L1_error)
       __Pyx_XGOTREF(__pyx_t_5);
     }
     #else
-    __pyx_t_2 = __Pyx_PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 25, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 35, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_5 = __Pyx_PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 25, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 35, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
     #endif
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   } else {
     Py_ssize_t index = -1;
-    __pyx_t_7 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 25, __pyx_L1_error)
+    __pyx_t_7 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 35, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_7);
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __pyx_t_8 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_7);
@@ -3569,7 +3570,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __Pyx_GOTREF(__pyx_t_2);
     index = 1; __pyx_t_5 = __pyx_t_8(__pyx_t_7); if (unlikely(!__pyx_t_5)) goto __pyx_L3_unpacking_failed;
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_IternextUnpackEndCheck(__pyx_t_8(__pyx_t_7), 2) < (0)) __PYX_ERR(0, 25, __pyx_L1_error)
+    if (__Pyx_IternextUnpackEndCheck(__pyx_t_8(__pyx_t_7), 2) < (0)) __PYX_ERR(0, 35, __pyx_L1_error)
     __pyx_t_8 = NULL;
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     goto __pyx_L4_unpacking_done;
@@ -3577,7 +3578,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __pyx_t_8 = NULL;
     if (__Pyx_IterFinish() == 0) __Pyx_RaiseNeedMoreValuesError(index);
-    __PYX_ERR(0, 25, __pyx_L1_error)
+    __PYX_ERR(0, 35, __pyx_L1_error)
     __pyx_L4_unpacking_done:;
   }
   __pyx_v_fd = __pyx_t_2;
@@ -3585,7 +3586,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   __pyx_v_tmp = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":26
+  /* "omnibioai_model_registry/storage/localfs.py":36
  *         path.parent.mkdir(parents=True, exist_ok=True)
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:             # <<<<<<<<<<<<<<
@@ -3594,7 +3595,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
 */
   /*try:*/ {
 
-    /* "omnibioai_model_registry/storage/localfs.py":27
+    /* "omnibioai_model_registry/storage/localfs.py":37
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:             # <<<<<<<<<<<<<<
@@ -3603,9 +3604,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
 */
     /*with:*/ {
       __pyx_t_5 = NULL;
-      __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 27, __pyx_L6_error)
+      __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 37, __pyx_L6_error)
       __Pyx_GOTREF(__pyx_t_2);
-      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_fdopen); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 27, __pyx_L6_error)
+      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_fdopen); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 37, __pyx_L6_error)
       __Pyx_GOTREF(__pyx_t_7);
       __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
       __pyx_t_4 = 1;
@@ -3624,13 +3625,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         PyObject *__pyx_callargs[4] = {__pyx_t_5, __pyx_v_fd, __pyx_mstate_global->__pyx_n_u_w, __pyx_mstate_global->__pyx_kp_u_utf_8};
         #if CYTHON_VECTORCALL
         __pyx_t_2 = __pyx_mstate_global->__pyx_tuple[2];
-        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 27, __pyx_L6_error)
+        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 37, __pyx_L6_error)
         __Pyx_INCREF(__pyx_t_2);
         #else
         {
           PyObject *__pyx_temp[1] = {__pyx_mstate_global->__pyx_n_u_encoding};
           __pyx_t_2 = __Pyx_MakeKwargDict(__pyx_temp, __pyx_callargs+3, 1);
-          if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 27, __pyx_L6_error)
+          if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 37, __pyx_L6_error)
           __Pyx_GOTREF(__pyx_t_2);
         }
         #endif
@@ -3638,13 +3639,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
         __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
         __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-        if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 27, __pyx_L6_error)
+        if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 37, __pyx_L6_error)
         __Pyx_GOTREF(__pyx_t_1);
       }
-      __pyx_t_9 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_exit); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 27, __pyx_L6_error)
+      __pyx_t_9 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_exit); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 37, __pyx_L6_error)
       __Pyx_GOTREF(__pyx_t_9);
       __pyx_t_2 = NULL;
-      __pyx_t_5 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_enter); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 27, __pyx_L8_error)
+      __pyx_t_5 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_enter); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 37, __pyx_L8_error)
       __Pyx_GOTREF(__pyx_t_5);
       __pyx_t_4 = 1;
       #if CYTHON_UNPACK_METHODS
@@ -3663,7 +3664,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_5, __pyx_callargs+__pyx_t_4, (1-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
         __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-        if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 27, __pyx_L8_error)
+        if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 37, __pyx_L8_error)
         __Pyx_GOTREF(__pyx_t_7);
       }
       __pyx_t_5 = __pyx_t_7;
@@ -3681,7 +3682,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
             __pyx_v_f = __pyx_t_5;
             __pyx_t_5 = 0;
 
-            /* "omnibioai_model_registry/storage/localfs.py":28
+            /* "omnibioai_model_registry/storage/localfs.py":38
  *         try:
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:
  *                 f.write(text)             # <<<<<<<<<<<<<<
@@ -3695,12 +3696,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
               PyObject *__pyx_callargs[2] = {__pyx_t_1, __pyx_v_text};
               __pyx_t_5 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_write, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
               __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
-              if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 28, __pyx_L12_error)
+              if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 38, __pyx_L12_error)
               __Pyx_GOTREF(__pyx_t_5);
             }
             __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-            /* "omnibioai_model_registry/storage/localfs.py":27
+            /* "omnibioai_model_registry/storage/localfs.py":37
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:             # <<<<<<<<<<<<<<
@@ -3721,23 +3722,23 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
           /*except:*/ {
             __Pyx_AddTraceback("omnibioai_model_registry.storage.localfs.LocalFS.atomic_write_text", __pyx_clineno, __pyx_lineno, __pyx_filename);
-            if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_1, &__pyx_t_7) < 0) __PYX_ERR(0, 27, __pyx_L14_except_error)
+            if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_1, &__pyx_t_7) < 0) __PYX_ERR(0, 37, __pyx_L14_except_error)
             __Pyx_XGOTREF(__pyx_t_5);
             __Pyx_XGOTREF(__pyx_t_1);
             __Pyx_XGOTREF(__pyx_t_7);
             {
               PyObject* __pyx_temp[3] = {__pyx_t_5, __pyx_t_1, __pyx_t_7};
-              __pyx_t_2 = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 27, __pyx_L14_except_error)
+              __pyx_t_2 = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 37, __pyx_L14_except_error)
               __Pyx_GOTREF(__pyx_t_2);
             }
             __pyx_t_13 = __Pyx_PyObject_Call(__pyx_t_9, __pyx_t_2, NULL);
             __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
             __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-            if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 27, __pyx_L14_except_error)
+            if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 37, __pyx_L14_except_error)
             __Pyx_GOTREF(__pyx_t_13);
             __pyx_t_14 = __Pyx_PyObject_IsTrue(__pyx_t_13);
             __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
-            if (__pyx_t_14 < (0)) __PYX_ERR(0, 27, __pyx_L14_except_error)
+            if (__pyx_t_14 < (0)) __PYX_ERR(0, 37, __pyx_L14_except_error)
             __pyx_t_15 = (!__pyx_t_14);
 
 
@@ -3748,7 +3749,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
               __Pyx_XGIVEREF(__pyx_t_7);
               __Pyx_ErrRestoreWithState(__pyx_t_5, __pyx_t_1, __pyx_t_7);
               __pyx_t_5 = 0;  __pyx_t_1 = 0;  __pyx_t_7 = 0; 
-              __PYX_ERR(0, 27, __pyx_L14_except_error)
+              __PYX_ERR(0, 37, __pyx_L14_except_error)
             }
             __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
             __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -3774,7 +3775,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           if (__pyx_t_9) {
             __pyx_t_12 = __Pyx_PyObject_Call(__pyx_t_9, __pyx_mstate_global->__pyx_tuple[3], NULL);
             __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-            if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 27, __pyx_L6_error)
+            if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 37, __pyx_L6_error)
             __Pyx_GOTREF(__pyx_t_12);
             __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
           }
@@ -3789,7 +3790,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       __pyx_L21:;
     }
 
-    /* "omnibioai_model_registry/storage/localfs.py":29
+    /* "omnibioai_model_registry/storage/localfs.py":39
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:
  *                 f.write(text)
  *             os.replace(tmp, path)             # <<<<<<<<<<<<<<
@@ -3797,9 +3798,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *             try:
 */
     __pyx_t_1 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 29, __pyx_L6_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 39, __pyx_L6_error)
     __Pyx_GOTREF(__pyx_t_5);
-    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_replace); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 29, __pyx_L6_error)
+    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_replace); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 39, __pyx_L6_error)
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __pyx_t_4 = 1;
@@ -3819,13 +3820,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_2, __pyx_callargs+__pyx_t_4, (3-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
       __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-      if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 29, __pyx_L6_error)
+      if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 39, __pyx_L6_error)
       __Pyx_GOTREF(__pyx_t_7);
     }
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
   }
 
-  /* "omnibioai_model_registry/storage/localfs.py":31
+  /* "omnibioai_model_registry/storage/localfs.py":41
  *             os.replace(tmp, path)
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -3843,16 +3844,16 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         __Pyx_XGOTREF(__pyx_t_11);
         /*try:*/ {
 
-          /* "omnibioai_model_registry/storage/localfs.py":32
+          /* "omnibioai_model_registry/storage/localfs.py":42
  *         finally:
  *             try:
  *                 if os.path.exists(tmp):             # <<<<<<<<<<<<<<
  *                     os.unlink(tmp)
  *             except Exception:
 */
-          __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L22_error)
+          __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 42, __pyx_L22_error)
           __Pyx_GOTREF(__pyx_t_1);
-          __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_path); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 32, __pyx_L22_error)
+          __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_path); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 42, __pyx_L22_error)
           __Pyx_GOTREF(__pyx_t_5);
           __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
           __pyx_t_2 = __pyx_t_5;
@@ -3863,15 +3864,15 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
             __pyx_t_7 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
             __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
             __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-            if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 32, __pyx_L22_error)
+            if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 42, __pyx_L22_error)
             __Pyx_GOTREF(__pyx_t_7);
           }
-          __pyx_t_15 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_15 < 0))) __PYX_ERR(0, 32, __pyx_L22_error)
+          __pyx_t_15 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_15 < 0))) __PYX_ERR(0, 42, __pyx_L22_error)
           __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
           if (__pyx_t_15) {
 
 
-            /* "omnibioai_model_registry/storage/localfs.py":33
+            /* "omnibioai_model_registry/storage/localfs.py":43
  *             try:
  *                 if os.path.exists(tmp):
  *                     os.unlink(tmp)             # <<<<<<<<<<<<<<
@@ -3879,9 +3880,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *                 pass
 */
             __pyx_t_5 = NULL;
-            __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 33, __pyx_L22_error)
+            __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 43, __pyx_L22_error)
             __Pyx_GOTREF(__pyx_t_2);
-            __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_unlink); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L22_error)
+            __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_unlink); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 43, __pyx_L22_error)
             __Pyx_GOTREF(__pyx_t_1);
             __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
             __pyx_t_4 = 1;
@@ -3901,12 +3902,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
               __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_1, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
               __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
               __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-              if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 33, __pyx_L22_error)
+              if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 43, __pyx_L22_error)
               __Pyx_GOTREF(__pyx_t_7);
             }
             __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-            /* "omnibioai_model_registry/storage/localfs.py":32
+            /* "omnibioai_model_registry/storage/localfs.py":42
  *         finally:
  *             try:
  *                 if os.path.exists(tmp):             # <<<<<<<<<<<<<<
@@ -3915,7 +3916,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
 */
           }
 
-          /* "omnibioai_model_registry/storage/localfs.py":31
+          /* "omnibioai_model_registry/storage/localfs.py":41
  *             os.replace(tmp, path)
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -3935,7 +3936,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
         __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-        /* "omnibioai_model_registry/storage/localfs.py":34
+        /* "omnibioai_model_registry/storage/localfs.py":44
  *                 if os.path.exists(tmp):
  *                     os.unlink(tmp)
  *             except Exception:             # <<<<<<<<<<<<<<
@@ -3949,7 +3950,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         }
         goto __pyx_L24_except_error;
 
-        /* "omnibioai_model_registry/storage/localfs.py":31
+        /* "omnibioai_model_registry/storage/localfs.py":41
  *             os.replace(tmp, path)
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -4001,16 +4002,16 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           __Pyx_XGOTREF(__pyx_t_22);
           /*try:*/ {
 
-            /* "omnibioai_model_registry/storage/localfs.py":32
+            /* "omnibioai_model_registry/storage/localfs.py":42
  *         finally:
  *             try:
  *                 if os.path.exists(tmp):             # <<<<<<<<<<<<<<
  *                     os.unlink(tmp)
  *             except Exception:
 */
-            __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 32, __pyx_L33_error)
+            __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 42, __pyx_L33_error)
             __Pyx_GOTREF(__pyx_t_5);
-            __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_path); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 32, __pyx_L33_error)
+            __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_path); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 42, __pyx_L33_error)
             __Pyx_GOTREF(__pyx_t_2);
             __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
             __pyx_t_1 = __pyx_t_2;
@@ -4021,15 +4022,15 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
               __pyx_t_7 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
               __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
               __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-              if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 32, __pyx_L33_error)
+              if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 42, __pyx_L33_error)
               __Pyx_GOTREF(__pyx_t_7);
             }
-            __pyx_t_15 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_15 < 0))) __PYX_ERR(0, 32, __pyx_L33_error)
+            __pyx_t_15 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_15 < 0))) __PYX_ERR(0, 42, __pyx_L33_error)
             __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
             if (__pyx_t_15) {
 
 
-              /* "omnibioai_model_registry/storage/localfs.py":33
+              /* "omnibioai_model_registry/storage/localfs.py":43
  *             try:
  *                 if os.path.exists(tmp):
  *                     os.unlink(tmp)             # <<<<<<<<<<<<<<
@@ -4037,9 +4038,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *                 pass
 */
               __pyx_t_2 = NULL;
-              __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L33_error)
+              __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 43, __pyx_L33_error)
               __Pyx_GOTREF(__pyx_t_1);
-              __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_unlink); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 33, __pyx_L33_error)
+              __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_unlink); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 43, __pyx_L33_error)
               __Pyx_GOTREF(__pyx_t_5);
               __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
               __pyx_t_4 = 1;
@@ -4059,12 +4060,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
                 __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_5, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
                 __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
                 __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-                if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 33, __pyx_L33_error)
+                if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 43, __pyx_L33_error)
                 __Pyx_GOTREF(__pyx_t_7);
               }
               __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-              /* "omnibioai_model_registry/storage/localfs.py":32
+              /* "omnibioai_model_registry/storage/localfs.py":42
  *         finally:
  *             try:
  *                 if os.path.exists(tmp):             # <<<<<<<<<<<<<<
@@ -4073,7 +4074,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
 */
             }
 
-            /* "omnibioai_model_registry/storage/localfs.py":31
+            /* "omnibioai_model_registry/storage/localfs.py":41
  *             os.replace(tmp, path)
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -4093,7 +4094,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
           __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-          /* "omnibioai_model_registry/storage/localfs.py":34
+          /* "omnibioai_model_registry/storage/localfs.py":44
  *                 if os.path.exists(tmp):
  *                     os.unlink(tmp)
  *             except Exception:             # <<<<<<<<<<<<<<
@@ -4107,7 +4108,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           }
           goto __pyx_L35_except_error;
 
-          /* "omnibioai_model_registry/storage/localfs.py":31
+          /* "omnibioai_model_registry/storage/localfs.py":41
  *             os.replace(tmp, path)
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -4153,7 +4154,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __pyx_L7:;
   }
 
-  /* "omnibioai_model_registry/storage/localfs.py":23
+  /* "omnibioai_model_registry/storage/localfs.py":33
  *         shutil.copytree(src_dir, dst_dir)
  * 
  *     def atomic_write_text(self, path: Path, text: str) -> None:             # <<<<<<<<<<<<<<
@@ -4182,7 +4183,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   return __pyx_r;
 }
 
-/* "omnibioai_model_registry/storage/localfs.py":37
+/* "omnibioai_model_registry/storage/localfs.py":47
  *                 pass
  * 
  *     def write_once_text(self, path: Path, text: str) -> bool:             # <<<<<<<<<<<<<<
@@ -4232,38 +4233,38 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_self,&__pyx_mstate_global->__pyx_n_u_path,&__pyx_mstate_global->__pyx_n_u_text,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 37, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 47, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 37, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 47, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 37, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 47, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 37, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 47, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "write_once_text", 0) < (0)) __PYX_ERR(0, 37, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "write_once_text", 0) < (0)) __PYX_ERR(0, 47, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("write_once_text", 1, 3, 3, i); __PYX_ERR(0, 37, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("write_once_text", 1, 3, 3, i); __PYX_ERR(0, 47, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 37, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 47, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 37, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 47, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 37, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 47, __pyx_L3_error)
     }
     __pyx_v_self = values[0];
     __pyx_v_path = values[1];
@@ -4271,7 +4272,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("write_once_text", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 37, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("write_once_text", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 47, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -4282,7 +4283,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_text), (&PyUnicode_Type), 0, "text", 2))) __PYX_ERR(0, 37, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_text), (&PyUnicode_Type), 0, "text", 2))) __PYX_ERR(0, 47, __pyx_L1_error)
   __pyx_r = __pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_8write_once_text(__pyx_self, __pyx_v_self, __pyx_v_path, __pyx_v_text);
 
   /* function exit code */
@@ -4336,14 +4337,14 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("write_once_text", 0);
 
-  /* "omnibioai_model_registry/storage/localfs.py":45
+  /* "omnibioai_model_registry/storage/localfs.py":55
  *         observes it already exists and its own write is discarded. Unlike
  *         atomic_write_text's os.replace, this never overwrites."""
  *         path.parent.mkdir(parents=True, exist_ok=True)             # <<<<<<<<<<<<<<
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:
 */
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_parent); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 45, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_parent); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 55, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __pyx_t_2 = __pyx_t_3;
   __Pyx_INCREF(__pyx_t_2);
@@ -4352,13 +4353,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     PyObject *__pyx_callargs[3] = {__pyx_t_2, Py_True, Py_True};
     #if CYTHON_VECTORCALL
     __pyx_t_5 = __pyx_mstate_global->__pyx_tuple[0];
-    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 45, __pyx_L1_error)
+    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_INCREF(__pyx_t_5);
     #else
     {
       PyObject *__pyx_temp[2] = {__pyx_mstate_global->__pyx_n_u_parents, __pyx_mstate_global->__pyx_n_u_exist_ok};
       __pyx_t_5 = __Pyx_MakeKwargDict(__pyx_temp, __pyx_callargs+1, 2);
-      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 45, __pyx_L1_error)
+      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 55, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
     }
     #endif
@@ -4366,12 +4367,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 45, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":46
+  /* "omnibioai_model_registry/storage/localfs.py":56
  *         atomic_write_text's os.replace, this never overwrites."""
  *         path.parent.mkdir(parents=True, exist_ok=True)
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))             # <<<<<<<<<<<<<<
@@ -4379,19 +4380,19 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:
 */
   __pyx_t_3 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_tempfile); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_tempfile); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_mkstemp); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_mkstemp); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 56, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = PyNumber_Add(__pyx_t_5, __pyx_mstate_global->__pyx_kp_u_); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __pyx_t_6 = PyNumber_Add(__pyx_t_5, __pyx_mstate_global->__pyx_kp_u_); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 56, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_parent); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_path, __pyx_mstate_global->__pyx_n_u_parent); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_7 = __Pyx_PyObject_Unicode(__pyx_t_5); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyObject_Unicode(__pyx_t_5); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 56, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_4 = 1;
@@ -4410,13 +4411,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     PyObject *__pyx_callargs[3] = {__pyx_t_3, __pyx_t_6, __pyx_t_7};
     #if CYTHON_VECTORCALL
     __pyx_t_5 = __pyx_mstate_global->__pyx_tuple[1];
-    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
     __Pyx_INCREF(__pyx_t_5);
     #else
     {
       PyObject *__pyx_temp[2] = {__pyx_mstate_global->__pyx_n_u_prefix, __pyx_mstate_global->__pyx_n_u_dir};
       __pyx_t_5 = __Pyx_MakeKwargDict(__pyx_temp, __pyx_callargs+1, 2);
-      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
     }
     #endif
@@ -4426,7 +4427,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 46, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 56, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   if ((likely(PyTuple_CheckExact(__pyx_t_1))) || (PyList_CheckExact(__pyx_t_1))) {
@@ -4435,7 +4436,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     if (unlikely(size != 2)) {
       if (size > 2) __Pyx_RaiseTooManyValuesError(2);
       else if (size >= 0) __Pyx_RaiseNeedMoreValuesError(size);
-      __PYX_ERR(0, 46, __pyx_L1_error)
+      __PYX_ERR(0, 56, __pyx_L1_error)
     }
     #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
     if (likely(PyTuple_CheckExact(sequence))) {
@@ -4445,22 +4446,22 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       __Pyx_INCREF(__pyx_t_5);
     } else {
       __pyx_t_2 = __Pyx_PyList_GET_ITEM_REF(sequence, 0, __Pyx_ReferenceSharing_SharedReference);
-      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 46, __pyx_L1_error)
+      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 56, __pyx_L1_error)
       __Pyx_XGOTREF(__pyx_t_2);
       __pyx_t_5 = __Pyx_PyList_GET_ITEM_REF(sequence, 1, __Pyx_ReferenceSharing_SharedReference);
-      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+      if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
       __Pyx_XGOTREF(__pyx_t_5);
     }
     #else
-    __pyx_t_2 = __Pyx_PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 46, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 56, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_5 = __Pyx_PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 56, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
     #endif
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   } else {
     Py_ssize_t index = -1;
-    __pyx_t_7 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 46, __pyx_L1_error)
+    __pyx_t_7 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 56, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_7);
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __pyx_t_8 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_7);
@@ -4468,7 +4469,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __Pyx_GOTREF(__pyx_t_2);
     index = 1; __pyx_t_5 = __pyx_t_8(__pyx_t_7); if (unlikely(!__pyx_t_5)) goto __pyx_L3_unpacking_failed;
     __Pyx_GOTREF(__pyx_t_5);
-    if (__Pyx_IternextUnpackEndCheck(__pyx_t_8(__pyx_t_7), 2) < (0)) __PYX_ERR(0, 46, __pyx_L1_error)
+    if (__Pyx_IternextUnpackEndCheck(__pyx_t_8(__pyx_t_7), 2) < (0)) __PYX_ERR(0, 56, __pyx_L1_error)
     __pyx_t_8 = NULL;
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     goto __pyx_L4_unpacking_done;
@@ -4476,7 +4477,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __pyx_t_8 = NULL;
     if (__Pyx_IterFinish() == 0) __Pyx_RaiseNeedMoreValuesError(index);
-    __PYX_ERR(0, 46, __pyx_L1_error)
+    __PYX_ERR(0, 56, __pyx_L1_error)
     __pyx_L4_unpacking_done:;
   }
   __pyx_v_fd = __pyx_t_2;
@@ -4484,7 +4485,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
   __pyx_v_tmp = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":47
+  /* "omnibioai_model_registry/storage/localfs.py":57
  *         path.parent.mkdir(parents=True, exist_ok=True)
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:             # <<<<<<<<<<<<<<
@@ -4493,7 +4494,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
 */
   /*try:*/ {
 
-    /* "omnibioai_model_registry/storage/localfs.py":48
+    /* "omnibioai_model_registry/storage/localfs.py":58
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:             # <<<<<<<<<<<<<<
@@ -4502,9 +4503,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
 */
     /*with:*/ {
       __pyx_t_5 = NULL;
-      __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 48, __pyx_L6_error)
+      __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 58, __pyx_L6_error)
       __Pyx_GOTREF(__pyx_t_2);
-      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_fdopen); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 48, __pyx_L6_error)
+      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_fdopen); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 58, __pyx_L6_error)
       __Pyx_GOTREF(__pyx_t_7);
       __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
       __pyx_t_4 = 1;
@@ -4523,13 +4524,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         PyObject *__pyx_callargs[4] = {__pyx_t_5, __pyx_v_fd, __pyx_mstate_global->__pyx_n_u_w, __pyx_mstate_global->__pyx_kp_u_utf_8};
         #if CYTHON_VECTORCALL
         __pyx_t_2 = __pyx_mstate_global->__pyx_tuple[2];
-        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 48, __pyx_L6_error)
+        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 58, __pyx_L6_error)
         __Pyx_INCREF(__pyx_t_2);
         #else
         {
           PyObject *__pyx_temp[1] = {__pyx_mstate_global->__pyx_n_u_encoding};
           __pyx_t_2 = __Pyx_MakeKwargDict(__pyx_temp, __pyx_callargs+3, 1);
-          if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 48, __pyx_L6_error)
+          if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 58, __pyx_L6_error)
           __Pyx_GOTREF(__pyx_t_2);
         }
         #endif
@@ -4537,13 +4538,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
         __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
         __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-        if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 48, __pyx_L6_error)
+        if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 58, __pyx_L6_error)
         __Pyx_GOTREF(__pyx_t_1);
       }
-      __pyx_t_9 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_exit); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 48, __pyx_L6_error)
+      __pyx_t_9 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_exit); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 58, __pyx_L6_error)
       __Pyx_GOTREF(__pyx_t_9);
       __pyx_t_2 = NULL;
-      __pyx_t_5 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_enter); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 48, __pyx_L8_error)
+      __pyx_t_5 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_enter); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 58, __pyx_L8_error)
       __Pyx_GOTREF(__pyx_t_5);
       __pyx_t_4 = 1;
       #if CYTHON_UNPACK_METHODS
@@ -4562,7 +4563,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_5, __pyx_callargs+__pyx_t_4, (1-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
         __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-        if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 48, __pyx_L8_error)
+        if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 58, __pyx_L8_error)
         __Pyx_GOTREF(__pyx_t_7);
       }
       __pyx_t_5 = __pyx_t_7;
@@ -4580,7 +4581,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
             __pyx_v_f = __pyx_t_5;
             __pyx_t_5 = 0;
 
-            /* "omnibioai_model_registry/storage/localfs.py":49
+            /* "omnibioai_model_registry/storage/localfs.py":59
  *         try:
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:
  *                 f.write(text)             # <<<<<<<<<<<<<<
@@ -4594,12 +4595,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
               PyObject *__pyx_callargs[2] = {__pyx_t_1, __pyx_v_text};
               __pyx_t_5 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_write, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
               __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
-              if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 49, __pyx_L12_error)
+              if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 59, __pyx_L12_error)
               __Pyx_GOTREF(__pyx_t_5);
             }
             __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-            /* "omnibioai_model_registry/storage/localfs.py":48
+            /* "omnibioai_model_registry/storage/localfs.py":58
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:             # <<<<<<<<<<<<<<
@@ -4620,23 +4621,23 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
           /*except:*/ {
             __Pyx_AddTraceback("omnibioai_model_registry.storage.localfs.LocalFS.write_once_text", __pyx_clineno, __pyx_lineno, __pyx_filename);
-            if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_1, &__pyx_t_7) < 0) __PYX_ERR(0, 48, __pyx_L14_except_error)
+            if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_1, &__pyx_t_7) < 0) __PYX_ERR(0, 58, __pyx_L14_except_error)
             __Pyx_XGOTREF(__pyx_t_5);
             __Pyx_XGOTREF(__pyx_t_1);
             __Pyx_XGOTREF(__pyx_t_7);
             {
               PyObject* __pyx_temp[3] = {__pyx_t_5, __pyx_t_1, __pyx_t_7};
-              __pyx_t_2 = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 48, __pyx_L14_except_error)
+              __pyx_t_2 = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 58, __pyx_L14_except_error)
               __Pyx_GOTREF(__pyx_t_2);
             }
             __pyx_t_13 = __Pyx_PyObject_Call(__pyx_t_9, __pyx_t_2, NULL);
             __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
             __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-            if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 48, __pyx_L14_except_error)
+            if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 58, __pyx_L14_except_error)
             __Pyx_GOTREF(__pyx_t_13);
             __pyx_t_14 = __Pyx_PyObject_IsTrue(__pyx_t_13);
             __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
-            if (__pyx_t_14 < (0)) __PYX_ERR(0, 48, __pyx_L14_except_error)
+            if (__pyx_t_14 < (0)) __PYX_ERR(0, 58, __pyx_L14_except_error)
             __pyx_t_15 = (!__pyx_t_14);
 
 
@@ -4647,7 +4648,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
               __Pyx_XGIVEREF(__pyx_t_7);
               __Pyx_ErrRestoreWithState(__pyx_t_5, __pyx_t_1, __pyx_t_7);
               __pyx_t_5 = 0;  __pyx_t_1 = 0;  __pyx_t_7 = 0; 
-              __PYX_ERR(0, 48, __pyx_L14_except_error)
+              __PYX_ERR(0, 58, __pyx_L14_except_error)
             }
             __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
             __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -4673,7 +4674,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           if (__pyx_t_9) {
             __pyx_t_12 = __Pyx_PyObject_Call(__pyx_t_9, __pyx_mstate_global->__pyx_tuple[3], NULL);
             __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-            if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 48, __pyx_L6_error)
+            if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 58, __pyx_L6_error)
             __Pyx_GOTREF(__pyx_t_12);
             __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
           }
@@ -4688,7 +4689,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       __pyx_L21:;
     }
 
-    /* "omnibioai_model_registry/storage/localfs.py":50
+    /* "omnibioai_model_registry/storage/localfs.py":60
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:
  *                 f.write(text)
  *             try:             # <<<<<<<<<<<<<<
@@ -4704,7 +4705,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       __Pyx_XGOTREF(__pyx_t_11);
       /*try:*/ {
 
-        /* "omnibioai_model_registry/storage/localfs.py":51
+        /* "omnibioai_model_registry/storage/localfs.py":61
  *                 f.write(text)
  *             try:
  *                 os.link(tmp, path)             # <<<<<<<<<<<<<<
@@ -4712,9 +4713,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *             except FileExistsError:
 */
         __pyx_t_1 = NULL;
-        __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 51, __pyx_L22_error)
+        __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 61, __pyx_L22_error)
         __Pyx_GOTREF(__pyx_t_5);
-        __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_link); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 51, __pyx_L22_error)
+        __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_link); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 61, __pyx_L22_error)
         __Pyx_GOTREF(__pyx_t_2);
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
         __pyx_t_4 = 1;
@@ -4734,12 +4735,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_2, __pyx_callargs+__pyx_t_4, (3-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
           __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
           __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-          if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 51, __pyx_L22_error)
+          if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 61, __pyx_L22_error)
           __Pyx_GOTREF(__pyx_t_7);
         }
         __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-        /* "omnibioai_model_registry/storage/localfs.py":52
+        /* "omnibioai_model_registry/storage/localfs.py":62
  *             try:
  *                 os.link(tmp, path)
  *                 return True             # <<<<<<<<<<<<<<
@@ -4757,7 +4758,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         }
         goto __pyx_L26_try_return;
 
-        /* "omnibioai_model_registry/storage/localfs.py":50
+        /* "omnibioai_model_registry/storage/localfs.py":60
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:
  *                 f.write(text)
  *             try:             # <<<<<<<<<<<<<<
@@ -4773,7 +4774,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
       __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-      /* "omnibioai_model_registry/storage/localfs.py":53
+      /* "omnibioai_model_registry/storage/localfs.py":63
  *                 os.link(tmp, path)
  *                 return True
  *             except FileExistsError:             # <<<<<<<<<<<<<<
@@ -4784,7 +4785,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       if (__pyx_t_16) {
         __Pyx_ErrRestore(0,0,0);
 
-        /* "omnibioai_model_registry/storage/localfs.py":54
+        /* "omnibioai_model_registry/storage/localfs.py":64
  *                 return True
  *             except FileExistsError:
  *                 return False             # <<<<<<<<<<<<<<
@@ -4804,7 +4805,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
       }
       goto __pyx_L24_except_error;
 
-      /* "omnibioai_model_registry/storage/localfs.py":50
+      /* "omnibioai_model_registry/storage/localfs.py":60
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:
  *                 f.write(text)
  *             try:             # <<<<<<<<<<<<<<
@@ -4832,7 +4833,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     }
   }
 
-  /* "omnibioai_model_registry/storage/localfs.py":56
+  /* "omnibioai_model_registry/storage/localfs.py":66
  *                 return False
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -4870,16 +4871,16 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           __Pyx_XGOTREF(__pyx_t_22);
           /*try:*/ {
 
-            /* "omnibioai_model_registry/storage/localfs.py":57
+            /* "omnibioai_model_registry/storage/localfs.py":67
  *         finally:
  *             try:
  *                 if os.path.exists(tmp):             # <<<<<<<<<<<<<<
  *                     os.unlink(tmp)
  *             except Exception:
 */
-            __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 57, __pyx_L32_error)
+            __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 67, __pyx_L32_error)
             __Pyx_GOTREF(__pyx_t_1);
-            __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_path); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 57, __pyx_L32_error)
+            __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_path); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 67, __pyx_L32_error)
             __Pyx_GOTREF(__pyx_t_5);
             __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
             __pyx_t_2 = __pyx_t_5;
@@ -4890,15 +4891,15 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
               __pyx_t_7 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
               __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
               __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-              if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 57, __pyx_L32_error)
+              if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 67, __pyx_L32_error)
               __Pyx_GOTREF(__pyx_t_7);
             }
-            __pyx_t_15 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_15 < 0))) __PYX_ERR(0, 57, __pyx_L32_error)
+            __pyx_t_15 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_15 < 0))) __PYX_ERR(0, 67, __pyx_L32_error)
             __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
             if (__pyx_t_15) {
 
 
-              /* "omnibioai_model_registry/storage/localfs.py":58
+              /* "omnibioai_model_registry/storage/localfs.py":68
  *             try:
  *                 if os.path.exists(tmp):
  *                     os.unlink(tmp)             # <<<<<<<<<<<<<<
@@ -4906,9 +4907,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *                 pass
 */
               __pyx_t_5 = NULL;
-              __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 58, __pyx_L32_error)
+              __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 68, __pyx_L32_error)
               __Pyx_GOTREF(__pyx_t_2);
-              __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_unlink); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 58, __pyx_L32_error)
+              __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_unlink); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 68, __pyx_L32_error)
               __Pyx_GOTREF(__pyx_t_1);
               __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
               __pyx_t_4 = 1;
@@ -4928,12 +4929,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
                 __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_1, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
                 __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
                 __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-                if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 58, __pyx_L32_error)
+                if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 68, __pyx_L32_error)
                 __Pyx_GOTREF(__pyx_t_7);
               }
               __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-              /* "omnibioai_model_registry/storage/localfs.py":57
+              /* "omnibioai_model_registry/storage/localfs.py":67
  *         finally:
  *             try:
  *                 if os.path.exists(tmp):             # <<<<<<<<<<<<<<
@@ -4942,7 +4943,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
 */
             }
 
-            /* "omnibioai_model_registry/storage/localfs.py":56
+            /* "omnibioai_model_registry/storage/localfs.py":66
  *                 return False
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -4962,7 +4963,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
           __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-          /* "omnibioai_model_registry/storage/localfs.py":59
+          /* "omnibioai_model_registry/storage/localfs.py":69
  *                 if os.path.exists(tmp):
  *                     os.unlink(tmp)
  *             except Exception:             # <<<<<<<<<<<<<<
@@ -4975,7 +4976,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
           }
           goto __pyx_L34_except_error;
 
-          /* "omnibioai_model_registry/storage/localfs.py":56
+          /* "omnibioai_model_registry/storage/localfs.py":66
  *                 return False
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -5030,16 +5031,16 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         __Pyx_XGOTREF(__pyx_t_9);
         /*try:*/ {
 
-          /* "omnibioai_model_registry/storage/localfs.py":57
+          /* "omnibioai_model_registry/storage/localfs.py":67
  *         finally:
  *             try:
  *                 if os.path.exists(tmp):             # <<<<<<<<<<<<<<
  *                     os.unlink(tmp)
  *             except Exception:
 */
-          __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 57, __pyx_L41_error)
+          __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 67, __pyx_L41_error)
           __Pyx_GOTREF(__pyx_t_5);
-          __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_path); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 57, __pyx_L41_error)
+          __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_path); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 67, __pyx_L41_error)
           __Pyx_GOTREF(__pyx_t_2);
           __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
           __pyx_t_1 = __pyx_t_2;
@@ -5050,15 +5051,15 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
             __pyx_t_7 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
             __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
             __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-            if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 57, __pyx_L41_error)
+            if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 67, __pyx_L41_error)
             __Pyx_GOTREF(__pyx_t_7);
           }
-          __pyx_t_15 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_15 < 0))) __PYX_ERR(0, 57, __pyx_L41_error)
+          __pyx_t_15 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_15 < 0))) __PYX_ERR(0, 67, __pyx_L41_error)
           __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
           if (__pyx_t_15) {
 
 
-            /* "omnibioai_model_registry/storage/localfs.py":58
+            /* "omnibioai_model_registry/storage/localfs.py":68
  *             try:
  *                 if os.path.exists(tmp):
  *                     os.unlink(tmp)             # <<<<<<<<<<<<<<
@@ -5066,9 +5067,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
  *                 pass
 */
             __pyx_t_2 = NULL;
-            __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 58, __pyx_L41_error)
+            __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_os); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 68, __pyx_L41_error)
             __Pyx_GOTREF(__pyx_t_1);
-            __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_unlink); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 58, __pyx_L41_error)
+            __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_unlink); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 68, __pyx_L41_error)
             __Pyx_GOTREF(__pyx_t_5);
             __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
             __pyx_t_4 = 1;
@@ -5088,12 +5089,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
               __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_5, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
               __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
               __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-              if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 58, __pyx_L41_error)
+              if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 68, __pyx_L41_error)
               __Pyx_GOTREF(__pyx_t_7);
             }
             __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-            /* "omnibioai_model_registry/storage/localfs.py":57
+            /* "omnibioai_model_registry/storage/localfs.py":67
  *         finally:
  *             try:
  *                 if os.path.exists(tmp):             # <<<<<<<<<<<<<<
@@ -5102,7 +5103,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
 */
           }
 
-          /* "omnibioai_model_registry/storage/localfs.py":56
+          /* "omnibioai_model_registry/storage/localfs.py":66
  *                 return False
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -5122,7 +5123,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
         __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-        /* "omnibioai_model_registry/storage/localfs.py":59
+        /* "omnibioai_model_registry/storage/localfs.py":69
  *                 if os.path.exists(tmp):
  *                     os.unlink(tmp)
  *             except Exception:             # <<<<<<<<<<<<<<
@@ -5135,7 +5136,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
         }
         goto __pyx_L43_except_error;
 
-        /* "omnibioai_model_registry/storage/localfs.py":56
+        /* "omnibioai_model_registry/storage/localfs.py":66
  *                 return False
  *         finally:
  *             try:             # <<<<<<<<<<<<<<
@@ -5161,7 +5162,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7storage_7localfs_7LocalFS_
     }
   }
 
-  /* "omnibioai_model_registry/storage/localfs.py":37
+  /* "omnibioai_model_registry/storage/localfs.py":47
  *                 pass
  * 
  *     def write_once_text(self, path: Path, text: str) -> bool:             # <<<<<<<<<<<<<<
@@ -5286,7 +5287,7 @@ namespace {
   {
       PyModuleDef_HEAD_INIT,
       "localfs",
-      0, /* m_doc */
+      __pyx_k_OmniBioAI_omnibioai_model_regis, /* m_doc */
     #if CYTHON_USE_MODULE_STATE
       sizeof(__pyx_mstatetype), /* m_size */
     #else
@@ -5538,46 +5539,46 @@ __Pyx_RefNannySetupContext("PyInit_localfs", 0);
   if (__Pyx_InitAfterSharedUtility() < (0)) __PYX_ERR(0, 1, __pyx_L1_error)
   /*--- Execution code ---*/
 
-  /* "omnibioai_model_registry/storage/localfs.py":4
+  /* "omnibioai_model_registry/storage/localfs.py":14
  * from __future__ import annotations
  * 
  * import os             # <<<<<<<<<<<<<<
  * import shutil
  * import tempfile
 */
-  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_os, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_os, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 14, __pyx_L1_error)
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_os, __pyx_t_2) < (0)) __PYX_ERR(0, 4, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_os, __pyx_t_2) < (0)) __PYX_ERR(0, 14, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":5
+  /* "omnibioai_model_registry/storage/localfs.py":15
  * 
  * import os
  * import shutil             # <<<<<<<<<<<<<<
  * import tempfile
  * from pathlib import Path
 */
-  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_shutil, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 5, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_shutil, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 15, __pyx_L1_error)
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_shutil, __pyx_t_2) < (0)) __PYX_ERR(0, 5, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_shutil, __pyx_t_2) < (0)) __PYX_ERR(0, 15, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":6
+  /* "omnibioai_model_registry/storage/localfs.py":16
  * import os
  * import shutil
  * import tempfile             # <<<<<<<<<<<<<<
  * from pathlib import Path
  * 
 */
-  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_tempfile, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 6, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_tempfile, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 16, __pyx_L1_error)
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_tempfile, __pyx_t_2) < (0)) __PYX_ERR(0, 6, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_tempfile, __pyx_t_2) < (0)) __PYX_ERR(0, 16, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":7
+  /* "omnibioai_model_registry/storage/localfs.py":17
  * import shutil
  * import tempfile
  * from pathlib import Path             # <<<<<<<<<<<<<<
@@ -5586,22 +5587,22 @@ __Pyx_RefNannySetupContext("PyInit_localfs", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Path};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_pathlib, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 7, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_pathlib, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 17, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Path};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 7, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 17, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 7, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 17, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":9
+  /* "omnibioai_model_registry/storage/localfs.py":19
  * from pathlib import Path
  * 
  * from .base import StorageBackend             # <<<<<<<<<<<<<<
@@ -5610,168 +5611,168 @@ __Pyx_RefNannySetupContext("PyInit_localfs", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_StorageBackend};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_base, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_omnibioai_model_registry_storage, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 9, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_base, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_omnibioai_model_registry_storage, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 19, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_StorageBackend};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 9, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 19, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 9, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 19, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":12
+  /* "omnibioai_model_registry/storage/localfs.py":22
  * 
  * 
  * class LocalFS(StorageBackend):             # <<<<<<<<<<<<<<
  *     def ensure_dirs(self, path: Path) -> None:
  *         path.mkdir(parents=True, exist_ok=True)
 */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_StorageBackend); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_StorageBackend); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* __pyx_temp[1] = {__pyx_t_2};
-    __pyx_t_4 = __Pyx_PyTuple_FromArray(__pyx_temp, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 12, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyTuple_FromArray(__pyx_temp, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 22, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = __Pyx_PEP560_update_bases(__pyx_t_4); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PEP560_update_bases(__pyx_t_4); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_5 = __Pyx_CalculateMetaclass(NULL, __pyx_t_2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_CalculateMetaclass(NULL, __pyx_t_2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_Py3MetaclassPrepare(__pyx_t_5, __pyx_t_2, __pyx_mstate_global->__pyx_n_u_LocalFS, __pyx_mstate_global->__pyx_n_u_LocalFS, (PyObject *) NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, (PyObject *) NULL); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_Py3MetaclassPrepare(__pyx_t_5, __pyx_t_2, __pyx_mstate_global->__pyx_n_u_LocalFS, __pyx_mstate_global->__pyx_n_u_LocalFS, (PyObject *) NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, (PyObject *) NULL); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   if (__pyx_t_2 != __pyx_t_4) {
-    if (unlikely((PyDict_SetItemString(__pyx_t_6, "__orig_bases__", __pyx_t_4) < 0))) __PYX_ERR(0, 12, __pyx_L1_error)
+    if (unlikely((PyDict_SetItemString(__pyx_t_6, "__orig_bases__", __pyx_t_4) < 0))) __PYX_ERR(0, 22, __pyx_L1_error)
   }
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":13
+  /* "omnibioai_model_registry/storage/localfs.py":23
  * 
  * class LocalFS(StorageBackend):
  *     def ensure_dirs(self, path: Path) -> None:             # <<<<<<<<<<<<<<
  *         path.mkdir(parents=True, exist_ok=True)
  * 
 */
-  __pyx_t_4 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 13, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 23, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 13, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 13, __pyx_L1_error)
-  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_1ensure_dirs, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_ensure_dirs, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 13, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_1ensure_dirs, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_ensure_dirs, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 23, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_7);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_7, __pyx_t_4);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_ensure_dirs, __pyx_t_7) < (0)) __PYX_ERR(0, 13, __pyx_L1_error)
+  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_ensure_dirs, __pyx_t_7) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":16
+  /* "omnibioai_model_registry/storage/localfs.py":26
  *         path.mkdir(parents=True, exist_ok=True)
  * 
  *     def exists(self, path: Path) -> bool:             # <<<<<<<<<<<<<<
  *         return path.exists()
  * 
 */
-  __pyx_t_7 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 16, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 26, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
-  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 16, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_bool) < (0)) __PYX_ERR(0, 16, __pyx_L1_error)
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_3exists, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_exists, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 16, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 26, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_bool) < (0)) __PYX_ERR(0, 26, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_3exists, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_exists, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 26, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_4, __pyx_t_7);
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_exists, __pyx_t_4) < (0)) __PYX_ERR(0, 16, __pyx_L1_error)
+  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_exists, __pyx_t_4) < (0)) __PYX_ERR(0, 26, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":19
+  /* "omnibioai_model_registry/storage/localfs.py":29
  *         return path.exists()
  * 
  *     def copy_tree(self, src_dir: Path, dst_dir: Path) -> None:             # <<<<<<<<<<<<<<
  *         # shutil.copytree requires dst doesn't exist
  *         shutil.copytree(src_dir, dst_dir)
 */
-  __pyx_t_4 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 29, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_src_dir, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 19, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_dst_dir, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 19, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 19, __pyx_L1_error)
-  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_5copy_tree, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_copy_tree, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 19, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_src_dir, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 29, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_dst_dir, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 29, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 29, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_5copy_tree, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_copy_tree, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 29, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_7);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_7, __pyx_t_4);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_copy_tree, __pyx_t_7) < (0)) __PYX_ERR(0, 19, __pyx_L1_error)
+  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_copy_tree, __pyx_t_7) < (0)) __PYX_ERR(0, 29, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":23
+  /* "omnibioai_model_registry/storage/localfs.py":33
  *         shutil.copytree(src_dir, dst_dir)
  * 
  *     def atomic_write_text(self, path: Path, text: str) -> None:             # <<<<<<<<<<<<<<
  *         path.parent.mkdir(parents=True, exist_ok=True)
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
 */
-  __pyx_t_7 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 23, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 33, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
-  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_text, __pyx_mstate_global->__pyx_n_u_str) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_7atomic_write_text, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_atomic_write_text, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 23, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 33, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_text, __pyx_mstate_global->__pyx_n_u_str) < (0)) __PYX_ERR(0, 33, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_7atomic_write_text, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_atomic_write_text, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 33, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_4, __pyx_t_7);
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_atomic_write_text, __pyx_t_4) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
+  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_atomic_write_text, __pyx_t_4) < (0)) __PYX_ERR(0, 33, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":37
+  /* "omnibioai_model_registry/storage/localfs.py":47
  *                 pass
  * 
  *     def write_once_text(self, path: Path, text: str) -> bool:             # <<<<<<<<<<<<<<
  *         """Exclusive create: write to a temp file in the same directory,
  *         then os.link() it into place. os.link() is atomic and raises
 */
-  __pyx_t_4 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 37, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 47, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 37, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_text, __pyx_mstate_global->__pyx_n_u_str) < (0)) __PYX_ERR(0, 37, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_bool) < (0)) __PYX_ERR(0, 37, __pyx_L1_error)
-  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_9write_once_text, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_write_once_text, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[4])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 37, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 47, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_text, __pyx_mstate_global->__pyx_n_u_str) < (0)) __PYX_ERR(0, 47, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_bool) < (0)) __PYX_ERR(0, 47, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7storage_7localfs_7LocalFS_9write_once_text, 0, __pyx_mstate_global->__pyx_n_u_LocalFS_write_once_text, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_storage_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[4])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 47, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_7);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_7, __pyx_t_4);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_write_once_text, __pyx_t_7) < (0)) __PYX_ERR(0, 37, __pyx_L1_error)
+  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_write_once_text, __pyx_t_7) < (0)) __PYX_ERR(0, 47, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-  /* "omnibioai_model_registry/storage/localfs.py":12
+  /* "omnibioai_model_registry/storage/localfs.py":22
  * 
  * 
  * class LocalFS(StorageBackend):             # <<<<<<<<<<<<<<
  *     def ensure_dirs(self, path: Path) -> None:
  *         path.mkdir(parents=True, exist_ok=True)
 */
-  __pyx_t_7 = __Pyx_Py3ClassCreate(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_LocalFS, __pyx_t_2, __pyx_t_6, NULL, 0, 0); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_Py3ClassCreate(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_LocalFS, __pyx_t_2, __pyx_t_6, NULL, 0, 0); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_7);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_LocalFS, __pyx_t_7) < (0)) __PYX_ERR(0, 12, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_LocalFS, __pyx_t_7) < (0)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
@@ -5779,8 +5780,8 @@ __Pyx_RefNannySetupContext("PyInit_localfs", 0);
 
   /* "omnibioai_model_registry/storage/localfs.py":1
  * # File: omnibioai_model_registry/storage/localfs.py             # <<<<<<<<<<<<<<
- * from __future__ import annotations
- * 
+ * """
+ * OmniBioAI omnibioai_model_registry.storage.localfs.
 */
   __pyx_t_2 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
@@ -5847,7 +5848,7 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
   CYTHON_UNUSED_VAR(__pyx_mstate);
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "omnibioai_model_registry/storage/localfs.py":14
+  /* "omnibioai_model_registry/storage/localfs.py":24
  * class LocalFS(StorageBackend):
  *     def ensure_dirs(self, path: Path) -> None:
  *         path.mkdir(parents=True, exist_ok=True)             # <<<<<<<<<<<<<<
@@ -5856,12 +5857,12 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
 */
   {
     PyObject* __pyx_temp[2] = {__pyx_mstate_global->__pyx_n_u_parents, __pyx_mstate_global->__pyx_n_u_exist_ok};
-    __pyx_mstate_global->__pyx_tuple[0] = __Pyx_PyTuple_FromArray(__pyx_temp, 2); if (unlikely(!__pyx_mstate_global->__pyx_tuple[0])) __PYX_ERR(0, 14, __pyx_L1_error)
+    __pyx_mstate_global->__pyx_tuple[0] = __Pyx_PyTuple_FromArray(__pyx_temp, 2); if (unlikely(!__pyx_mstate_global->__pyx_tuple[0])) __PYX_ERR(0, 24, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[0]);
   }
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[0]);
 
-  /* "omnibioai_model_registry/storage/localfs.py":25
+  /* "omnibioai_model_registry/storage/localfs.py":35
  *     def atomic_write_text(self, path: Path, text: str) -> None:
  *         path.parent.mkdir(parents=True, exist_ok=True)
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))             # <<<<<<<<<<<<<<
@@ -5870,12 +5871,12 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
 */
   {
     PyObject* __pyx_temp[2] = {__pyx_mstate_global->__pyx_n_u_prefix, __pyx_mstate_global->__pyx_n_u_dir};
-    __pyx_mstate_global->__pyx_tuple[1] = __Pyx_PyTuple_FromArray(__pyx_temp, 2); if (unlikely(!__pyx_mstate_global->__pyx_tuple[1])) __PYX_ERR(0, 25, __pyx_L1_error)
+    __pyx_mstate_global->__pyx_tuple[1] = __Pyx_PyTuple_FromArray(__pyx_temp, 2); if (unlikely(!__pyx_mstate_global->__pyx_tuple[1])) __PYX_ERR(0, 35, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[1]);
   }
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[1]);
 
-  /* "omnibioai_model_registry/storage/localfs.py":27
+  /* "omnibioai_model_registry/storage/localfs.py":37
  *         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
  *         try:
  *             with os.fdopen(fd, "w", encoding="utf-8") as f:             # <<<<<<<<<<<<<<
@@ -5884,13 +5885,13 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
 */
   {
     PyObject* __pyx_temp[1] = {__pyx_mstate_global->__pyx_n_u_encoding};
-    __pyx_mstate_global->__pyx_tuple[2] = __Pyx_PyTuple_FromArray(__pyx_temp, 1); if (unlikely(!__pyx_mstate_global->__pyx_tuple[2])) __PYX_ERR(0, 27, __pyx_L1_error)
+    __pyx_mstate_global->__pyx_tuple[2] = __Pyx_PyTuple_FromArray(__pyx_temp, 1); if (unlikely(!__pyx_mstate_global->__pyx_tuple[2])) __PYX_ERR(0, 37, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[2]);
   }
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[2]);
   {
     PyObject* __pyx_temp[3] = {Py_None, Py_None, Py_None};
-    __pyx_mstate_global->__pyx_tuple[3] = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_mstate_global->__pyx_tuple[3])) __PYX_ERR(0, 27, __pyx_L1_error)
+    __pyx_mstate_global->__pyx_tuple[3] = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_mstate_global->__pyx_tuple[3])) __PYX_ERR(0, 37, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[3]);
   }
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[3]);
@@ -6047,27 +6048,27 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
   PyObject* tuple_dedup_map = PyDict_New();
   if (unlikely(!tuple_dedup_map)) return -1;
   {
-    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 2, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 13};
+    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 2, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 23};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_path};
     __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_storage_3, __pyx_mstate->__pyx_n_u_ensure_dirs, __pyx_mstate->__pyx_kp_b_iso88591_F_86, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 2, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 16};
+    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 2, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 26};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_path};
     __pyx_mstate_global->__pyx_codeobj_tab[1] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_storage_3, __pyx_mstate->__pyx_n_u_exists, __pyx_mstate->__pyx_kp_b_iso88591_9A_t7, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[1])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 19};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 29};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_src_dir, __pyx_mstate->__pyx_n_u_dst_dir};
     __pyx_mstate_global->__pyx_codeobj_tab[2] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_storage_3, __pyx_mstate->__pyx_n_u_copy_tree, __pyx_mstate->__pyx_kp_b_iso88591_iq, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[2])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 23};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 33};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_path, __pyx_mstate->__pyx_n_u_text, __pyx_mstate->__pyx_n_u_fd, __pyx_mstate->__pyx_n_u_tmp, __pyx_mstate->__pyx_n_u_f};
     __pyx_mstate_global->__pyx_codeobj_tab[3] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_storage_3, __pyx_mstate->__pyx_n_u_atomic_write_text, __pyx_mstate->__pyx_kp_b_iso88591_l_G6_F_7_fBe4s_4q_7_4uI_q_hauA, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[3])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 37};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 47};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_path, __pyx_mstate->__pyx_n_u_text, __pyx_mstate->__pyx_n_u_fd, __pyx_mstate->__pyx_n_u_tmp, __pyx_mstate->__pyx_n_u_f};
     __pyx_mstate_global->__pyx_codeobj_tab[4] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_storage_3, __pyx_mstate->__pyx_n_u_write_once_text, __pyx_mstate->__pyx_kp_b_iso88591_L_G6_F_7_fBe4s_4q_7_4uI_q_q_Q_q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[4])) goto bad;
   }

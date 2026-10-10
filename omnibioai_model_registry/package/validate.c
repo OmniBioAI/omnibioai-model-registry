@@ -2488,6 +2488,7 @@ int __pyx_module_is_main_omnibioai_model_registry__package__validate = 0;
 /* Implementation of "omnibioai_model_registry.package.validate" */
 /* #### Code section: global_var ### */
 /* #### Code section: string_decls ### */
+static const char __pyx_k_OmniBioAI_omnibioai_model_regis[] = "\nOmniBioAI omnibioai_model_registry.package.validate.\n\nPurpose:\n    Defines validate_package_files for omnibioai_model_registry.package.validate.\n\nAuthor:\n    Manish Kumar <manish@omnibioai.org>\n";
 /* #### Code section: decls ### */
 static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate_package_files(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_version_dir); /* proto */
 /* #### Code section: late_includes ### */
@@ -2657,7 +2658,7 @@ return 0;
 #endif
 /* #### Code section: module_code ### */
 
-/* "omnibioai_model_registry/package/validate.py":10
+/* "omnibioai_model_registry/package/validate.py":20
  * 
  * 
  * def validate_package_files(version_dir: Path) -> None:             # <<<<<<<<<<<<<<
@@ -2704,32 +2705,32 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_version_dir,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 10, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 20, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 10, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 20, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "validate_package_files", 0) < (0)) __PYX_ERR(0, 10, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "validate_package_files", 0) < (0)) __PYX_ERR(0, 20, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("validate_package_files", 1, 1, 1, i); __PYX_ERR(0, 10, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("validate_package_files", 1, 1, 1, i); __PYX_ERR(0, 20, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 1)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 10, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 20, __pyx_L3_error)
     }
     __pyx_v_version_dir = values[0];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("validate_package_files", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 10, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("validate_package_files", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 20, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -2773,7 +2774,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("validate_package_files", 0);
 
-  /* "omnibioai_model_registry/package/validate.py":11
+  /* "omnibioai_model_registry/package/validate.py":21
  * 
  * def validate_package_files(version_dir: Path) -> None:
  *     missing = [f for f in REQUIRED_FILES if not (version_dir / f).exists()]             # <<<<<<<<<<<<<<
@@ -2781,18 +2782,18 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
  *         raise ValidationError(
 */
   { /* enter inner scope */
-    __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 11, __pyx_L5_error)
+    __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 21, __pyx_L5_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_REQUIRED_FILES); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 11, __pyx_L5_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_REQUIRED_FILES); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 21, __pyx_L5_error)
     __Pyx_GOTREF(__pyx_t_2);
     if (likely(PyList_CheckExact(__pyx_t_2)) || PyTuple_CheckExact(__pyx_t_2)) {
       __pyx_t_3 = __pyx_t_2; __Pyx_INCREF(__pyx_t_3);
       __pyx_t_4 = 0;
       __pyx_t_5 = NULL;
     } else {
-      __pyx_t_4 = -1; __pyx_t_3 = PyObject_GetIter(__pyx_t_2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 11, __pyx_L5_error)
+      __pyx_t_4 = -1; __pyx_t_3 = PyObject_GetIter(__pyx_t_2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 21, __pyx_L5_error)
       __Pyx_GOTREF(__pyx_t_3);
-      __pyx_t_5 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_3); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 11, __pyx_L5_error)
+      __pyx_t_5 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_3); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 21, __pyx_L5_error)
     }
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     for (;;) {
@@ -2801,7 +2802,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
           {
             Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_3);
             #if !CYTHON_ASSUME_SAFE_SIZE
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 11, __pyx_L5_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 21, __pyx_L5_error)
             #endif
             if (__pyx_t_4 >= __pyx_temp) break;
           }
@@ -2811,7 +2812,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
           {
             Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_3);
             #if !CYTHON_ASSUME_SAFE_SIZE
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 11, __pyx_L5_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 21, __pyx_L5_error)
             #endif
             if (__pyx_t_4 >= __pyx_temp) break;
           }
@@ -2822,13 +2823,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
           #endif
           ++__pyx_t_4;
         }
-        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 11, __pyx_L5_error)
+        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 21, __pyx_L5_error)
       } else {
         __pyx_t_2 = __pyx_t_5(__pyx_t_3);
         if (unlikely(!__pyx_t_2)) {
           PyObject* exc_type = PyErr_Occurred();
           if (exc_type) {
-            if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 11, __pyx_L5_error)
+            if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 21, __pyx_L5_error)
             PyErr_Clear();
           }
           break;
@@ -2837,7 +2838,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
       __Pyx_GOTREF(__pyx_t_2);
       __Pyx_XDECREF_SET(__pyx_7genexpr__pyx_v_f, __pyx_t_2);
       __pyx_t_2 = 0;
-      __pyx_t_7 = __Pyx_PyNumber_Divide(__pyx_v_version_dir, __pyx_7genexpr__pyx_v_f); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 11, __pyx_L5_error)
+      __pyx_t_7 = __Pyx_PyNumber_Divide(__pyx_v_version_dir, __pyx_7genexpr__pyx_v_f); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 21, __pyx_L5_error)
       __Pyx_GOTREF(__pyx_t_7);
       __pyx_t_6 = __pyx_t_7;
       __Pyx_INCREF(__pyx_t_6);
@@ -2847,17 +2848,17 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
         __pyx_t_2 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_8, (1-__pyx_t_8) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
         __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
         __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 11, __pyx_L5_error)
+        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 21, __pyx_L5_error)
         __Pyx_GOTREF(__pyx_t_2);
       }
-      __pyx_t_9 = __Pyx_PyObject_IsTrue(__pyx_t_2); if (unlikely((__pyx_t_9 < 0))) __PYX_ERR(0, 11, __pyx_L5_error)
+      __pyx_t_9 = __Pyx_PyObject_IsTrue(__pyx_t_2); if (unlikely((__pyx_t_9 < 0))) __PYX_ERR(0, 21, __pyx_L5_error)
       __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
       __pyx_t_10 = (!__pyx_t_9);
 
 
       if (__pyx_t_10) {
 
-        if (unlikely(__Pyx_ListComp_Append(__pyx_t_1, __pyx_7genexpr__pyx_v_f))) __PYX_ERR(0, 11, __pyx_L5_error)
+        if (unlikely(__Pyx_ListComp_Append(__pyx_t_1, __pyx_7genexpr__pyx_v_f))) __PYX_ERR(0, 21, __pyx_L5_error)
       }
     }
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
@@ -2871,7 +2872,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
   __pyx_v_missing = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/package/validate.py":12
+  /* "omnibioai_model_registry/package/validate.py":22
  * def validate_package_files(version_dir: Path) -> None:
  *     missing = [f for f in REQUIRED_FILES if not (version_dir / f).exists()]
  *     if missing:             # <<<<<<<<<<<<<<
@@ -2880,14 +2881,14 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
 */
   {
     Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_v_missing);
-    if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 12, __pyx_L1_error)
+    if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 22, __pyx_L1_error)
     __pyx_t_10 = (__pyx_temp != 0);
   }
 
   if (unlikely(__pyx_t_10)) {
 
 
-    /* "omnibioai_model_registry/package/validate.py":13
+    /* "omnibioai_model_registry/package/validate.py":23
  *     missing = [f for f in REQUIRED_FILES if not (version_dir / f).exists()]
  *     if missing:
  *         raise ValidationError(             # <<<<<<<<<<<<<<
@@ -2895,18 +2896,18 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
  *         )
 */
     __pyx_t_3 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_ValidationError); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 13, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_ValidationError); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 23, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
 
-    /* "omnibioai_model_registry/package/validate.py":14
+    /* "omnibioai_model_registry/package/validate.py":24
  *     if missing:
  *         raise ValidationError(
  *             f"Model package missing required files: {missing}. In: {version_dir}"             # <<<<<<<<<<<<<<
  *         )
 */
-    __pyx_t_7 = __Pyx_PyObject_FormatSimple(__pyx_v_missing, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 14, __pyx_L1_error)
+    __pyx_t_7 = __Pyx_PyObject_FormatSimple(__pyx_v_missing, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 24, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_7);
-    __pyx_t_6 = __Pyx_PyObject_FormatSimple(__pyx_v_version_dir, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 14, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyObject_FormatSimple(__pyx_v_version_dir, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 24, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
     __pyx_t_11[0] = __pyx_mstate_global->__pyx_kp_u_Model_package_missing_required_f;
     __pyx_t_11[1] = __pyx_t_7;
@@ -2921,7 +2922,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
     __pyx_t_12 |= __Pyx_PyUnicode_KIND_04(__pyx_t_11[1]) | __Pyx_PyUnicode_KIND_04(__pyx_t_11[3]);
     #endif
     __pyx_t_13 = __Pyx_PyUnicode_Join(__pyx_t_11, 4, __pyx_t_4, __pyx_t_12);
-    if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 14, __pyx_L1_error)
+    if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 24, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_13);
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
@@ -2943,14 +2944,14 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
       __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
       __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
       __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 13, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 23, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
     __Pyx_Raise(__pyx_t_1, 0, 0, 0);
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __PYX_ERR(0, 13, __pyx_L1_error)
+    __PYX_ERR(0, 23, __pyx_L1_error)
 
-    /* "omnibioai_model_registry/package/validate.py":12
+    /* "omnibioai_model_registry/package/validate.py":22
  * def validate_package_files(version_dir: Path) -> None:
  *     missing = [f for f in REQUIRED_FILES if not (version_dir / f).exists()]
  *     if missing:             # <<<<<<<<<<<<<<
@@ -2959,7 +2960,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8validate_validate
 */
   }
 
-  /* "omnibioai_model_registry/package/validate.py":10
+  /* "omnibioai_model_registry/package/validate.py":20
  * 
  * 
  * def validate_package_files(version_dir: Path) -> None:             # <<<<<<<<<<<<<<
@@ -3085,7 +3086,7 @@ namespace {
   {
       PyModuleDef_HEAD_INIT,
       "validate",
-      0, /* m_doc */
+      __pyx_k_OmniBioAI_omnibioai_model_regis, /* m_doc */
     #if CYTHON_USE_MODULE_STATE
       sizeof(__pyx_mstatetype), /* m_size */
     #else
@@ -3334,7 +3335,7 @@ __Pyx_RefNannySetupContext("PyInit_validate", 0);
   if (__Pyx_InitAfterSharedUtility() < (0)) __PYX_ERR(0, 1, __pyx_L1_error)
   /*--- Execution code ---*/
 
-  /* "omnibioai_model_registry/package/validate.py":4
+  /* "omnibioai_model_registry/package/validate.py":14
  * from __future__ import annotations
  * 
  * from pathlib import Path             # <<<<<<<<<<<<<<
@@ -3343,22 +3344,22 @@ __Pyx_RefNannySetupContext("PyInit_validate", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Path};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_pathlib, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_pathlib, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 14, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Path};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 4, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 14, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 4, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 14, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/package/validate.py":6
+  /* "omnibioai_model_registry/package/validate.py":16
  * from pathlib import Path
  * 
  * from ..errors import ValidationError             # <<<<<<<<<<<<<<
@@ -3367,22 +3368,22 @@ __Pyx_RefNannySetupContext("PyInit_validate", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_ValidationError};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_errors, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_omnibioai_model_registry_errors, 2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 6, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_errors, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_omnibioai_model_registry_errors, 2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 16, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_ValidationError};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 6, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 16, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 6, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 16, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/package/validate.py":7
+  /* "omnibioai_model_registry/package/validate.py":17
  * 
  * from ..errors import ValidationError
  * from .layout import REQUIRED_FILES             # <<<<<<<<<<<<<<
@@ -3391,46 +3392,46 @@ __Pyx_RefNannySetupContext("PyInit_validate", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_REQUIRED_FILES};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_layout, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_omnibioai_model_registry_package, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 7, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_layout, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_omnibioai_model_registry_package, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 17, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_REQUIRED_FILES};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 7, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 17, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 7, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 17, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/package/validate.py":10
+  /* "omnibioai_model_registry/package/validate.py":20
  * 
  * 
  * def validate_package_files(version_dir: Path) -> None:             # <<<<<<<<<<<<<<
  *     missing = [f for f in REQUIRED_FILES if not (version_dir / f).exists()]
  *     if missing:
 */
-  __pyx_t_2 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 10, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 20, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_version_dir, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 10, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 10, __pyx_L1_error)
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8validate_1validate_package_files, 0, __pyx_mstate_global->__pyx_n_u_validate_package_files, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 10, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_version_dir, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 20, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 20, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8validate_1validate_package_files, 0, __pyx_mstate_global->__pyx_n_u_validate_package_files, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 20, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_4, __pyx_t_2);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_validate_package_files, __pyx_t_4) < (0)) __PYX_ERR(0, 10, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_validate_package_files, __pyx_t_4) < (0)) __PYX_ERR(0, 20, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
   /* "omnibioai_model_registry/package/validate.py":1
  * # File: omnibioai_model_registry/package/validate.py             # <<<<<<<<<<<<<<
- * from __future__ import annotations
- * 
+ * """
+ * OmniBioAI omnibioai_model_registry.package.validate.
 */
   __pyx_t_4 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
@@ -3573,7 +3574,7 @@ typedef struct {
     unsigned int num_kwonly_args : 1;
     unsigned int nlocals : 2;
     unsigned int flags : 10;
-    unsigned int first_line : 4;
+    unsigned int first_line : 5;
 } __Pyx_PyCode_New_function_description;
 #ifdef __cplusplus
 } /* anonymous namespace */
@@ -3593,7 +3594,7 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
   PyObject* tuple_dedup_map = PyDict_New();
   if (unlikely(!tuple_dedup_map)) return -1;
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 10};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 20};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_version_dir, __pyx_mstate->__pyx_n_u_missing, __pyx_mstate->__pyx_n_u_f};
     __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_package_3, __pyx_mstate->__pyx_n_u_validate_package_files, __pyx_mstate->__pyx_kp_b_iso88591_ar_U_E_Rr_q_oQ_4A_1A, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
   }

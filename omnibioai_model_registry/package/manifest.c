@@ -2700,6 +2700,7 @@ int __pyx_module_is_main_omnibioai_model_registry__package__manifest = 0;
 /* Implementation of "omnibioai_model_registry.package.manifest" */
 /* #### Code section: global_var ### */
 /* #### Code section: string_decls ### */
+static const char __pyx_k_OmniBioAI_omnibioai_model_regis[] = "\nOmniBioAI omnibioai_model_registry.package.manifest.\n\nPurpose:\n    Defines sha256_file, write_sha256_manifest, read_sha256_manifest and verify_sha256_manifest for omnibioai_model_registry.package.manifest.\n\nAuthor:\n    Manish Kumar <manish@omnibioai.org>\n";
 /* #### Code section: decls ### */
 static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_file(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_path, PyObject *__pyx_v_chunk_size); /* proto */
 static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_sha256_manifest(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_dir_path, PyObject *__pyx_v_manifest_path, PyObject *__pyx_v_include_files); /* proto */
@@ -2933,7 +2934,7 @@ return 0;
 #endif
 /* #### Code section: module_code ### */
 
-/* "omnibioai_model_registry/package/manifest.py":11
+/* "omnibioai_model_registry/package/manifest.py":21
  * 
  * 
  * def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:             # <<<<<<<<<<<<<<
@@ -2981,47 +2982,47 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_path,&__pyx_mstate_global->__pyx_n_u_chunk_size,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 11, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 21, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 11, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 21, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 11, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 21, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "sha256_file", 0) < (0)) __PYX_ERR(0, 11, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "sha256_file", 0) < (0)) __PYX_ERR(0, 21, __pyx_L3_error)
       if (!values[1]) values[1] = __Pyx_NewRef(((PyObject*)((PyObject*)__pyx_mstate_global->__pyx_int_1048576)));
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("sha256_file", 0, 1, 2, i); __PYX_ERR(0, 11, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("sha256_file", 0, 1, 2, i); __PYX_ERR(0, 21, __pyx_L3_error) }
       }
     } else {
       switch (__pyx_nargs) {
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 11, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 21, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 11, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 21, __pyx_L3_error)
         break;
         default: goto __pyx_L5_argtuple_error;
       }
       if (!values[1]) values[1] = __Pyx_NewRef(((PyObject*)((PyObject*)__pyx_mstate_global->__pyx_int_1048576)));
     }
     __pyx_v_path = values[0];
-    if (__Pyx_PyInt_FromNumber(&values[1], "chunk_size", 0) < (0)) __PYX_ERR(0, 11, __pyx_L3_error)
+    if (__Pyx_PyInt_FromNumber(&values[1], "chunk_size", 0) < (0)) __PYX_ERR(0, 21, __pyx_L3_error)
     __pyx_v_chunk_size = ((PyObject*)values[1]);
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("sha256_file", 0, 1, 2, __pyx_nargs); __PYX_ERR(0, 11, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("sha256_file", 0, 1, 2, __pyx_nargs); __PYX_ERR(0, 21, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3032,7 +3033,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_chunk_size), (&PyLong_Type), 0, "chunk_size", 2))) __PYX_ERR(0, 11, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_chunk_size), (&PyLong_Type), 0, "chunk_size", 2))) __PYX_ERR(0, 21, __pyx_L1_error)
   __pyx_r = __pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_file(__pyx_self, __pyx_v_path, __pyx_v_chunk_size);
 
   /* function exit code */
@@ -3075,7 +3076,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("sha256_file", 0);
 
-  /* "omnibioai_model_registry/package/manifest.py":12
+  /* "omnibioai_model_registry/package/manifest.py":22
  * 
  * def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
  *     h = hashlib.sha256()             # <<<<<<<<<<<<<<
@@ -3083,9 +3084,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
  *         while True:
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_hashlib); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_hashlib); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_sha256); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_sha256); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_t_5 = 1;
@@ -3105,13 +3106,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
     __pyx_t_1 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_5, (1-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 12, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 22, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_h = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":13
+  /* "omnibioai_model_registry/package/manifest.py":23
  * def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
  *     h = hashlib.sha256()
  *     with path.open("rb") as f:             # <<<<<<<<<<<<<<
@@ -3126,13 +3127,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
       PyObject *__pyx_callargs[2] = {__pyx_t_4, __pyx_mstate_global->__pyx_n_u_rb};
       __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_open, __pyx_callargs+__pyx_t_5, (2-__pyx_t_5) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 13, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 23, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
-    __pyx_t_6 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_exit); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 13, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_exit); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 23, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
     __pyx_t_2 = NULL;
-    __pyx_t_3 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_enter); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 13, __pyx_L3_error)
+    __pyx_t_3 = __Pyx_PyObject_LookupSpecial(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_enter); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 23, __pyx_L3_error)
     __Pyx_GOTREF(__pyx_t_3);
     __pyx_t_5 = 1;
     #if CYTHON_UNPACK_METHODS
@@ -3151,7 +3152,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
       __pyx_t_4 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_3, __pyx_callargs+__pyx_t_5, (1-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-      if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 13, __pyx_L3_error)
+      if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 23, __pyx_L3_error)
       __Pyx_GOTREF(__pyx_t_4);
     }
     __pyx_t_3 = __pyx_t_4;
@@ -3169,7 +3170,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
           __pyx_v_f = __pyx_t_3;
           __pyx_t_3 = 0;
 
-          /* "omnibioai_model_registry/package/manifest.py":14
+          /* "omnibioai_model_registry/package/manifest.py":24
  *     h = hashlib.sha256()
  *     with path.open("rb") as f:
  *         while True:             # <<<<<<<<<<<<<<
@@ -3178,7 +3179,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
 */
           while (1) {
 
-            /* "omnibioai_model_registry/package/manifest.py":15
+            /* "omnibioai_model_registry/package/manifest.py":25
  *     with path.open("rb") as f:
  *         while True:
  *             b = f.read(chunk_size)             # <<<<<<<<<<<<<<
@@ -3192,27 +3193,27 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
               PyObject *__pyx_callargs[2] = {__pyx_t_1, __pyx_v_chunk_size};
               __pyx_t_3 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_read, __pyx_callargs+__pyx_t_5, (2-__pyx_t_5) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
               __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
-              if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 15, __pyx_L7_error)
+              if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 25, __pyx_L7_error)
               __Pyx_GOTREF(__pyx_t_3);
             }
             __Pyx_XDECREF_SET(__pyx_v_b, __pyx_t_3);
             __pyx_t_3 = 0;
 
-            /* "omnibioai_model_registry/package/manifest.py":16
+            /* "omnibioai_model_registry/package/manifest.py":26
  *         while True:
  *             b = f.read(chunk_size)
  *             if not b:             # <<<<<<<<<<<<<<
  *                 break
  *             h.update(b)
 */
-            __pyx_t_10 = __Pyx_PyObject_IsTrue(__pyx_v_b); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 16, __pyx_L7_error)
+            __pyx_t_10 = __Pyx_PyObject_IsTrue(__pyx_v_b); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 26, __pyx_L7_error)
             __pyx_t_11 = (!__pyx_t_10);
 
 
             if (__pyx_t_11) {
 
 
-              /* "omnibioai_model_registry/package/manifest.py":17
+              /* "omnibioai_model_registry/package/manifest.py":27
  *             b = f.read(chunk_size)
  *             if not b:
  *                 break             # <<<<<<<<<<<<<<
@@ -3221,7 +3222,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
 */
               goto __pyx_L14_break;
 
-              /* "omnibioai_model_registry/package/manifest.py":16
+              /* "omnibioai_model_registry/package/manifest.py":26
  *         while True:
  *             b = f.read(chunk_size)
  *             if not b:             # <<<<<<<<<<<<<<
@@ -3230,7 +3231,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
 */
             }
 
-            /* "omnibioai_model_registry/package/manifest.py":18
+            /* "omnibioai_model_registry/package/manifest.py":28
  *             if not b:
  *                 break
  *             h.update(b)             # <<<<<<<<<<<<<<
@@ -3244,14 +3245,14 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
               PyObject *__pyx_callargs[2] = {__pyx_t_1, __pyx_v_b};
               __pyx_t_3 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_update, __pyx_callargs+__pyx_t_5, (2-__pyx_t_5) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
               __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
-              if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 18, __pyx_L7_error)
+              if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 28, __pyx_L7_error)
               __Pyx_GOTREF(__pyx_t_3);
             }
             __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
           }
           __pyx_L14_break:;
 
-          /* "omnibioai_model_registry/package/manifest.py":13
+          /* "omnibioai_model_registry/package/manifest.py":23
  * def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
  *     h = hashlib.sha256()
  *     with path.open("rb") as f:             # <<<<<<<<<<<<<<
@@ -3270,23 +3271,23 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
         __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
         /*except:*/ {
           __Pyx_AddTraceback("omnibioai_model_registry.package.manifest.sha256_file", __pyx_clineno, __pyx_lineno, __pyx_filename);
-          if (__Pyx_GetException(&__pyx_t_3, &__pyx_t_1, &__pyx_t_4) < 0) __PYX_ERR(0, 13, __pyx_L9_except_error)
+          if (__Pyx_GetException(&__pyx_t_3, &__pyx_t_1, &__pyx_t_4) < 0) __PYX_ERR(0, 23, __pyx_L9_except_error)
           __Pyx_XGOTREF(__pyx_t_3);
           __Pyx_XGOTREF(__pyx_t_1);
           __Pyx_XGOTREF(__pyx_t_4);
           {
             PyObject* __pyx_temp[3] = {__pyx_t_3, __pyx_t_1, __pyx_t_4};
-            __pyx_t_2 = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 13, __pyx_L9_except_error)
+            __pyx_t_2 = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 23, __pyx_L9_except_error)
             __Pyx_GOTREF(__pyx_t_2);
           }
           __pyx_t_12 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_t_2, NULL);
           __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
           __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-          if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 13, __pyx_L9_except_error)
+          if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 23, __pyx_L9_except_error)
           __Pyx_GOTREF(__pyx_t_12);
           __pyx_t_11 = __Pyx_PyObject_IsTrue(__pyx_t_12);
           __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
-          if (__pyx_t_11 < (0)) __PYX_ERR(0, 13, __pyx_L9_except_error)
+          if (__pyx_t_11 < (0)) __PYX_ERR(0, 23, __pyx_L9_except_error)
           __pyx_t_10 = (!__pyx_t_11);
 
 
@@ -3297,7 +3298,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
             __Pyx_XGIVEREF(__pyx_t_4);
             __Pyx_ErrRestoreWithState(__pyx_t_3, __pyx_t_1, __pyx_t_4);
             __pyx_t_3 = 0;  __pyx_t_1 = 0;  __pyx_t_4 = 0; 
-            __PYX_ERR(0, 13, __pyx_L9_except_error)
+            __PYX_ERR(0, 23, __pyx_L9_except_error)
           }
           __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
           __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -3323,7 +3324,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
         if (__pyx_t_6) {
           __pyx_t_9 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_mstate_global->__pyx_tuple[0], NULL);
           __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-          if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 13, __pyx_L1_error)
+          if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 23, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_9);
           __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
         }
@@ -3338,7 +3339,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
     __pyx_L19:;
   }
 
-  /* "omnibioai_model_registry/package/manifest.py":19
+  /* "omnibioai_model_registry/package/manifest.py":29
  *                 break
  *             h.update(b)
  *     return h.hexdigest()             # <<<<<<<<<<<<<<
@@ -3352,10 +3353,10 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
     PyObject *__pyx_callargs[2] = {__pyx_t_1, NULL};
     __pyx_t_4 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_hexdigest, __pyx_callargs+__pyx_t_5, (1-__pyx_t_5) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
-    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 19, __pyx_L1_error)
+    if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 29, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
   }
-  if (!(likely(PyUnicode_CheckExact(__pyx_t_4))||((__pyx_t_4) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_4))) __PYX_ERR(0, 19, __pyx_L1_error)
+  if (!(likely(PyUnicode_CheckExact(__pyx_t_4))||((__pyx_t_4) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_4))) __PYX_ERR(0, 29, __pyx_L1_error)
   {
     PyObject *__pyx_temp;
     {
@@ -3367,7 +3368,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
   __pyx_t_4 = 0;
   goto __pyx_L0;
 
-  /* "omnibioai_model_registry/package/manifest.py":11
+  /* "omnibioai_model_registry/package/manifest.py":21
  * 
  * 
  * def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:             # <<<<<<<<<<<<<<
@@ -3392,7 +3393,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_sha256_f
   return __pyx_r;
 }
 
-/* "omnibioai_model_registry/package/manifest.py":22
+/* "omnibioai_model_registry/package/manifest.py":32
  * 
  * 
  * def write_sha256_manifest(             # <<<<<<<<<<<<<<
@@ -3442,38 +3443,38 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_dir_path,&__pyx_mstate_global->__pyx_n_u_manifest_path,&__pyx_mstate_global->__pyx_n_u_include_files,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 22, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 32, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 22, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 32, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 22, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 32, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 22, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 32, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "write_sha256_manifest", 0) < (0)) __PYX_ERR(0, 22, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "write_sha256_manifest", 0) < (0)) __PYX_ERR(0, 32, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("write_sha256_manifest", 1, 3, 3, i); __PYX_ERR(0, 22, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("write_sha256_manifest", 1, 3, 3, i); __PYX_ERR(0, 32, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 22, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 32, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 22, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 32, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 22, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 32, __pyx_L3_error)
     }
     __pyx_v_dir_path = values[0];
     __pyx_v_manifest_path = values[1];
@@ -3481,7 +3482,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("write_sha256_manifest", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 22, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("write_sha256_manifest", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 32, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3492,7 +3493,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_include_files), (&PyList_Type), 0, "include_files", 2))) __PYX_ERR(0, 23, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_include_files), (&PyList_Type), 0, "include_files", 2))) __PYX_ERR(0, 33, __pyx_L1_error)
   __pyx_r = __pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_sha256_manifest(__pyx_self, __pyx_v_dir_path, __pyx_v_manifest_path, __pyx_v_include_files);
 
   /* function exit code */
@@ -3539,31 +3540,31 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("write_sha256_manifest", 0);
 
-  /* "omnibioai_model_registry/package/manifest.py":31
+  /* "omnibioai_model_registry/package/manifest.py":41
  *     NOTE: We never hash the manifest file itself (sha256sums.txt) to avoid self-referential mismatch.
  *     """
  *     hashes: Dict[str, str] = {}             # <<<<<<<<<<<<<<
  *     lines = []
  *     manifest_name = Path(manifest_path).name  # usually "sha256sums.txt"
 */
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 31, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 41, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_hashes = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":32
+  /* "omnibioai_model_registry/package/manifest.py":42
  *     """
  *     hashes: Dict[str, str] = {}
  *     lines = []             # <<<<<<<<<<<<<<
  *     manifest_name = Path(manifest_path).name  # usually "sha256sums.txt"
  * 
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 42, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_lines = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":33
+  /* "omnibioai_model_registry/package/manifest.py":43
  *     hashes: Dict[str, str] = {}
  *     lines = []
  *     manifest_name = Path(manifest_path).name  # usually "sha256sums.txt"             # <<<<<<<<<<<<<<
@@ -3571,7 +3572,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
  *     for name in include_files:
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_Path); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_Path); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 43, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __pyx_t_4 = 1;
   #if CYTHON_UNPACK_METHODS
@@ -3590,16 +3591,16 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
     __pyx_t_1 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_3, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 43, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_name); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_name); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 43, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_v_manifest_name = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":35
+  /* "omnibioai_model_registry/package/manifest.py":45
  *     manifest_name = Path(manifest_path).name  # usually "sha256sums.txt"
  * 
  *     for name in include_files:             # <<<<<<<<<<<<<<
@@ -3612,30 +3613,30 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
     {
       Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_3);
       #if !CYTHON_ASSUME_SAFE_SIZE
-      if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 35, __pyx_L1_error)
+      if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 45, __pyx_L1_error)
       #endif
       if (__pyx_t_5 >= __pyx_temp) break;
     }
     __pyx_t_1 = __Pyx_PyList_GET_ITEM_REF(__pyx_t_3, __pyx_t_5, __Pyx_ReferenceSharing_OwnStrongReference);
     ++__pyx_t_5;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 35, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 45, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    if (!(likely(PyUnicode_CheckExact(__pyx_t_1))||((__pyx_t_1) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_1))) __PYX_ERR(0, 35, __pyx_L1_error)
+    if (!(likely(PyUnicode_CheckExact(__pyx_t_1))||((__pyx_t_1) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_1))) __PYX_ERR(0, 45, __pyx_L1_error)
     __Pyx_XDECREF_SET(__pyx_v_name, ((PyObject*)__pyx_t_1));
     __pyx_t_1 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":37
+    /* "omnibioai_model_registry/package/manifest.py":47
  *     for name in include_files:
  *         # Never include the manifest itself
  *         if name == manifest_name:             # <<<<<<<<<<<<<<
  *             continue
  * 
 */
-    __pyx_t_6 = __Pyx_PyObject_CompareBoolEq_str_object(__pyx_v_name, __pyx_v_manifest_name, Py_EQ); if (unlikely((__pyx_t_6 < 0))) __PYX_ERR(0, 37, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyObject_CompareBoolEq_str_object(__pyx_v_name, __pyx_v_manifest_name, Py_EQ); if (unlikely((__pyx_t_6 < 0))) __PYX_ERR(0, 47, __pyx_L1_error)
     if (__pyx_t_6) {
 
 
-      /* "omnibioai_model_registry/package/manifest.py":38
+      /* "omnibioai_model_registry/package/manifest.py":48
  *         # Never include the manifest itself
  *         if name == manifest_name:
  *             continue             # <<<<<<<<<<<<<<
@@ -3644,7 +3645,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
 */
       goto __pyx_L3_continue;
 
-      /* "omnibioai_model_registry/package/manifest.py":37
+      /* "omnibioai_model_registry/package/manifest.py":47
  *     for name in include_files:
  *         # Never include the manifest itself
  *         if name == manifest_name:             # <<<<<<<<<<<<<<
@@ -3653,19 +3654,19 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
 */
     }
 
-    /* "omnibioai_model_registry/package/manifest.py":40
+    /* "omnibioai_model_registry/package/manifest.py":50
  *             continue
  * 
  *         p = dir_path / name             # <<<<<<<<<<<<<<
  *         if not p.exists():
  *             continue
 */
-    __pyx_t_1 = __Pyx_PyNumber_Divide(__pyx_v_dir_path, __pyx_v_name); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 40, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyNumber_Divide(__pyx_v_dir_path, __pyx_v_name); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 50, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
     __Pyx_XDECREF_SET(__pyx_v_p, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":41
+    /* "omnibioai_model_registry/package/manifest.py":51
  * 
  *         p = dir_path / name
  *         if not p.exists():             # <<<<<<<<<<<<<<
@@ -3679,10 +3680,10 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
       PyObject *__pyx_callargs[2] = {__pyx_t_2, NULL};
       __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_4, (1-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 41, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 51, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
-    __pyx_t_6 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely((__pyx_t_6 < 0))) __PYX_ERR(0, 41, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely((__pyx_t_6 < 0))) __PYX_ERR(0, 51, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __pyx_t_7 = (!__pyx_t_6);
 
@@ -3690,7 +3691,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
     if (__pyx_t_7) {
 
 
-      /* "omnibioai_model_registry/package/manifest.py":42
+      /* "omnibioai_model_registry/package/manifest.py":52
  *         p = dir_path / name
  *         if not p.exists():
  *             continue             # <<<<<<<<<<<<<<
@@ -3699,7 +3700,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
 */
       goto __pyx_L3_continue;
 
-      /* "omnibioai_model_registry/package/manifest.py":41
+      /* "omnibioai_model_registry/package/manifest.py":51
  * 
  *         p = dir_path / name
  *         if not p.exists():             # <<<<<<<<<<<<<<
@@ -3708,7 +3709,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
 */
     }
 
-    /* "omnibioai_model_registry/package/manifest.py":43
+    /* "omnibioai_model_registry/package/manifest.py":53
  *         if not p.exists():
  *             continue
  *         digest = sha256_file(p)             # <<<<<<<<<<<<<<
@@ -3716,7 +3717,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
  *         lines.append(f"{digest}  {name}")
 */
     __pyx_t_2 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_sha256_file); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 43, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_mstate_global->__pyx_n_u_sha256_file); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 53, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
     __pyx_t_4 = 1;
     #if CYTHON_UNPACK_METHODS
@@ -3735,31 +3736,31 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
       __pyx_t_1 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_8, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 43, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 53, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
     __Pyx_XDECREF_SET(__pyx_v_digest, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":44
+    /* "omnibioai_model_registry/package/manifest.py":54
  *             continue
  *         digest = sha256_file(p)
  *         hashes[name] = digest             # <<<<<<<<<<<<<<
  *         lines.append(f"{digest}  {name}")
  * 
 */
-    if (unlikely((PyDict_SetItem(__pyx_v_hashes, __pyx_v_name, __pyx_v_digest) < 0))) __PYX_ERR(0, 44, __pyx_L1_error)
+    if (unlikely((PyDict_SetItem(__pyx_v_hashes, __pyx_v_name, __pyx_v_digest) < 0))) __PYX_ERR(0, 54, __pyx_L1_error)
 
-    /* "omnibioai_model_registry/package/manifest.py":45
+    /* "omnibioai_model_registry/package/manifest.py":55
  *         digest = sha256_file(p)
  *         hashes[name] = digest
  *         lines.append(f"{digest}  {name}")             # <<<<<<<<<<<<<<
  * 
  *     manifest_path.write_text("\n".join(lines) + ("\n" if lines else ""))
 */
-    __pyx_t_1 = __Pyx_PyObject_FormatSimple(__pyx_v_digest, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 45, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyObject_FormatSimple(__pyx_v_digest, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_8 = __Pyx_PyUnicode_Unicode(__pyx_v_name); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 45, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_PyUnicode_Unicode(__pyx_v_name); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
     __pyx_t_9[0] = __pyx_t_1;
     __pyx_t_9[1] = __pyx_mstate_global->__pyx_kp_u__2;
@@ -3773,15 +3774,15 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
     __pyx_t_11 |= __Pyx_PyUnicode_KIND_04(__pyx_t_9[0]) | __Pyx_PyUnicode_KIND_04(__pyx_t_9[2]);
     #endif
     __pyx_t_2 = __Pyx_PyUnicode_Join(__pyx_t_9, 3, __pyx_t_10, __pyx_t_11);
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 45, __pyx_L1_error)
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-    __pyx_t_12 = __Pyx_PyList_Append(__pyx_v_lines, __pyx_t_2); if (unlikely(__pyx_t_12 == ((int)-1))) __PYX_ERR(0, 45, __pyx_L1_error)
+    __pyx_t_12 = __Pyx_PyList_Append(__pyx_v_lines, __pyx_t_2); if (unlikely(__pyx_t_12 == ((int)-1))) __PYX_ERR(0, 55, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
 
-    /* "omnibioai_model_registry/package/manifest.py":35
+    /* "omnibioai_model_registry/package/manifest.py":45
  *     manifest_name = Path(manifest_path).name  # usually "sha256sums.txt"
  * 
  *     for name in include_files:             # <<<<<<<<<<<<<<
@@ -3792,7 +3793,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
   }
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":47
+  /* "omnibioai_model_registry/package/manifest.py":57
  *         lines.append(f"{digest}  {name}")
  * 
  *     manifest_path.write_text("\n".join(lines) + ("\n" if lines else ""))             # <<<<<<<<<<<<<<
@@ -3801,11 +3802,11 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
 */
   __pyx_t_2 = __pyx_v_manifest_path;
   __Pyx_INCREF(__pyx_t_2);
-  __pyx_t_8 = PyUnicode_Join(__pyx_mstate_global->__pyx_kp_u__3, __pyx_v_lines); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 47, __pyx_L1_error)
+  __pyx_t_8 = PyUnicode_Join(__pyx_mstate_global->__pyx_kp_u__3, __pyx_v_lines); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 57, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_8);
   {
     Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_v_lines);
-    if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 47, __pyx_L1_error)
+    if (unlikely(((!CYTHON_ASSUME_SAFE_SIZE) && __pyx_temp < 0))) __PYX_ERR(0, 57, __pyx_L1_error)
     __pyx_t_7 = (__pyx_temp != 0);
   }
 
@@ -3817,7 +3818,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
     __pyx_t_1 = __pyx_mstate_global->__pyx_kp_u__4;
   }
 
-  __pyx_t_13 = __Pyx_PyUnicode_Concat__Pyx_ReferenceSharing_OwnStrongReferenceInPlaceSafe(__pyx_t_8, __pyx_t_1); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 47, __pyx_L1_error)
+  __pyx_t_13 = __Pyx_PyUnicode_Concat__Pyx_ReferenceSharing_OwnStrongReferenceInPlaceSafe(__pyx_t_8, __pyx_t_1); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 57, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_13);
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -3827,12 +3828,12 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
     __pyx_t_3 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_write_text, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
-    if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 47, __pyx_L1_error)
+    if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 57, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
   }
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":48
+  /* "omnibioai_model_registry/package/manifest.py":58
  * 
  *     manifest_path.write_text("\n".join(lines) + ("\n" if lines else ""))
  *     return hashes             # <<<<<<<<<<<<<<
@@ -3850,7 +3851,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
   }
   goto __pyx_L0;
 
-  /* "omnibioai_model_registry/package/manifest.py":22
+  /* "omnibioai_model_registry/package/manifest.py":32
  * 
  * 
  * def write_sha256_manifest(             # <<<<<<<<<<<<<<
@@ -3879,7 +3880,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_2write_s
   return __pyx_r;
 }
 
-/* "omnibioai_model_registry/package/manifest.py":51
+/* "omnibioai_model_registry/package/manifest.py":61
  * 
  * 
  * def read_sha256_manifest(manifest_path: Path) -> Dict[str, str]:             # <<<<<<<<<<<<<<
@@ -3926,32 +3927,32 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_manifest_path,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 51, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 61, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 51, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 61, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "read_sha256_manifest", 0) < (0)) __PYX_ERR(0, 51, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "read_sha256_manifest", 0) < (0)) __PYX_ERR(0, 61, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("read_sha256_manifest", 1, 1, 1, i); __PYX_ERR(0, 51, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("read_sha256_manifest", 1, 1, 1, i); __PYX_ERR(0, 61, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 1)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 51, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 61, __pyx_L3_error)
     }
     __pyx_v_manifest_path = values[0];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("read_sha256_manifest", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 51, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("read_sha256_manifest", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 61, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3996,7 +3997,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("read_sha256_manifest", 0);
 
-  /* "omnibioai_model_registry/package/manifest.py":52
+  /* "omnibioai_model_registry/package/manifest.py":62
  * 
  * def read_sha256_manifest(manifest_path: Path) -> Dict[str, str]:
  *     if not manifest_path.exists():             # <<<<<<<<<<<<<<
@@ -4010,10 +4011,10 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
     PyObject *__pyx_callargs[2] = {__pyx_t_2, NULL};
     __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_3, (1-__pyx_t_3) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 52, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 62, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
-  __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely((__pyx_t_4 < 0))) __PYX_ERR(0, 52, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely((__pyx_t_4 < 0))) __PYX_ERR(0, 62, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_t_5 = (!__pyx_t_4);
 
@@ -4021,7 +4022,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
   if (unlikely(__pyx_t_5)) {
 
 
-    /* "omnibioai_model_registry/package/manifest.py":53
+    /* "omnibioai_model_registry/package/manifest.py":63
  * def read_sha256_manifest(manifest_path: Path) -> Dict[str, str]:
  *     if not manifest_path.exists():
  *         raise IntegrityError(f"Missing manifest: {manifest_path}")             # <<<<<<<<<<<<<<
@@ -4029,11 +4030,11 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
  *     for line in manifest_path.read_text().splitlines():
 */
     __pyx_t_2 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_IntegrityError); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 53, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_IntegrityError); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 63, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    __pyx_t_7 = __Pyx_PyObject_FormatSimple(__pyx_v_manifest_path, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 53, __pyx_L1_error)
+    __pyx_t_7 = __Pyx_PyObject_FormatSimple(__pyx_v_manifest_path, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 63, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_7);
-    __pyx_t_8 = __Pyx_PyUnicode_Concat(__pyx_mstate_global->__pyx_kp_u_Missing_manifest, __pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 53, __pyx_L1_error)
+    __pyx_t_8 = __Pyx_PyUnicode_Concat(__pyx_mstate_global->__pyx_kp_u_Missing_manifest, __pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 63, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __pyx_t_3 = 1;
@@ -4054,14 +4055,14 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
       __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 53, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 63, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
     __Pyx_Raise(__pyx_t_1, 0, 0, 0);
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __PYX_ERR(0, 53, __pyx_L1_error)
+    __PYX_ERR(0, 63, __pyx_L1_error)
 
-    /* "omnibioai_model_registry/package/manifest.py":52
+    /* "omnibioai_model_registry/package/manifest.py":62
  * 
  * def read_sha256_manifest(manifest_path: Path) -> Dict[str, str]:
  *     if not manifest_path.exists():             # <<<<<<<<<<<<<<
@@ -4070,19 +4071,19 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
 */
   }
 
-  /* "omnibioai_model_registry/package/manifest.py":54
+  /* "omnibioai_model_registry/package/manifest.py":64
  *     if not manifest_path.exists():
  *         raise IntegrityError(f"Missing manifest: {manifest_path}")
  *     out: Dict[str, str] = {}             # <<<<<<<<<<<<<<
  *     for line in manifest_path.read_text().splitlines():
  *         line = line.strip()
 */
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 54, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 64, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_out = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":55
+  /* "omnibioai_model_registry/package/manifest.py":65
  *         raise IntegrityError(f"Missing manifest: {manifest_path}")
  *     out: Dict[str, str] = {}
  *     for line in manifest_path.read_text().splitlines():             # <<<<<<<<<<<<<<
@@ -4096,7 +4097,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
     PyObject *__pyx_callargs[2] = {__pyx_t_2, NULL};
     __pyx_t_8 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_read_text, __pyx_callargs+__pyx_t_3, (1-__pyx_t_3) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 55, __pyx_L1_error)
+    if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 65, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
   }
   __pyx_t_6 = __pyx_t_8;
@@ -4107,7 +4108,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
     __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_splitlines, __pyx_callargs+__pyx_t_3, (1-__pyx_t_3) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 55, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 65, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   if (likely(PyList_CheckExact(__pyx_t_1)) || PyTuple_CheckExact(__pyx_t_1)) {
@@ -4115,9 +4116,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
     __pyx_t_9 = 0;
     __pyx_t_10 = NULL;
   } else {
-    __pyx_t_9 = -1; __pyx_t_8 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __pyx_t_9 = -1; __pyx_t_8 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 65, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
-    __pyx_t_10 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_8); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 55, __pyx_L1_error)
+    __pyx_t_10 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_8); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 65, __pyx_L1_error)
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   for (;;) {
@@ -4126,7 +4127,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
         {
           Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_8);
           #if !CYTHON_ASSUME_SAFE_SIZE
-          if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 55, __pyx_L1_error)
+          if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 65, __pyx_L1_error)
           #endif
           if (__pyx_t_9 >= __pyx_temp) break;
         }
@@ -4136,7 +4137,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
         {
           Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_8);
           #if !CYTHON_ASSUME_SAFE_SIZE
-          if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 55, __pyx_L1_error)
+          if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 65, __pyx_L1_error)
           #endif
           if (__pyx_t_9 >= __pyx_temp) break;
         }
@@ -4147,13 +4148,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
         #endif
         ++__pyx_t_9;
       }
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 55, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 65, __pyx_L1_error)
     } else {
       __pyx_t_1 = __pyx_t_10(__pyx_t_8);
       if (unlikely(!__pyx_t_1)) {
         PyObject* exc_type = PyErr_Occurred();
         if (exc_type) {
-          if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 55, __pyx_L1_error)
+          if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 65, __pyx_L1_error)
           PyErr_Clear();
         }
         break;
@@ -4163,7 +4164,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
     __Pyx_XDECREF_SET(__pyx_v_line, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":56
+    /* "omnibioai_model_registry/package/manifest.py":66
  *     out: Dict[str, str] = {}
  *     for line in manifest_path.read_text().splitlines():
  *         line = line.strip()             # <<<<<<<<<<<<<<
@@ -4177,27 +4178,27 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
       PyObject *__pyx_callargs[2] = {__pyx_t_6, NULL};
       __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_strip, __pyx_callargs+__pyx_t_3, (1-__pyx_t_3) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 56, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 66, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
     __Pyx_DECREF_SET(__pyx_v_line, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":57
+    /* "omnibioai_model_registry/package/manifest.py":67
  *     for line in manifest_path.read_text().splitlines():
  *         line = line.strip()
  *         if not line:             # <<<<<<<<<<<<<<
  *             continue
  *         # "<hash>  <filename>"
 */
-    __pyx_t_5 = __Pyx_PyObject_IsTrue(__pyx_v_line); if (unlikely((__pyx_t_5 < 0))) __PYX_ERR(0, 57, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_PyObject_IsTrue(__pyx_v_line); if (unlikely((__pyx_t_5 < 0))) __PYX_ERR(0, 67, __pyx_L1_error)
     __pyx_t_4 = (!__pyx_t_5);
 
 
     if (__pyx_t_4) {
 
 
-      /* "omnibioai_model_registry/package/manifest.py":58
+      /* "omnibioai_model_registry/package/manifest.py":68
  *         line = line.strip()
  *         if not line:
  *             continue             # <<<<<<<<<<<<<<
@@ -4206,7 +4207,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
 */
       goto __pyx_L4_continue;
 
-      /* "omnibioai_model_registry/package/manifest.py":57
+      /* "omnibioai_model_registry/package/manifest.py":67
  *     for line in manifest_path.read_text().splitlines():
  *         line = line.strip()
  *         if not line:             # <<<<<<<<<<<<<<
@@ -4215,7 +4216,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
 */
     }
 
-    /* "omnibioai_model_registry/package/manifest.py":60
+    /* "omnibioai_model_registry/package/manifest.py":70
  *             continue
  *         # "<hash>  <filename>"
  *         parts = line.split()             # <<<<<<<<<<<<<<
@@ -4229,27 +4230,27 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
       PyObject *__pyx_callargs[2] = {__pyx_t_6, NULL};
       __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_split, __pyx_callargs+__pyx_t_3, (1-__pyx_t_3) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 60, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 70, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
     __Pyx_XDECREF_SET(__pyx_v_parts, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":61
+    /* "omnibioai_model_registry/package/manifest.py":71
  *         # "<hash>  <filename>"
  *         parts = line.split()
  *         if len(parts) < 2:             # <<<<<<<<<<<<<<
  *             continue
  *         digest = parts[0]
 */
-    __pyx_t_11 = PyObject_Length(__pyx_v_parts); if (unlikely(__pyx_t_11 == ((Py_ssize_t)-1))) __PYX_ERR(0, 61, __pyx_L1_error)
+    __pyx_t_11 = PyObject_Length(__pyx_v_parts); if (unlikely(__pyx_t_11 == ((Py_ssize_t)-1))) __PYX_ERR(0, 71, __pyx_L1_error)
     __pyx_t_4 = (__pyx_t_11 < 2);
 
 
     if (__pyx_t_4) {
 
 
-      /* "omnibioai_model_registry/package/manifest.py":62
+      /* "omnibioai_model_registry/package/manifest.py":72
  *         parts = line.split()
  *         if len(parts) < 2:
  *             continue             # <<<<<<<<<<<<<<
@@ -4258,7 +4259,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
 */
       goto __pyx_L4_continue;
 
-      /* "omnibioai_model_registry/package/manifest.py":61
+      /* "omnibioai_model_registry/package/manifest.py":71
  *         # "<hash>  <filename>"
  *         parts = line.split()
  *         if len(parts) < 2:             # <<<<<<<<<<<<<<
@@ -4267,40 +4268,40 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
 */
     }
 
-    /* "omnibioai_model_registry/package/manifest.py":63
+    /* "omnibioai_model_registry/package/manifest.py":73
  *         if len(parts) < 2:
  *             continue
  *         digest = parts[0]             # <<<<<<<<<<<<<<
  *         name = parts[-1]
  *         out[name] = digest
 */
-    __pyx_t_1 = __Pyx_GetItemInt(__pyx_v_parts, 0, long, 1, __Pyx_PyLong_From_long, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 63, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_GetItemInt(__pyx_v_parts, 0, long, 1, __Pyx_PyLong_From_long, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 73, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
     __Pyx_XDECREF_SET(__pyx_v_digest, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":64
+    /* "omnibioai_model_registry/package/manifest.py":74
  *             continue
  *         digest = parts[0]
  *         name = parts[-1]             # <<<<<<<<<<<<<<
  *         out[name] = digest
  *     return out
 */
-    __pyx_t_1 = __Pyx_GetItemInt(__pyx_v_parts, -1L, long, 1, __Pyx_PyLong_From_long, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 64, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_GetItemInt(__pyx_v_parts, -1L, long, 1, __Pyx_PyLong_From_long, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 74, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
     __Pyx_XDECREF_SET(__pyx_v_name, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":65
+    /* "omnibioai_model_registry/package/manifest.py":75
  *         digest = parts[0]
  *         name = parts[-1]
  *         out[name] = digest             # <<<<<<<<<<<<<<
  *     return out
  * 
 */
-    if (unlikely((PyDict_SetItem(__pyx_v_out, __pyx_v_name, __pyx_v_digest) < 0))) __PYX_ERR(0, 65, __pyx_L1_error)
+    if (unlikely((PyDict_SetItem(__pyx_v_out, __pyx_v_name, __pyx_v_digest) < 0))) __PYX_ERR(0, 75, __pyx_L1_error)
 
-    /* "omnibioai_model_registry/package/manifest.py":55
+    /* "omnibioai_model_registry/package/manifest.py":65
  *         raise IntegrityError(f"Missing manifest: {manifest_path}")
  *     out: Dict[str, str] = {}
  *     for line in manifest_path.read_text().splitlines():             # <<<<<<<<<<<<<<
@@ -4311,7 +4312,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
   }
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":66
+  /* "omnibioai_model_registry/package/manifest.py":76
  *         name = parts[-1]
  *         out[name] = digest
  *     return out             # <<<<<<<<<<<<<<
@@ -4329,7 +4330,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
   }
   goto __pyx_L0;
 
-  /* "omnibioai_model_registry/package/manifest.py":51
+  /* "omnibioai_model_registry/package/manifest.py":61
  * 
  * 
  * def read_sha256_manifest(manifest_path: Path) -> Dict[str, str]:             # <<<<<<<<<<<<<<
@@ -4357,7 +4358,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_4read_sh
   return __pyx_r;
 }
 
-/* "omnibioai_model_registry/package/manifest.py":69
+/* "omnibioai_model_registry/package/manifest.py":79
  * 
  * 
  * def verify_sha256_manifest(dir_path: Path, manifest_path: Path) -> None:             # <<<<<<<<<<<<<<
@@ -4405,39 +4406,39 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_dir_path,&__pyx_mstate_global->__pyx_n_u_manifest_path,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 69, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len < 0)) __PYX_ERR(0, 79, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 69, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 79, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 69, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 79, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "verify_sha256_manifest", 0) < (0)) __PYX_ERR(0, 69, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "verify_sha256_manifest", 0) < (0)) __PYX_ERR(0, 79, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 2; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("verify_sha256_manifest", 1, 2, 2, i); __PYX_ERR(0, 69, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("verify_sha256_manifest", 1, 2, 2, i); __PYX_ERR(0, 79, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 2)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 69, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 79, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 69, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 79, __pyx_L3_error)
     }
     __pyx_v_dir_path = values[0];
     __pyx_v_manifest_path = values[1];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("verify_sha256_manifest", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 69, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("verify_sha256_manifest", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 79, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -4488,7 +4489,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("verify_sha256_manifest", 0);
 
-  /* "omnibioai_model_registry/package/manifest.py":70
+  /* "omnibioai_model_registry/package/manifest.py":80
  * 
  * def verify_sha256_manifest(dir_path: Path, manifest_path: Path) -> None:
  *     expected = read_sha256_manifest(manifest_path)             # <<<<<<<<<<<<<<
@@ -4496,7 +4497,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
  *         p = dir_path / name
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_read_sha256_manifest); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 70, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_read_sha256_manifest); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 80, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __pyx_t_4 = 1;
   #if CYTHON_UNPACK_METHODS
@@ -4515,13 +4516,13 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
     __pyx_t_1 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_3, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 70, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 80, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_expected = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":71
+  /* "omnibioai_model_registry/package/manifest.py":81
  * def verify_sha256_manifest(dir_path: Path, manifest_path: Path) -> None:
  *     expected = read_sha256_manifest(manifest_path)
  *     for name, exp_digest in expected.items():             # <<<<<<<<<<<<<<
@@ -4531,9 +4532,9 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
   __pyx_t_5 = 0;
   if (unlikely(__pyx_v_expected == Py_None)) {
     PyErr_Format(PyExc_AttributeError, "\047NoneType\047 object has no attribute \047%.30s\047", "items");
-    __PYX_ERR(0, 71, __pyx_L1_error)
+    __PYX_ERR(0, 81, __pyx_L1_error)
   }
-  __pyx_t_3 = __Pyx_dict_iterator(__pyx_v_expected, 0, __pyx_mstate_global->__pyx_n_u_items, (&__pyx_t_6), (&__pyx_t_7)); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 71, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_dict_iterator(__pyx_v_expected, 0, __pyx_mstate_global->__pyx_n_u_items, (&__pyx_t_6), (&__pyx_t_7)); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 81, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_1);
   __pyx_t_1 = __pyx_t_3;
@@ -4541,7 +4542,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
   while (1) {
     __pyx_t_8 = __Pyx_dict_iter_next(__pyx_t_1, __pyx_t_6, &__pyx_t_5, &__pyx_t_3, &__pyx_t_2, NULL, __pyx_t_7);
     if (unlikely(__pyx_t_8 == 0)) break;
-    if (unlikely(__pyx_t_8 == -1)) __PYX_ERR(0, 71, __pyx_L1_error)
+    if (unlikely(__pyx_t_8 == -1)) __PYX_ERR(0, 81, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_XDECREF_SET(__pyx_v_name, __pyx_t_3);
@@ -4549,19 +4550,19 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
     __Pyx_XDECREF_SET(__pyx_v_exp_digest, __pyx_t_2);
     __pyx_t_2 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":72
+    /* "omnibioai_model_registry/package/manifest.py":82
  *     expected = read_sha256_manifest(manifest_path)
  *     for name, exp_digest in expected.items():
  *         p = dir_path / name             # <<<<<<<<<<<<<<
  *         if not p.exists():
  *             raise IntegrityError(f"Manifest expects file missing: {name}")
 */
-    __pyx_t_2 = __Pyx_PyNumber_Divide(__pyx_v_dir_path, __pyx_v_name); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 72, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyNumber_Divide(__pyx_v_dir_path, __pyx_v_name); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 82, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_XDECREF_SET(__pyx_v_p, __pyx_t_2);
     __pyx_t_2 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":73
+    /* "omnibioai_model_registry/package/manifest.py":83
  *     for name, exp_digest in expected.items():
  *         p = dir_path / name
  *         if not p.exists():             # <<<<<<<<<<<<<<
@@ -4575,10 +4576,10 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
       PyObject *__pyx_callargs[2] = {__pyx_t_3, NULL};
       __pyx_t_2 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_exists, __pyx_callargs+__pyx_t_4, (1-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
-      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 73, __pyx_L1_error)
+      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 83, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_2);
     }
-    __pyx_t_9 = __Pyx_PyObject_IsTrue(__pyx_t_2); if (unlikely((__pyx_t_9 < 0))) __PYX_ERR(0, 73, __pyx_L1_error)
+    __pyx_t_9 = __Pyx_PyObject_IsTrue(__pyx_t_2); if (unlikely((__pyx_t_9 < 0))) __PYX_ERR(0, 83, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     __pyx_t_10 = (!__pyx_t_9);
 
@@ -4586,7 +4587,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
     if (unlikely(__pyx_t_10)) {
 
 
-      /* "omnibioai_model_registry/package/manifest.py":74
+      /* "omnibioai_model_registry/package/manifest.py":84
  *         p = dir_path / name
  *         if not p.exists():
  *             raise IntegrityError(f"Manifest expects file missing: {name}")             # <<<<<<<<<<<<<<
@@ -4594,11 +4595,11 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
  *         if got != exp_digest:
 */
       __pyx_t_3 = NULL;
-      __Pyx_GetModuleGlobalName(__pyx_t_11, __pyx_mstate_global->__pyx_n_u_IntegrityError); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 74, __pyx_L1_error)
+      __Pyx_GetModuleGlobalName(__pyx_t_11, __pyx_mstate_global->__pyx_n_u_IntegrityError); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 84, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_11);
-      __pyx_t_12 = __Pyx_PyObject_FormatSimple(__pyx_v_name, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 74, __pyx_L1_error)
+      __pyx_t_12 = __Pyx_PyObject_FormatSimple(__pyx_v_name, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 84, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_12);
-      __pyx_t_13 = __Pyx_PyUnicode_Concat(__pyx_mstate_global->__pyx_kp_u_Manifest_expects_file_missing, __pyx_t_12); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 74, __pyx_L1_error)
+      __pyx_t_13 = __Pyx_PyUnicode_Concat(__pyx_mstate_global->__pyx_kp_u_Manifest_expects_file_missing, __pyx_t_12); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 84, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_13);
       __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
       __pyx_t_4 = 1;
@@ -4619,14 +4620,14 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
         __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
         __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
         __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
-        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 74, __pyx_L1_error)
+        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 84, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_2);
       }
       __Pyx_Raise(__pyx_t_2, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-      __PYX_ERR(0, 74, __pyx_L1_error)
+      __PYX_ERR(0, 84, __pyx_L1_error)
 
-      /* "omnibioai_model_registry/package/manifest.py":73
+      /* "omnibioai_model_registry/package/manifest.py":83
  *     for name, exp_digest in expected.items():
  *         p = dir_path / name
  *         if not p.exists():             # <<<<<<<<<<<<<<
@@ -4635,7 +4636,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
 */
     }
 
-    /* "omnibioai_model_registry/package/manifest.py":75
+    /* "omnibioai_model_registry/package/manifest.py":85
  *         if not p.exists():
  *             raise IntegrityError(f"Manifest expects file missing: {name}")
  *         got = sha256_file(p)             # <<<<<<<<<<<<<<
@@ -4643,7 +4644,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
  *             raise IntegrityError(
 */
     __pyx_t_11 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_13, __pyx_mstate_global->__pyx_n_u_sha256_file); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 75, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_13, __pyx_mstate_global->__pyx_n_u_sha256_file); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 85, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_13);
     __pyx_t_4 = 1;
     #if CYTHON_UNPACK_METHODS
@@ -4662,24 +4663,24 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
       __pyx_t_2 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_13, __pyx_callargs+__pyx_t_4, (2-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_11); __pyx_t_11 = 0;
       __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
-      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 75, __pyx_L1_error)
+      if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 85, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_2);
     }
     __Pyx_XDECREF_SET(__pyx_v_got, __pyx_t_2);
     __pyx_t_2 = 0;
 
-    /* "omnibioai_model_registry/package/manifest.py":76
+    /* "omnibioai_model_registry/package/manifest.py":86
  *             raise IntegrityError(f"Manifest expects file missing: {name}")
  *         got = sha256_file(p)
  *         if got != exp_digest:             # <<<<<<<<<<<<<<
  *             raise IntegrityError(
  *                 f"SHA256 mismatch for {name}: expected {exp_digest}, got {got}"
 */
-    __pyx_t_10 = __Pyx_PyObject_CompareBoolNe_object_object(__pyx_v_got, __pyx_v_exp_digest, Py_NE); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 76, __pyx_L1_error)
+    __pyx_t_10 = __Pyx_PyObject_CompareBoolNe_object_object(__pyx_v_got, __pyx_v_exp_digest, Py_NE); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 86, __pyx_L1_error)
     if (unlikely(__pyx_t_10)) {
 
 
-      /* "omnibioai_model_registry/package/manifest.py":77
+      /* "omnibioai_model_registry/package/manifest.py":87
  *         got = sha256_file(p)
  *         if got != exp_digest:
  *             raise IntegrityError(             # <<<<<<<<<<<<<<
@@ -4687,20 +4688,20 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
  *             )
 */
       __pyx_t_13 = NULL;
-      __Pyx_GetModuleGlobalName(__pyx_t_11, __pyx_mstate_global->__pyx_n_u_IntegrityError); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 77, __pyx_L1_error)
+      __Pyx_GetModuleGlobalName(__pyx_t_11, __pyx_mstate_global->__pyx_n_u_IntegrityError); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 87, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_11);
 
-      /* "omnibioai_model_registry/package/manifest.py":78
+      /* "omnibioai_model_registry/package/manifest.py":88
  *         if got != exp_digest:
  *             raise IntegrityError(
  *                 f"SHA256 mismatch for {name}: expected {exp_digest}, got {got}"             # <<<<<<<<<<<<<<
  *             )
 */
-      __pyx_t_3 = __Pyx_PyObject_FormatSimple(__pyx_v_name, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 78, __pyx_L1_error)
+      __pyx_t_3 = __Pyx_PyObject_FormatSimple(__pyx_v_name, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 88, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_3);
-      __pyx_t_12 = __Pyx_PyObject_FormatSimple(__pyx_v_exp_digest, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 78, __pyx_L1_error)
+      __pyx_t_12 = __Pyx_PyObject_FormatSimple(__pyx_v_exp_digest, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 88, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_12);
-      __pyx_t_14 = __Pyx_PyObject_FormatSimple(__pyx_v_got, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 78, __pyx_L1_error)
+      __pyx_t_14 = __Pyx_PyObject_FormatSimple(__pyx_v_got, __pyx_mstate_global->__pyx_empty_unicode); if (unlikely(!__pyx_t_14)) __PYX_ERR(0, 88, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_14);
       __pyx_t_15[0] = __pyx_mstate_global->__pyx_kp_u_SHA256_mismatch_for;
       __pyx_t_15[1] = __pyx_t_3;
@@ -4717,7 +4718,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
       __pyx_t_8 |= __Pyx_PyUnicode_KIND_04(__pyx_t_15[1]) | __Pyx_PyUnicode_KIND_04(__pyx_t_15[3]) | __Pyx_PyUnicode_KIND_04(__pyx_t_15[5]);
       #endif
       __pyx_t_17 = __Pyx_PyUnicode_Join(__pyx_t_15, 6, __pyx_t_16, __pyx_t_8);
-      if (unlikely(!__pyx_t_17)) __PYX_ERR(0, 78, __pyx_L1_error)
+      if (unlikely(!__pyx_t_17)) __PYX_ERR(0, 88, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_17);
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
       __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
@@ -4740,14 +4741,14 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
         __Pyx_XDECREF(__pyx_t_13); __pyx_t_13 = 0;
         __Pyx_DECREF(__pyx_t_17); __pyx_t_17 = 0;
         __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
-        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 77, __pyx_L1_error)
+        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 87, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_2);
       }
       __Pyx_Raise(__pyx_t_2, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-      __PYX_ERR(0, 77, __pyx_L1_error)
+      __PYX_ERR(0, 87, __pyx_L1_error)
 
-      /* "omnibioai_model_registry/package/manifest.py":76
+      /* "omnibioai_model_registry/package/manifest.py":86
  *             raise IntegrityError(f"Manifest expects file missing: {name}")
  *         got = sha256_file(p)
  *         if got != exp_digest:             # <<<<<<<<<<<<<<
@@ -4758,7 +4759,7 @@ static PyObject *__pyx_pf_24omnibioai_model_registry_7package_8manifest_6verify_
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":69
+  /* "omnibioai_model_registry/package/manifest.py":79
  * 
  * 
  * def verify_sha256_manifest(dir_path: Path, manifest_path: Path) -> None:             # <<<<<<<<<<<<<<
@@ -4889,7 +4890,7 @@ namespace {
   {
       PyModuleDef_HEAD_INIT,
       "manifest",
-      0, /* m_doc */
+      __pyx_k_OmniBioAI_omnibioai_model_regis, /* m_doc */
     #if CYTHON_USE_MODULE_STATE
       sizeof(__pyx_mstatetype), /* m_size */
     #else
@@ -5138,20 +5139,20 @@ __Pyx_RefNannySetupContext("PyInit_manifest", 0);
   if (__Pyx_InitAfterSharedUtility() < (0)) __PYX_ERR(0, 1, __pyx_L1_error)
   /*--- Execution code ---*/
 
-  /* "omnibioai_model_registry/package/manifest.py":4
+  /* "omnibioai_model_registry/package/manifest.py":14
  * from __future__ import annotations
  * 
  * import hashlib             # <<<<<<<<<<<<<<
  * from pathlib import Path
  * from typing import Dict
 */
-  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_hashlib, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_hashlib, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 14, __pyx_L1_error)
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_hashlib, __pyx_t_2) < (0)) __PYX_ERR(0, 4, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_hashlib, __pyx_t_2) < (0)) __PYX_ERR(0, 14, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":5
+  /* "omnibioai_model_registry/package/manifest.py":15
  * 
  * import hashlib
  * from pathlib import Path             # <<<<<<<<<<<<<<
@@ -5160,22 +5161,22 @@ __Pyx_RefNannySetupContext("PyInit_manifest", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Path};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_pathlib, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 5, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_pathlib, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 15, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Path};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 5, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 15, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 5, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 15, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":6
+  /* "omnibioai_model_registry/package/manifest.py":16
  * import hashlib
  * from pathlib import Path
  * from typing import Dict             # <<<<<<<<<<<<<<
@@ -5184,22 +5185,22 @@ __Pyx_RefNannySetupContext("PyInit_manifest", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Dict};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_typing, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 6, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_typing, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 16, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Dict};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 6, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 16, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 6, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 16, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":8
+  /* "omnibioai_model_registry/package/manifest.py":18
  * from typing import Dict
  * 
  * from ..errors import IntegrityError             # <<<<<<<<<<<<<<
@@ -5208,34 +5209,34 @@ __Pyx_RefNannySetupContext("PyInit_manifest", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_IntegrityError};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_errors, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_omnibioai_model_registry_errors, 2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 8, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_errors, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_omnibioai_model_registry_errors, 2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 18, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_IntegrityError};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 8, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 18, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 8, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 18, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":11
+  /* "omnibioai_model_registry/package/manifest.py":21
  * 
  * 
  * def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:             # <<<<<<<<<<<<<<
  *     h = hashlib.sha256()
  *     with path.open("rb") as f:
 */
-  __pyx_t_2 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 11, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 21, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 11, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_chunk_size, __pyx_mstate_global->__pyx_n_u_int) < (0)) __PYX_ERR(0, 11, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_str) < (0)) __PYX_ERR(0, 11, __pyx_L1_error)
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8manifest_1sha256_file, 0, __pyx_mstate_global->__pyx_n_u_sha256_file, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 11, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 21, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_chunk_size, __pyx_mstate_global->__pyx_n_u_int) < (0)) __PYX_ERR(0, 21, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_str) < (0)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8manifest_1sha256_file, 0, __pyx_mstate_global->__pyx_n_u_sha256_file, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 21, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
@@ -5243,79 +5244,79 @@ __Pyx_RefNannySetupContext("PyInit_manifest", 0);
   __Pyx_CyFunction_SetDefaultsTuple(__pyx_t_4, __pyx_mstate_global->__pyx_tuple[1]);
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_4, __pyx_t_2);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_sha256_file, __pyx_t_4) < (0)) __PYX_ERR(0, 11, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_sha256_file, __pyx_t_4) < (0)) __PYX_ERR(0, 21, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":22
+  /* "omnibioai_model_registry/package/manifest.py":32
  * 
  * 
  * def write_sha256_manifest(             # <<<<<<<<<<<<<<
  *     dir_path: Path, manifest_path: Path, include_files: list[str]
  * ) -> Dict[str, str]:
 */
-  __pyx_t_4 = __Pyx_PyDict_NewPresized(4); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 22, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(4); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 32, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_dir_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 22, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_manifest_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 22, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_include_files, __pyx_mstate_global->__pyx_kp_u_list_str) < (0)) __PYX_ERR(0, 22, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_kp_u_Dict_str_str) < (0)) __PYX_ERR(0, 22, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8manifest_3write_sha256_manifest, 0, __pyx_mstate_global->__pyx_n_u_write_sha256_manifest, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 22, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_dir_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 32, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_manifest_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 32, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_include_files, __pyx_mstate_global->__pyx_kp_u_list_str) < (0)) __PYX_ERR(0, 32, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_kp_u_Dict_str_str) < (0)) __PYX_ERR(0, 32, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8manifest_3write_sha256_manifest, 0, __pyx_mstate_global->__pyx_n_u_write_sha256_manifest, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 32, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_2);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_2, __pyx_t_4);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_write_sha256_manifest, __pyx_t_2) < (0)) __PYX_ERR(0, 22, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_write_sha256_manifest, __pyx_t_2) < (0)) __PYX_ERR(0, 32, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":51
+  /* "omnibioai_model_registry/package/manifest.py":61
  * 
  * 
  * def read_sha256_manifest(manifest_path: Path) -> Dict[str, str]:             # <<<<<<<<<<<<<<
  *     if not manifest_path.exists():
  *         raise IntegrityError(f"Missing manifest: {manifest_path}")
 */
-  __pyx_t_2 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 51, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 61, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_manifest_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 51, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_kp_u_Dict_str_str) < (0)) __PYX_ERR(0, 51, __pyx_L1_error)
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8manifest_5read_sha256_manifest, 0, __pyx_mstate_global->__pyx_n_u_read_sha256_manifest, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 51, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_manifest_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 61, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_kp_u_Dict_str_str) < (0)) __PYX_ERR(0, 61, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8manifest_5read_sha256_manifest, 0, __pyx_mstate_global->__pyx_n_u_read_sha256_manifest, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 61, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_4, __pyx_t_2);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_read_sha256_manifest, __pyx_t_4) < (0)) __PYX_ERR(0, 51, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_read_sha256_manifest, __pyx_t_4) < (0)) __PYX_ERR(0, 61, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "omnibioai_model_registry/package/manifest.py":69
+  /* "omnibioai_model_registry/package/manifest.py":79
  * 
  * 
  * def verify_sha256_manifest(dir_path: Path, manifest_path: Path) -> None:             # <<<<<<<<<<<<<<
  *     expected = read_sha256_manifest(manifest_path)
  *     for name, exp_digest in expected.items():
 */
-  __pyx_t_4 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 69, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 79, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_dir_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 69, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_manifest_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 69, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 69, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8manifest_7verify_sha256_manifest, 0, __pyx_mstate_global->__pyx_n_u_verify_sha256_manifest, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 69, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_dir_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 79, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_manifest_path, __pyx_mstate_global->__pyx_n_u_Path) < (0)) __PYX_ERR(0, 79, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_None) < (0)) __PYX_ERR(0, 79, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_24omnibioai_model_registry_7package_8manifest_7verify_sha256_manifest, 0, __pyx_mstate_global->__pyx_n_u_verify_sha256_manifest, NULL, __pyx_mstate_global->__pyx_n_u_omnibioai_model_registry_package, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 79, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_2);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_2, __pyx_t_4);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_verify_sha256_manifest, __pyx_t_2) < (0)) __PYX_ERR(0, 69, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_verify_sha256_manifest, __pyx_t_2) < (0)) __PYX_ERR(0, 79, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "omnibioai_model_registry/package/manifest.py":1
  * # File: omnibioai_model_registry/package/manifest.py             # <<<<<<<<<<<<<<
- * from __future__ import annotations
- * 
+ * """
+ * OmniBioAI omnibioai_model_registry.package.manifest.
 */
   __pyx_t_2 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
@@ -5379,7 +5380,7 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
   CYTHON_UNUSED_VAR(__pyx_mstate);
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "omnibioai_model_registry/package/manifest.py":13
+  /* "omnibioai_model_registry/package/manifest.py":23
  * def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
  *     h = hashlib.sha256()
  *     with path.open("rb") as f:             # <<<<<<<<<<<<<<
@@ -5388,12 +5389,12 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
 */
   {
     PyObject* __pyx_temp[3] = {Py_None, Py_None, Py_None};
-    __pyx_mstate_global->__pyx_tuple[0] = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_mstate_global->__pyx_tuple[0])) __PYX_ERR(0, 13, __pyx_L1_error)
+    __pyx_mstate_global->__pyx_tuple[0] = __Pyx_PyTuple_FromArray(__pyx_temp, 3); if (unlikely(!__pyx_mstate_global->__pyx_tuple[0])) __PYX_ERR(0, 23, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[0]);
   }
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[0]);
 
-  /* "omnibioai_model_registry/package/manifest.py":11
+  /* "omnibioai_model_registry/package/manifest.py":21
  * 
  * 
  * def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:             # <<<<<<<<<<<<<<
@@ -5402,7 +5403,7 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
 */
   {
     PyObject* __pyx_temp[1] = {((PyObject*)__pyx_mstate_global->__pyx_int_1048576)};
-    __pyx_mstate_global->__pyx_tuple[1] = __Pyx_PyTuple_FromArray(__pyx_temp, 1); if (unlikely(!__pyx_mstate_global->__pyx_tuple[1])) __PYX_ERR(0, 11, __pyx_L1_error)
+    __pyx_mstate_global->__pyx_tuple[1] = __Pyx_PyTuple_FromArray(__pyx_temp, 1); if (unlikely(!__pyx_mstate_global->__pyx_tuple[1])) __PYX_ERR(0, 21, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[1]);
   }
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[1]);
@@ -5590,22 +5591,22 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
   PyObject* tuple_dedup_map = PyDict_New();
   if (unlikely(!tuple_dedup_map)) return -1;
   {
-    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 11};
+    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 5, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 21};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_path, __pyx_mstate->__pyx_n_u_chunk_size, __pyx_mstate->__pyx_n_u_h, __pyx_mstate->__pyx_n_u_f, __pyx_mstate->__pyx_n_u_b};
     __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_package_2, __pyx_mstate->__pyx_n_u_sha256_file, __pyx_mstate->__pyx_kp_b_iso88591_fL_a_wa_U_9A_aq_t1_WAQ_1Ja, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 9, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 22};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 9, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 32};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_dir_path, __pyx_mstate->__pyx_n_u_manifest_path, __pyx_mstate->__pyx_n_u_include_files, __pyx_mstate->__pyx_n_u_hashes, __pyx_mstate->__pyx_n_u_lines, __pyx_mstate->__pyx_n_u_manifest_name, __pyx_mstate->__pyx_n_u_name, __pyx_mstate->__pyx_n_u_p, __pyx_mstate->__pyx_n_u_digest};
     __pyx_mstate_global->__pyx_codeobj_tab[1] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_package_2, __pyx_mstate->__pyx_n_u_write_sha256_manifest, __pyx_mstate->__pyx_kp_b_iso88591_8_Q_A_D_q_5_1_IRq_4q_q_AQ_axq_W, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[1])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 51};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 61};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_manifest_path, __pyx_mstate->__pyx_n_u_out, __pyx_mstate->__pyx_n_u_line, __pyx_mstate->__pyx_n_u_parts, __pyx_mstate->__pyx_n_u_digest, __pyx_mstate->__pyx_n_u_name};
     __pyx_mstate_global->__pyx_codeobj_tab[2] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_package_2, __pyx_mstate->__pyx_n_u_read_sha256_manifest, __pyx_mstate->__pyx_kp_b_iso88591_t_q_nA_1_Zr_A_t6_4q_F_3awb_aq_u, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[2])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 7, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 69};
+    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 7, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 79};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_dir_path, __pyx_mstate->__pyx_n_u_manifest_path, __pyx_mstate->__pyx_n_u_expected_2, __pyx_mstate->__pyx_n_u_name, __pyx_mstate->__pyx_n_u_exp_digest, __pyx_mstate->__pyx_n_u_p, __pyx_mstate->__pyx_n_u_got_2};
     __pyx_mstate_global->__pyx_codeobj_tab[3] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_omnibioai_model_registry_package_2, __pyx_mstate->__pyx_n_u_verify_sha256_manifest, __pyx_mstate->__pyx_kp_b_iso88591_1_1A_nHF_IRq_4q_q_B_1_k_4s_a_7q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[3])) goto bad;
   }
