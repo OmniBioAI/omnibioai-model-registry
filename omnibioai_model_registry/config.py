@@ -47,7 +47,7 @@ def load_config() -> RegistryConfig:
     if not root:
         raise RegistryNotConfigured(
             "OMNIBIOAI_MODEL_REGISTRY_ROOT is not set. "
-            "Example: export OMNIBIOAI_MODEL_REGISTRY_ROOT=~/Desktop/machine/local_registry/model_registry"
+            "Example: export OMNIBIOAI_MODEL_REGISTRY_ROOT=~/Desktop/omnibioai-ecosystem/local_registry/model_registry"
         )
     backend = (
         os.getenv("OMNIBIOAI_MODEL_REGISTRY_BACKEND", "localfs").strip() or "localfs"

@@ -51,7 +51,7 @@ OMNIBIOAI_MODEL_REGISTRY_ROOT
 Example (local):
 
 ```bash
-export OMNIBIOAI_MODEL_REGISTRY_ROOT=~/Desktop/machine/local_registry/model_registry
+export OMNIBIOAI_MODEL_REGISTRY_ROOT=~/Desktop/omnibioai-ecosystem/local_registry/model_registry
 ```
 
 Inside Docker, this must point to a mounted path.
@@ -61,9 +61,9 @@ Inside Docker, this must point to a mounted path.
 # 5) Run Locally (No Docker, No Compose)
 
 ```bash
-export OMNIBIOAI_MODEL_REGISTRY_ROOT=~/Desktop/machine/local_registry/model_registry
+export OMNIBIOAI_MODEL_REGISTRY_ROOT=~/Desktop/omnibioai-ecosystem/local_registry/model_registry
 
-cd ~/Desktop/machine/omnibioai-model-registry
+cd ~/Desktop/omnibioai-ecosystem/omnibioai-model-registry
 pip install -e .
 pip install -r omnibioai_model_registry/service/requirements.txt
 
