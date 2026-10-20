@@ -161,7 +161,7 @@ def get_connection():
     )
 
 
-def init_tables(conn) -> None:
+def provision_tables(conn) -> None:
     """CREATE TABLE IF NOT EXISTS for every registry table, then apply the
     Phase 2C additive-only column migration (see _ALTER_DDL above) so an
     existing omr_runs table gets organization_id/ownership_status too.
@@ -170,3 +170,17 @@ def init_tables(conn) -> None:
         for ddl in _DDL:
             cursor.execute(ddl)
     _run_alter_ddl_idempotent(conn)
+
+
+def init_tables(conn) -> None:
+    """Validate the pre-provisioned schema without runtime DDL privileges."""
+    expected = {
+        "omr_runs": "run_id,task,model_name,status,started_at,finished_at,actor,organization_id,ownership_status",
+        "omr_params": "id,run_id,key_name,value_text",
+        "omr_metrics": "id,run_id,key_name,value,step,ts_utc",
+        "omr_tags": "id,run_id,key_name,value_text",
+        "omr_version_tags": "id,task,model_name,version,key_name,value_text",
+    }
+    with conn.cursor() as cursor:
+        for table, columns in expected.items():
+            cursor.execute(f"SELECT {columns} FROM {table} LIMIT 0")
