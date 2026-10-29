@@ -10,7 +10,7 @@ export default function RunMetricChart({
   data,
   width = 200,
   height = 60,
-  color = '#4ADE80',
+  color = 'var(--color-success)',
   label,
 }: Props) {
   if (data.length === 0) return null;

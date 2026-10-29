@@ -273,12 +273,12 @@ export default function ModelDrawer({
 function StageBadge({ stage }: { stage?: string }) {
   if (!stage || stage === "none") return null;
   const colors: Record<string, { bg: string; fg: string }> = {
-    latest:     { bg: "#3D3D3D", fg: "#9CA3AF" },
-    staging:    { bg: "#1E3A5F", fg: "#60A5FA" },
-    production: { bg: "#14532D", fg: "#4ADE80" },
-    archived:   { bg: "#78350F", fg: "#FCD34D" },
+    latest:     { bg: "var(--stage-neutral-bg)", fg: "var(--color-text-muted)" },
+    staging:    { bg: "var(--stage-info-bg)", fg: "var(--stage-info-fg)" },
+    production: { bg: "var(--stage-success-bg)", fg: "var(--color-success)" },
+    archived:   { bg: "var(--stage-warning-bg)", fg: "var(--color-warning)" },
   };
-  const c = colors[stage] ?? { bg: "#3D3D3D", fg: "#9CA3AF" };
+  const c = colors[stage] ?? { bg: "var(--stage-neutral-bg)", fg: "var(--color-text-muted)" };
   return (
     <span
       style={{
@@ -329,7 +329,7 @@ const overlayStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   zIndex: 100,
-  boxShadow: "-4px 0 32px rgba(0,0,0,0.45)",
+  boxShadow: "var(--shadow-drawer)",
 };
 
 const headerStyle: CSSProperties = {
@@ -350,12 +350,12 @@ const versionCardStyle: CSSProperties = {
 
 function drawerAliasBadge(alias: string): CSSProperties {
   const colors: Record<string, { bg: string; fg: string }> = {
-    latest:     { bg: "#3D3D3D", fg: "#9CA3AF" },
-    staging:    { bg: "#1E3A5F", fg: "#60A5FA" },
-    production: { bg: "#14532D", fg: "#4ADE80" },
-    archived:   { bg: "#78350F", fg: "#FCD34D" },
+    latest:     { bg: "var(--stage-neutral-bg)", fg: "var(--color-text-muted)" },
+    staging:    { bg: "var(--stage-info-bg)", fg: "var(--stage-info-fg)" },
+    production: { bg: "var(--stage-success-bg)", fg: "var(--color-success)" },
+    archived:   { bg: "var(--stage-warning-bg)", fg: "var(--color-warning)" },
   };
-  const c = colors[alias] ?? { bg: "#3D3D3D", fg: "#9CA3AF" };
+  const c = colors[alias] ?? { bg: "var(--stage-neutral-bg)", fg: "var(--color-text-muted)" };
   return {
     display: "inline-block",
     background: c.bg,

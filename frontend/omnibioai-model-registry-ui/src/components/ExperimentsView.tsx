@@ -265,7 +265,7 @@ export default function ExperimentsView({ selectedTask, onOpenModel }: Props) {
                         {metricEntries.slice(0, 2).map(([k, v]) => (
                           <span key={k} style={{ fontSize: 12 }}>
                             <span style={{ color: 'var(--text-muted)' }}>{k}:</span>{' '}
-                            <span style={{ color: '#4ADE80', fontWeight: 500 }}>{typeof v === 'number' ? v.toPrecision(4) : v}</span>
+                            <span style={{ color: 'var(--color-success)', fontWeight: 500 }}>{typeof v === 'number' ? v.toPrecision(4) : v}</span>
                           </span>
                         ))}
                         {metricEntries.length === 0 && <span style={{ color: 'var(--text-muted)' }}>—</span>}
@@ -315,7 +315,7 @@ export default function ExperimentsView({ selectedTask, onOpenModel }: Props) {
                             {registrationInfo[run.run_id] && (
                               <>
                                 <SectionLabel style={{ marginTop: 12 }}>Registered as</SectionLabel>
-                                <span style={{ background: '#0D3D3D', color: '#2DD4BF', fontSize: 12, padding: '3px 10px', borderRadius: 4, fontWeight: 500, display: 'inline-block' }}>
+                                <span style={{ background: 'var(--color-success-dim)', color: 'var(--color-success)', fontSize: 12, padding: '3px 10px', borderRadius: 4, fontWeight: 500, display: 'inline-block' }}>
                                   {registrationInfo[run.run_id]}
                                 </span>
                               </>
@@ -374,27 +374,27 @@ function SectionLabel({ children, style }: { children: React.ReactNode; style?: 
 
 function statusDot(status: string): CSSProperties {
   const colors: Record<string, string> = {
-    running: '#FCD34D',
-    finished: '#4ADE80',
-    failed: '#F87171',
+    running: 'var(--color-warning)',
+    finished: 'var(--color-success)',
+    failed: 'var(--color-danger)',
   };
   return {
     display: 'inline-block',
     width: 7,
     height: 7,
     borderRadius: '50%',
-    background: colors[status] ?? '#9CA3AF',
+    background: colors[status] ?? 'var(--color-text-muted)',
     flexShrink: 0,
   };
 }
 
 function statusBadge(status: string): CSSProperties {
   const map: Record<string, { background: string; color: string }> = {
-    running:  { background: '#78350F', color: '#FCD34D' },
-    finished: { background: '#14532D', color: '#4ADE80' },
-    failed:   { background: '#4C1D1D', color: '#F87171' },
+    running:  { background: 'var(--stage-warning-bg)', color: 'var(--color-warning)' },
+    finished: { background: 'var(--stage-success-bg)', color: 'var(--color-success)' },
+    failed:   { background: 'var(--stage-danger-bg)', color: 'var(--color-danger)' },
   };
-  const c = map[status] ?? { background: '#3D3D3D', color: '#9CA3AF' };
+  const c = map[status] ?? { background: 'var(--stage-neutral-bg)', color: 'var(--color-text-muted)' };
   return {
     ...c,
     display: 'inline-flex',

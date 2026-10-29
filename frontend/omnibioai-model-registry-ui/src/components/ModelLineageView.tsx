@@ -60,7 +60,7 @@ export default function ModelLineageView({ model }: { model: Model }) {
   );
 
   return (
-    <div style={{ height: 500, border: "1px solid #2a2d3e", borderRadius: 8, marginTop: 10, background: "#0f1117" }}>
+    <div style={{ height: 500, border: "1px solid var(--color-border)", borderRadius: 8, marginTop: 10, background: "var(--color-bg)" }}>
       <ReactFlow nodes={layoutNodes} edges={graph.edges} fitView>
         <Background />
         <Controls />
@@ -84,11 +84,11 @@ function buildGraph(model: Model) {
     data: { label: `📦 ${model.model_name}` },
     position: { x: 0, y: 0 },
     style: {
-      background: "#0094ff",
-      color: "#fff",
+      background: "var(--color-info)",
+      color: "var(--color-on-accent)",
       padding: 10,
       borderRadius: 8,
-      border: "1px solid rgba(0,148,255,0.4)",
+      border: "1px solid var(--color-info-border)",
     },
   });
 
@@ -102,7 +102,7 @@ function buildGraph(model: Model) {
         <div style={{ textAlign: "left", lineHeight: 1.6, fontSize: 12 }}>
           <div>Version: {model.version}</div>
           <div>Task: {model.task}</div>
-          <div style={{ color: model.lineage?.run_id ? "#ffffff" : "#9CA3AF" }}>
+          <div style={{ color: model.lineage?.run_id ? "var(--color-text)" : "var(--color-text-muted)" }}>
             Run: {model.lineage?.run_id ?? "not tracked"}
           </div>
         </div>
@@ -110,11 +110,11 @@ function buildGraph(model: Model) {
     },
     position: { x: 0, y: 0 },
     style: {
-      background: "#1a1d2e",
-      color: "#ffffff",
+      background: "var(--color-bg-surface)",
+      color: "var(--color-text)",
       padding: 10,
       borderRadius: 8,
-      border: "1px solid #2a2d3e",
+      border: "1px solid var(--color-border)",
       fontSize: 12,
     },
   });
@@ -136,11 +136,11 @@ function buildGraph(model: Model) {
       data: { label: `🧬 ${model.lineage.dataset}` },
       position: { x: 0, y: 0 },
       style: {
-        background: "rgba(0, 229, 160, 0.12)",
-        color: "#00e5a0",
+        background: "var(--color-accent-dim)",
+        color: "var(--color-accent)",
         padding: 10,
         borderRadius: 8,
-        border: "1px solid rgba(0, 229, 160, 0.3)",
+        border: "1px solid var(--color-accent-border)",
       },
     });
 
@@ -164,11 +164,11 @@ function buildGraph(model: Model) {
       },
       position: { x: 0, y: 0 },
       style: {
-        background: "rgba(251, 191, 36, 0.12)",
-        color: "#fbbf24",
+        background: "var(--color-warning-dim)",
+        color: "var(--color-warning)",
         padding: 10,
         borderRadius: 8,
-        border: "1px solid rgba(251, 191, 36, 0.3)",
+        border: "1px solid var(--color-warning-border)",
         fontSize: 12,
       },
     });
