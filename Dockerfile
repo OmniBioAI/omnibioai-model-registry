@@ -6,10 +6,10 @@
 # ── Stage 1: Build React UI ────────────────────────────────────────────────────
 FROM --platform=$BUILDPLATFORM node:20-bookworm-slim AS ui-builder
 WORKDIR /ui
-COPY omnibioai-model-registry/frontend/omnibioai-model-registry-ui/package*.json ./
+COPY frontend/omnibioai-model-registry-ui/package*.json ./
 RUN npm ci
 # Application source
-COPY omnibioai-model-registry/frontend/omnibioai-model-registry-ui/ ./
+COPY frontend/omnibioai-model-registry-ui/ ./
 ARG VITE_STUDIO_DEV_ORIGIN=""
 ENV VITE_STUDIO_DEV_ORIGIN=$VITE_STUDIO_DEV_ORIGIN
 RUN npm run build
@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Python dependencies
-COPY omnibioai-model-registry/pyproject.toml .
+COPY pyproject.toml .
 
 # Model Registry IAM integration: pyproject.toml declares omnibioai-iam-client
 # as a pinned git+https dependency (private repo -- GitHub Packages has no
@@ -59,7 +59,7 @@ RUN --mount=type=secret,id=github_token \
     pip install --no-cache-dir -U pip; \
     GIT_ASKPASS=/tmp/git-askpass GIT_TERMINAL_PROMPT=0 \
       pip install --no-cache-dir .
-COPY omnibioai-model-registry/omnibioai_model_registry/ ./omnibioai_model_registry/
+COPY omnibioai_model_registry/ ./omnibioai_model_registry/
 
 COPY --from=ui-builder /ui/dist /usr/share/nginx/html
 
