@@ -7,9 +7,9 @@ export default function ModelGroup({ group }: any) {
   const latest = group.versions.find((v: any) => v.alias === "latest");
 
   return (
-    <div style={{ border: "1px solid #ddd", marginBottom: 10 }}>
+    <div style={{ border: "1px solid var(--color-border)", marginBottom: 10 }}>
       <div
-        style={{ padding: 10, cursor: "pointer", background: "#f5f5f5" }}
+        style={{ padding: 10, cursor: "pointer", background: "var(--color-bg-surface2)" }}
         onClick={() => setOpen(!open)}
       >
         <strong>{group.model_name}</strong> ({group.task}){" "}

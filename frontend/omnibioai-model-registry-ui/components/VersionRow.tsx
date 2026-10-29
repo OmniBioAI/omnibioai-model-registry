@@ -15,7 +15,7 @@ export default function VersionRow({ version }: any) {
   }
 
   return (
-    <div style={{ padding: 10, borderTop: "1px solid #eee" }}>
+    <div style={{ padding: 10, borderTop: "1px solid var(--color-border-muted)" }}>
       <div>
         Version: <b>{version.version}</b>
       </div>

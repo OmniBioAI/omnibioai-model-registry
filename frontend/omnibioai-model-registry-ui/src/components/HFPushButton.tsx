@@ -228,7 +228,7 @@ export default function HFPushButton({
                 <button
                   onClick={push}
                   disabled={busy}
-                  style={{ background: "var(--accent)", color: "#fff", border: "none", fontWeight: 600 }}
+                  style={{ background: "var(--accent)", color: "var(--color-on-accent)", border: "none", fontWeight: 600 }}
                 >
                   {busy ? "Pushing…" : "Push"}
                 </button>
@@ -254,7 +254,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 const overlayStyle: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0,0,0,0.65)",
+  background: "var(--overlay)",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
@@ -270,7 +270,7 @@ const modalStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
-  boxShadow: "0 12px 48px rgba(0,0,0,0.55)",
+  boxShadow: "var(--shadow-modal)",
 };
 
 const modalHeaderStyle: CSSProperties = {

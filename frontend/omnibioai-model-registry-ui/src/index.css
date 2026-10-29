@@ -1,38 +1,28 @@
-/* OmniBioAI Design Tokens v1.0 — Phase 2 migration */
+/* color-token-mapping:start
+ * All literal colors live in this compatibility mapping. Application rules
+ * below consume semantic variables only; tests enforce that boundary.
+ */
 :root {
-  --font-sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.5;
-  color-scheme: dark;
 
-  /* OmniBioAI dark theme tokens */
-  --bg:    #0f1117;
-  --bg2:   #1a1d2e;
-  --bg3:   #1f2236;
-  --bg4:   rgba(0, 229, 160, 0.07);
-  --border:  #2a2d3e;
-  --border2: #353850;
-  --text:  #ffffff;
-  --color-text-muted: #6b7280;
-  --text3: #4b5563;
-  --teal:      #00e5a0;
-  --teal-dim:  rgba(0, 229, 160, 0.12);
-  --teal-dim2: rgba(0, 229, 160, 0.22);
-  --blue:      #0094ff;
-  --blue-dim:  rgba(0, 148, 255, 0.12);
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --color-accent:  #00e5a0;
-  --color-danger:  #ef4444;
-  --color-warning: #f59e0b;
-  --green: #34d399;
-
-  /* Aliases — backward compatibility */
-  --surface:    var(--bg2);
-  --surface-2:  var(--bg3);
-  --accent:     var(--teal);
-  --accent-bg:  var(--teal-dim);
+  --bg2: var(--color-bg-surface);
+  --bg3: var(--color-bg-surface2);
+  --bg4: var(--color-accent-surface);
+  --border2: var(--color-border-bright);
+  --text3: var(--color-text-dim);
+  --teal: var(--color-accent);
+  --teal-dim: var(--color-accent-dim);
+  --teal-dim2: var(--color-accent-border);
+  --blue: var(--color-info);
+  --blue-dim: var(--color-info-dim);
+  --green: var(--color-success);
+  --surface: var(--color-bg-surface);
+  --surface-2: var(--color-bg-surface2);
+  --accent: var(--color-accent);
+  --accent-bg: var(--color-accent-dim);
+  --accent-border: var(--color-accent-border);
   --text2:      var(--color-text-muted);
   --text-muted: var(--color-text-muted);
   --red:        var(--color-danger);
@@ -40,11 +30,38 @@
   --r:          var(--radius-lg);
   --rl:         var(--radius-xl);
   --radius:     var(--radius-lg);
-  --green-bg:   rgba(52, 211, 153, 0.12);
-  --red-bg:     rgba(239, 68, 68, 0.12);
+  --green-bg: var(--color-success-dim);
+  --red-bg: var(--color-danger-dim);
   --yellow:     var(--color-warning);
-  --yellow-bg:  rgba(245, 158, 11, 0.12);
+  --yellow-bg: var(--color-warning-dim);
+  --overlay: rgba(0,0,0,0.65);
+  --shadow-modal: 0 12px 48px rgba(0,0,0,0.55);
+  --shadow-drawer: -4px 0 32px rgba(0,0,0,0.45);
+  --stage-neutral-bg: #3d3d3d;
+  --stage-neutral-fg: #c2c8d2;
+  --stage-info-bg: #1e3a5f;
+  --stage-info-fg: #75b8ff;
+  --stage-success-bg: #14532d;
+  --stage-success-fg: #5ce0a0;
+  --stage-warning-bg: #78350f;
+  --stage-warning-fg: #ffd166;
+  --stage-danger-bg: #4c1d1d;
+  --stage-danger-fg: #ff6b72;
 }
+
+:root[data-theme="dark"][data-accent="teal"] { --color-accent: #00e5a0; --color-accent-dim: rgba(0,229,160,.20); --color-accent-border: rgba(0,229,160,.7); --color-accent-surface: rgba(0,229,160,.14); --color-on-accent: #00150e; }
+:root[data-theme="dark"][data-accent="blue"] { --color-accent: #75b8ff; --color-accent-dim: rgba(117,184,255,.20); --color-accent-border: rgba(117,184,255,.7); --color-accent-surface: rgba(117,184,255,.14); --color-on-accent: #00101f; }
+:root[data-theme="dark"][data-accent="purple"] { --color-accent: #c084fc; --color-accent-dim: rgba(192,132,252,.20); --color-accent-border: rgba(192,132,252,.7); --color-accent-surface: rgba(192,132,252,.14); --color-on-accent: #1a0828; }
+:root[data-theme="dark"][data-accent="orange"] { --color-accent: #ffb26b; --color-accent-dim: rgba(255,178,107,.20); --color-accent-border: rgba(255,178,107,.7); --color-accent-surface: rgba(255,178,107,.14); --color-on-accent: #241000; }
+:root[data-theme="light"][data-accent="teal"],
+:root[data-theme="light"][data-accent="blue"],
+:root[data-theme="light"][data-accent="purple"],
+:root[data-theme="light"][data-accent="orange"] {
+  --color-accent-dim: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-accent-border: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  --color-accent-surface: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+/* color-token-mapping:end */
 
 *,
 *::before,
@@ -57,6 +74,18 @@
 html,
 body {
   height: 100%;
+}
+
+html[data-embedded="true"] .app-topbar { display: none !important; }
+
+html[data-density="compact"] {
+  font-size: calc(13px * var(--density-scale));
+}
+
+@media (max-width: 600px) {
+  .app-sidebar { display: none !important; }
+  .app-main { padding: 16px 12px !important; }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 
 body {

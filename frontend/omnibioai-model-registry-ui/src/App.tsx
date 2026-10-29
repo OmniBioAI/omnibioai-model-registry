@@ -165,14 +165,14 @@ export default function App() {
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* ── TOP HEADER ── */}
-      <header style={hdrStyle}>
+      <header className="app-topbar" style={hdrStyle}>
         <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" }}>
           🧬 OmniBioAI ModelHub
         </span>
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={() => setShowRegister(true)}
-            style={{ background: "var(--accent)", color: "#fff", border: "none", fontWeight: 600 }}
+            style={{ background: "var(--accent)", color: "var(--color-on-accent)", border: "none", fontWeight: 600 }}
           >
             + Register Model
           </button>
@@ -182,7 +182,7 @@ export default function App() {
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* ── LEFT SIDEBAR ── */}
-        <aside style={sidebarStyle}>
+        <aside className="app-sidebar" style={sidebarStyle}>
           <div style={sidebarTitleStyle}>Tasks</div>
           <SidebarItem
             label="All tasks"
@@ -204,7 +204,7 @@ export default function App() {
         </aside>
 
         {/* ── MAIN CONTENT ── flex-column so table can fill remaining height */}
-        <main style={mainStyle}>
+        <main className="app-main" style={mainStyle}>
           {/* TAB BAR */}
           <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
             {(["models", "experiments", "hf-models"] as const).map((tab) => (
@@ -305,7 +305,7 @@ export default function App() {
             /* ── MAIN LIST VIEW — fills remaining height ── */
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
               {/* STATS BAR */}
-              <div style={statsGridStyle}>
+              <div className="stats-grid" style={statsGridStyle}>
                 <StatCard label="Total Models" value={totalModels} />
                 <StatCard label="Total Versions" value={totalVersions} />
                 <StatCard label="Tasks" value={totalTasks} />
@@ -629,12 +629,12 @@ const taskBadgeStyle: CSSProperties = {
 
 function aliasBadgeStyle(alias: string): CSSProperties {
   const colors: Record<string, { bg: string; fg: string }> = {
-    latest:     { bg: "#3D3D3D", fg: "#9CA3AF" },
-    staging:    { bg: "#1E3A5F", fg: "#60A5FA" },
-    production: { bg: "#14532D", fg: "#4ADE80" },
-    archived:   { bg: "#78350F", fg: "#FCD34D" },
+    latest:     { bg: "var(--stage-neutral-bg)", fg: "var(--stage-neutral-fg)" },
+    staging:    { bg: "var(--stage-info-bg)", fg: "var(--stage-info-fg)" },
+    production: { bg: "var(--stage-success-bg)", fg: "var(--stage-success-fg)" },
+    archived:   { bg: "var(--stage-warning-bg)", fg: "var(--stage-warning-fg)" },
   };
-  const c = colors[alias] ?? { bg: "#3D3D3D", fg: "#9CA3AF" };
+  const c = colors[alias] ?? { bg: "var(--stage-neutral-bg)", fg: "var(--stage-neutral-fg)" };
   return {
     background: c.bg,
     color: c.fg,
